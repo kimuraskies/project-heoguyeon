@@ -510,7 +510,7 @@ function simGame(cfgH, cfgA, opts){
     }
     if(state.inning>=maxInn){
       if(H.runs!==A.runs) break;
-      if(state.inning>=12) break; // ties allowed (12-inning limit)
+      if(state.inning>=(opts.maxInnings||12)) break; // ties allowed (12-inning limit; postseason passes 15)
     }
     state.inning++;
     if(state.inning>15) break;
