@@ -537,28 +537,33 @@ function neutralCfg(team,gameNo){
   const rot=c.rotation.length?c.rotation:[c.bullpen[0]];
   return {teamId:team, lineup:c.lineup, bullpen:c.bullpen, closer:c.closer, spName:rot[gameNo%rot.length]};
 }
-function simSeries(seedHi, seedLo, bestOf){
-  // higher seed gets home for odd games; first to ceil(bestOf/2)
-  const need=Math.ceil(bestOf/2);
-  let wHi=0,wLo=0,gameNo=0; const games=[];
-  while(wHi<need && wLo<need){
-    const hiHome = (gameNo<2)|| (gameNo>=4); // simple home pattern favoring hi seed
+// KBO postseason: games go to 15 innings; a tie still counts as a game played but gives no win.
+// opts.hiStart = wins credited to the higher seed up front, opts.maxGames = series cap,
+// opts.hiHomeAll = every game at the higher seed's park (wild card).
+function simSeries(seedHi, seedLo, bestOf, opts){
+  opts=opts||{};
+  const need=Math.ceil(bestOf/2), maxGames=opts.maxGames||Infinity, hiStart=opts.hiStart||0;
+  let wHi=hiStart,wLo=0,gameNo=0; const games=[];
+  // stop once the lower seed can no longer reach `need` in the games left
+  while(wHi<need && wLo<need && need-wLo<=maxGames-gameNo){
+    const hiHome = opts.hiHomeAll || (gameNo<2)|| (gameNo>=4); // simple home pattern favoring hi seed
     const home= hiHome? seedHi:seedLo, away= hiHome? seedLo:seedHi;
-    const res=K.simGame(neutralCfg(home,gameNo),neutralCfg(away,gameNo),{});
-    let gw = res.winner;
-    if(gw===null){ gw = Math.random()<0.5?seedHi:seedLo; } // no ties in PS
-    if(gw===seedHi)wHi++; else wLo++;
+    const res=K.simGame(neutralCfg(home,gameNo),neutralCfg(away,gameNo),{maxInnings:15});
+    const gw = res.winner;
+    if(gw===seedHi)wHi++; else if(gw===seedLo)wLo++;
     games.push({home,away,hr:res.homeRuns,ar:res.awayRuns,winner:gw});
     gameNo++;
   }
-  return {winner: wHi>wLo?seedHi:seedLo, loser: wHi>wLo?seedLo:seedHi, wHi,wLo,games,bestOf};
+  const hiWon = wLo<need;
+  return {winner: hiWon?seedHi:seedLo, loser: hiWon?seedLo:seedHi, wHi,wLo,games,bestOf,hiStart};
 }
 function runPostseason(){
   const st=standings();
   const seed=st.slice(0,5).map(x=>x.t);
   const ps={seeds:seed, rounds:[]};
-  // wild card: 4 vs 5, single game, seed4 advances on tie (advantage)
-  const wc=simSeries(seed[3],seed[4],1);
+  // wild card: 4 vs 5 at seed4's park, up to 2 games; seed4 starts with a 1-win edge,
+  // so seed5 must win twice and a tie sends seed4 through
+  const wc=simSeries(seed[3],seed[4],3,{hiStart:1,maxGames:2,hiHomeAll:true});
   ps.rounds.push({name:"와일드카드", hi:seed[3], lo:seed[4], r:wc});
   const semi=simSeries(seed[2],wc.winner,5);
   ps.rounds.push({name:"준플레이오프", hi:seed[2], lo:wc.winner, r:semi});
@@ -633,6 +638,7 @@ function nextSeason(){
 const TABS=[["dash","🏠 대시보드"],["squad","👥 스쿼드"],["lineup","📋 라인업"],["sched","📅 일정/경기"],["stand","🏆 순위"],["leaders","📊 기록실"],["trade","🔁 트레이드"]];
 
 function render(){
+  autosave();
   // header
   $("teaminfo").innerHTML = `${teamDot(USER)} <b>${K.ROSTERS[USER].name}</b> · ${state.year} 시즌 · ${phaseLabel()}`;
   // tabs
@@ -1019,10 +1025,10 @@ function showPS(){
   const champ=ps.champion;
   const rounds=ps.rounds.map(rd=>{
     const r=rd.r;
-    const gl=r.games.map((g,i)=>`<div class="muted" style="font-size:12px">${i+1}차전: ${g.home} ${g.hr}:${g.ar} ${g.away} → ${g.winner} 승</div>`).join("");
+    const gl=r.games.map((g,i)=>`<div class="muted" style="font-size:12px">${i+1}차전: ${g.home} ${g.hr}:${g.ar} ${g.away} → ${g.winner? g.winner+' 승' : '무승부'}</div>`).join("");
     return `<div style="margin-bottom:12px;padding:10px;background:var(--panel2);border-radius:8px">
       <b>${rd.name}</b> — ${teamDot(rd.hi)}${rd.hi} vs ${teamDot(rd.lo)}${rd.lo}
-      <div style="margin:4px 0"><b class="win">승자: ${K.ROSTERS[r.winner].name}</b> (${r.bestOf===1?'단판':r.wHi+'-'+r.wLo})</div>${gl}</div>`;
+      <div style="margin:4px 0"><b class="win">승자: ${K.ROSTERS[r.winner].name}</b> (${r.hiStart? (r.wHi-r.hiStart)+'-'+r.wLo+', 상위 시드 1승 어드밴티지' : r.wHi+'-'+r.wLo})</div>${gl}</div>`;
   }).join("");
   const userRank=state.history.length?state.history[state.history.length-1].userRank:'-';
   const userMsg = champ===USER? '🏆🏆 KIA 타이거즈 한국시리즈 우승!! 🏆🏆' :
@@ -1041,27 +1047,44 @@ function showPS(){
 }
 
 // ---------- save / load ----------
+// Manual save and autosave use separate slots, so autosave never overwrites the manual one.
+const SAVE_KEY='kbo_manager_save', AUTOSAVE_KEY='kbo_manager_autosave', SAVE_VERSION=1;
+function saveData(){ return JSON.stringify({ v:SAVE_VERSION, savedAt:Date.now(), state, teamGameCount, rosters:K.ROSTERS }); }
+function applySave(data){
+  // restore rosters in place
+  for(const t in data.rosters){ K.ROSTERS[t].batters=data.rosters[t].batters; K.ROSTERS[t].pitchers=data.rosters[t].pitchers; K.ROSTERS[t].color=data.rosters[t].color; }
+  state=data.state; teamGameCount=data.teamGameCount; state.pendingGame=null;
+}
+function autosave(){
+  if(!state) return;
+  try{ localStorage.setItem(AUTOSAVE_KEY, saveData()); }catch(e){ console.warn('자동저장 실패', e); }
+}
+function restoreAutosave(){
+  try{
+    const raw=localStorage.getItem(AUTOSAVE_KEY);
+    if(!raw) return false;
+    const data=JSON.parse(raw);
+    if((data.v||0)>SAVE_VERSION) return false; // written by a newer version of the game
+    applySave(data); return true;
+  }catch(e){ console.warn('자동저장 복구 실패', e); return false; }
+}
 function save(){
   try{
-    const data={ state, teamGameCount, rosters:K.ROSTERS };
-    localStorage.setItem('kbo_manager_save', JSON.stringify(data));
+    localStorage.setItem(SAVE_KEY, saveData());
     alert('저장 완료! (이 브라우저에 저장됨)');
   }catch(e){ alert('저장 실패: '+e.message); }
 }
 function load(){
   try{
-    const raw=localStorage.getItem('kbo_manager_save');
+    const raw=localStorage.getItem(SAVE_KEY);
     if(!raw){ alert('저장된 게임이 없습니다.'); return; }
-    const data=JSON.parse(raw);
-    // restore rosters in place
-    for(const t in data.rosters){ K.ROSTERS[t].batters=data.rosters[t].batters; K.ROSTERS[t].pitchers=data.rosters[t].pitchers; K.ROSTERS[t].color=data.rosters[t].color; }
-    state=data.state; teamGameCount=data.teamGameCount; state.pendingGame=null;
+    applySave(JSON.parse(raw));
     const ro=document.getElementById('relay'); if(ro)ro.remove();
     closeModal(); currentTab="dash"; render();
     alert('불러오기 완료!');
   }catch(e){ alert('불러오기 실패: '+e.message); }
 }
-function confirmNew(){ if(confirm('새 게임을 시작하면 현재 진행 상황이 사라집니다. (저장은 유지됩니다) 계속할까요?')){ location.reload(); } }
+function confirmNew(){ if(confirm('새 게임을 시작하면 현재 진행 상황이 사라집니다. (저장은 유지됩니다) 계속할까요?')){ try{ localStorage.removeItem(AUTOSAVE_KEY); }catch(e){} location.reload(); } }
 
 // ---------- self test (dev) ----------
 function selfTest(){
@@ -1118,6 +1141,7 @@ window.Match=Match;
 function boot(){
   if(!K){ document.getElementById('view').innerHTML='<div class="card">엔진(core.js) 로드 실패. core.js가 같은 폴더에 있는지 확인하세요.</div>'; return; }
   initState();
+  restoreAutosave(); // pick up where the last session left off (refresh, closed tab)
   render();
 }
 boot();
