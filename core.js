@@ -326,12 +326,13 @@ function applyOutcome(state, outcome, batter){
     case "1B":
       if(b[2]){score(b[2]); b[2]=null;}
       if(b[1]){ if(rnd()<0.58){score(b[1]);} else {b[2]=b[1];} b[1]=null;}
-      if(b[0]){ if(rnd()<0.25){b[2]=b[0];} else {b[1]=b[0];} }
+      // 1st -> 3rd only if 3rd is empty (don't overwrite a runner held at 3rd)
+      if(b[0]){ if(!b[2] && rnd()<0.25){b[2]=b[0];} else {b[1]=b[0];} }
       b[0]=batter; break;
     case "2B":
       if(b[2]){score(b[2]); b[2]=null;}
       if(b[1]){score(b[1]); b[1]=null;}
-      if(b[0]){ if(rnd()<0.48){score(b[0]);} else {b[2]=b[0];} }
+      if(b[0]){ if(rnd()<0.48){score(b[0]);} else {b[2]=b[0];} b[0]=null; }
       b[1]=batter; break;
     case "3B":
       if(b[2]){score(b[2]);b[2]=null;}
