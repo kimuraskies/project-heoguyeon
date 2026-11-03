@@ -107,9 +107,11 @@ function ensurePlayer(p){
   if(p.yrs==null){ const h=hash(p.n+'y')%20; p.yrs = p.age>=35? 1+hash(p.n)%2 : h<3?1 : h<9?2 : h<15?3 : 4; }
   if(p.bench==null) p.bench=0;
 }
+function ensurePlayers(){ K.TEAM_IDS.forEach(t=>allPlayers(t).forEach(ensurePlayer)); }
 function ensure(){
   if(!state) return;
-  K.TEAM_IDS.forEach(t=>allPlayers(t).forEach(ensurePlayer));
+  ensurePlayers();
+  if(!state.user) state.user={name:'무명', team:USER, bg:'coach'}; // saves from before the setup screen
   if(!state.fm){
     state.fm={ inbox:[], nextId:1, autoRest:true, restNext:[], promises:[], lastMeeting:-99,
       lastWarn:-99, lastOffer:-99, lastTalk:{}, rt:{}, board:null, fin:null, fired:false, lastChance:false };
@@ -170,6 +172,94 @@ function act(id, i){
   m.done=true; m.result=res; m.read=true; render();
 }
 
+// ---------- manager & club identity ----------
+const MGR_BG={
+  rookie:{label:'신인 감독', d:'코치 경험 없이 바로 지휘봉을 잡았다.', fx:'이사회 신뢰도 50에서 시작', conf:50, mor:0},
+  coach: {label:'코치 출신', d:'오랜 코치 경력으로 구단의 신뢰를 받는다.', fx:'이사회 신뢰도 60에서 시작', conf:60, mor:3},
+  legend:{label:'레전드 출신', d:'선수 시절의 명성 덕분에 선수단이 잘 따른다.', fx:'신뢰도 55 · 선수단 사기 +10', conf:55, mor:10}
+};
+// readable accent per club (brand colors that are too dark on the dark UI are lifted)
+const TEAM_ACCENT={KIA:'#ea0029',LG:'#c30452','한화':'#fc4e00',SSG:'#ce0e2d','삼성':'#1d6fe0',NC:'#3f6fd1',KT:'#e4002b','롯데':'#d00f31','두산':'#4a5fd6','키움':'#b0123f'};
+function applyTheme(t){ document.documentElement.style.setProperty('--accent', TEAM_ACCENT[t]||'#ea0029'); }
+// one-line scouting summary: the best hitter and top two starters
+function teamPitch(t){
+  const r=K.ROSTERS[t];
+  const bat=r.batters.slice().sort((a,b)=>K.ovr(b)-K.ovr(a))[0];
+  const sp=r.pitchers.filter(p=>p.role==='SP').sort((a,b)=>K.ovr(b)-K.ovr(a)).slice(0,2);
+  return `${bat?bat.n+'을(를) 중심으로 한 타선과 ':''}${sp.map(p=>p.n).join('·')} 원투펀치로 가을야구에 도전!`;
+}
+
+// ---------- new career: manager profile + club selection ----------
+let setup={name:'', bg:'coach', team:null};
+function showSetup(){
+  ensurePlayers();
+  document.getElementById('tabs').hidden=true;
+  document.getElementById('teaminfo').innerHTML='<span class="muted">새 커리어</span>';
+  renderSetup();
+}
+function renderSetup(){
+  const ranks={}; K.TEAM_IDS.slice().sort((a,b)=>teamStrength(b)-teamStrength(a)).forEach((t,i)=>ranks[t]=i+1);
+  const card=t=>{
+    const r=K.ROSTERS[t], sel=setup.team===t, ex=expectationFor(ranks[t]);
+    const stars=r.batters.concat(r.pitchers).sort((a,b)=>K.ovr(b)-K.ovr(a)).slice(0,3);
+    return `<button class="setup-team${sel?' sel':''}" style="--tc:${TEAM_ACCENT[t]}" onclick="FM.setupPick('${q(t)}')" aria-pressed="${sel}">
+      <span class="row" style="gap:8px;flex-wrap:nowrap"><span class="teamdot" style="background:${r.color};box-shadow:0 0 0 2px ${TEAM_ACCENT[t]}"></span><b style="font-size:15px">${r.name}</b></span>
+      <span class="muted" style="font-size:12px">전력 ${ranks[t]}위 · 연봉 ${payroll(t)}억</span>
+      <span style="font-size:12px">핵심: ${stars.map(p=>`${p.n} <span class="muted">${K.ovr(p)}</span>`).join(', ')}</span>
+      <span class="pill" style="background:var(--panel);color:var(--dim);align-self:flex-start">이사회 목표: ${ex.label}</span></button>`;
+  };
+  const bgOpt=k=>{ const b=MGR_BG[k], sel=setup.bg===k;
+    return `<label class="setup-bg${sel?' sel':''}"><input type="radio" name="mgrbg" id="mgrbg-${k}" value="${k}" ${sel?'checked':''} onchange="FM.setupBg('${k}')">
+      <span><b>${b.label}</b><br><span class="muted" style="font-size:12px">${b.d}</span><br><span style="font-size:12px;color:var(--accent2)">${b.fx}</span></span></label>`; };
+  const t=setup.team, ready=!!t;
+  document.getElementById('view').innerHTML=`
+  <style>
+    .setup-team{display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-top:4px solid var(--tc);border-radius:10px;padding:12px;cursor:pointer;font:inherit;min-width:0}
+    .setup-team:hover,.setup-team:focus-visible{border-color:var(--tc);outline:none}
+    .setup-team.sel{border-color:var(--tc);background:color-mix(in srgb, var(--tc) 14%, var(--panel2))}
+    .setup-bg{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--panel2)}
+    .setup-bg.sel{border-color:var(--accent2)}
+    .setup-bg input{margin-top:3px}
+  </style>
+  <div class="card" style="margin-top:12px">
+    <h3 style="font-size:18px">⚾ 새 커리어 시작 <span class="tag">${state&&state.year||2026} 시즌</span></h3>
+    <div class="hint">감독 프로필을 정하고 지휘할 구단을 고르세요. 구단마다 전력과 이사회 기대치가 다릅니다.</div>
+  </div>
+  <div class="grid cols2" style="margin-top:14px;align-items:start">
+    <div class="card"><h3>👔 감독 프로필</h3>
+      <label for="mgrname" class="muted" style="font-size:12px">감독 이름</label>
+      <input id="mgrname" maxlength="12" placeholder="예: 김하늘" value="${esc(setup.name)}" oninput="FM.setupName(this.value)" style="width:100%;margin:4px 0 14px;font-size:15px;padding:8px 10px">
+      <div class="muted" style="font-size:12px;margin-bottom:6px">경력</div>
+      <div class="grid" style="gap:8px">${Object.keys(MGR_BG).map(bgOpt).join('')}</div>
+    </div>
+    <div class="card"><h3>🏟 선택한 구단</h3>
+      ${ready? `<div class="row" style="gap:10px"><span class="teamdot" style="width:22px;height:22px;background:${K.ROSTERS[t].color};box-shadow:0 0 0 2px ${TEAM_ACCENT[t]}"></span><b style="font-size:18px">${K.ROSTERS[t].name}</b></div>
+        <div class="muted" style="margin-top:8px">전력 평가 ${ranks[t]}위 · 이사회 목표: <b style="color:var(--txt)">${expectationFor(ranks[t]).label}</b></div>
+        <div class="hint" style="margin-top:6px">${teamPitch(t)}</div>`
+      : '<div class="muted">아래에서 구단을 선택하세요.</div>'}
+      <button class="btn primary" style="margin-top:14px;width:100%;padding:12px;font-size:15px${ready?`;background:${TEAM_ACCENT[t]};border-color:${TEAM_ACCENT[t]}`:''}" ${ready?'':'disabled'} onclick="FM.setupStart()">✍ 감독 취임하기</button>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">${K.TEAM_IDS.slice().sort((a,b)=>ranks[a]-ranks[b]).map(card).join('')}</div>
+  </div>`;
+}
+function setupPick(t){ setup.team=t; applyTheme(t); renderSetup(); }
+function setupBg(k){ setup.bg=k; renderSetup(); }
+function setupName(v){ setup.name=v; } // no re-render, so typing keeps focus
+function setupStart(){
+  if(!setup.team) return;
+  const name=(setup.name||'').trim().slice(0,12) || '무명';
+  document.getElementById('tabs').hidden=false;
+  beginCareer({name, team:setup.team, bg:setup.bg});
+}
+// called by the game once state exists for the new career
+function onCareerStart(){
+  ensure();
+  const bonus=(MGR_BG[state.user.bg]||MGR_BG.coach).mor;
+  if(bonus) allPlayers(USER).forEach(p=>{ p.mor=clampN(K.mor(p)+bonus,5,99); });
+}
+
 // ---------- board & finances ----------
 function teamStrength(t){
   const r=K.ROSTERS[t];
@@ -194,8 +284,8 @@ function boardStatus(){
 function confLabel(c){ return c>=80?'매우 만족':c>=60?'만족':c>=40?'보통':c>=20?'불만':'경질 위기'; }
 function seasonStart(first){
   const f=fm(), sr=strengthRank(USER), ex=expectationFor(sr);
-  const pay=payroll(USER);
-  f.board={expect:ex, conf: first? 60 : clampN(Math.round((f.board?f.board.conf:60)*0.5+30),20,90), lastReview:0, strengthRank:sr};
+  const pay=payroll(USER), bg=MGR_BG[state.user.bg]||MGR_BG.coach;
+  f.board={expect:ex, conf: first? bg.conf : clampN(Math.round((f.board?f.board.conf:60)*0.5+30),20,90), lastReview:0, strengthRank:sr};
   const balance = f.fin? f.fin.balance : 30;
   f.fin={balance, budget:Math.round(pay*1.06+4), rev:0, exp:0, attTotal:0, homeGames:0};
   f.rt={}; f.promises=[]; f.restNext=[]; f.lastMeeting=-99; f.lastWarn=-99; f.lastOffer=-99; f.lastTalk={};
@@ -203,6 +293,10 @@ function seasonStart(first){
     `감독님, ${state.year} 시즌을 앞두고 이사회의 기대치를 전달드립니다.\n\n` +
     `• 전력 평가: 리그 ${sr}위권\n• 시즌 목표: ${ex.label}\n• 연봉 예산: ${f.fin.budget}억 원 (현재 연봉 총액 ${pay}억 원)\n\n` +
     `12경기마다 진행 상황을 평가합니다. 목표를 크게 밑돌면 감독 거취를 재검토할 수 있습니다.`, [{label:'확인', fn:'ok'}]);
+  // sent after the target memo so it sits on top of the inbox
+  if(first) send('구단주','🤝',`${state.user.name} 감독님, ${K.ROSTERS[USER].name}에 오신 것을 환영합니다`,
+    `${state.user.name} 감독님의 취임을 진심으로 환영합니다.\n감독님의 경력(${bg.label})을 믿고 팀을 맡깁니다.\n\n` +
+    `받은편지함으로 이사회, 코칭스태프, 선수, 다른 구단의 연락이 옵니다. 결정이 필요한 메시지에는 직접 답해 주세요.`, []);
 }
 function boardReview(){
   const f=fm(), s=boardStatus(), b=f.board;
@@ -377,8 +471,9 @@ function checkStreak(){
   const gs=state.schedule.filter(g=>g.played&&(g.home===USER||g.away===USER));
   let w=0,l=0; for(let i=gs.length-1;i>=0;i--){ const g=gs[i], us=g.home===USER?g.hr:g.ar, th=g.home===USER?g.ar:g.hr;
     if(us>th){ if(l)break; w++; } else if(us<th){ if(w)break; l++; } else break; }
-  if(w===5||w===10) send('스포츠 뉴스','📰',`KIA, ${w}연승 질주!`,`KIA 타이거즈가 ${w}연승을 달렸습니다. 더그아웃 분위기가 최고조입니다.`,[]);
-  if(l===5||l===10) send('스포츠 뉴스','📰',`KIA, ${l}연패 수렁`,`KIA 타이거즈가 ${l}연패에 빠졌습니다. 팬들의 시선이 감독에게 쏠리고 있습니다. 팀 미팅을 고려해 보세요.`,[]);
+  const club=K.ROSTERS[USER].name;
+  if(w===5||w===10) send('스포츠 뉴스','📰',`${USER}, ${w}연승 질주!`,`${club}가 ${w}연승을 달렸습니다. 더그아웃 분위기가 최고조입니다.`,[]);
+  if(l===5||l===10) send('스포츠 뉴스','📰',`${USER}, ${l}연패 수렁`,`${club}가 ${l}연패에 빠졌습니다. 팬들의 시선이 ${state.user.name} 감독에게 쏠리고 있습니다. 팀 미팅을 고려해 보세요.`,[]);
 }
 function maybeTradeOffer(ug){
   const f=fm(); if(state.phase!=='regular' || ug-f.lastOffer<10 || Math.random()>0.08) return;
@@ -772,7 +867,7 @@ function showProfile(team,name){
     ${actions}`);
 }
 
-window.FM={ notify, ask, answer, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, showSetup, setupPick, setupBg, setupName, setupStart, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeBudget, doTrade, payroll, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance };
