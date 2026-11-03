@@ -16,6 +16,29 @@ function allPlayers(t){ return K.ROSTERS[t].batters.concat(K.ROSTERS[t].pitchers
 function userGamesPlayed(){ return state.schedule.slice(0,state.gameIdx).filter(g=>g.home===USER||g.away===USER).length; }
 function median(a){ const s=a.slice().sort((x,y)=>x-y); return s.length? s[Math.floor(s.length/2)] : 0; }
 
+// In-page replacements for alert()/confirm(), which embedded viewers block.
+function notify(msg, ms){
+  let box=document.getElementById('toasts');
+  if(!box){ box=document.createElement('div'); box.id='toasts';
+    box.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;'+
+      'padding:0 max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px))';
+    document.body.appendChild(box); }
+  const t=document.createElement('div');
+  t.setAttribute('role','status');
+  t.style.cssText='pointer-events:auto;cursor:pointer;max-width:520px;width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-left:4px solid var(--accent2);border-radius:10px;padding:10px 14px;white-space:pre-wrap;line-height:1.5;box-shadow:0 6px 24px rgba(0,0,0,.45)';
+  t.textContent=msg; t.onclick=()=>t.remove();
+  box.appendChild(t);
+  setTimeout(()=>t.remove(), ms || Math.min(9000, 2800+String(msg).length*40));
+}
+let pendingAsk=null;
+function ask(msg, yesLabel, onYes){
+  pendingAsk=onYes;
+  modal(`<h2 style="font-size:18px">확인</h2><div style="white-space:pre-wrap;line-height:1.6;margin:8px 0 16px">${esc(msg)}</div>
+    <div class="row" style="gap:8px;justify-content:flex-end"><button class="btn" onclick="App.closeModal()">취소</button>
+    <button class="btn primary" onclick="FM.answer()">${esc(yesLabel)}</button></div>`);
+}
+function answer(){ const f=pendingAsk; pendingAsk=null; closeModal(); if(f) f(); }
+
 // 40..99 rating -> FM 1..20 attribute
 function attr20(v){ return clampN(Math.round((v-35)/3.2),1,20); }
 function attrColor(a){ return a>=16?'#36c275':a>=11?'#d6e2c4':a>=6?'#e0b44c':'#e0556a'; }
@@ -143,7 +166,7 @@ const ACTIONS={
 function act(id, i){
   const m=fm().inbox.find(x=>x.id===id); if(!m||m.done) return;
   const a=m.actions[i]; const res=ACTIONS[a.fn](m,a.arg||{});
-  if(String(res).startsWith('❌')){ alert(res.replace(/^❌ /,'')); return; } // stays open
+  if(String(res).startsWith('❌')){ notify(res.replace(/^❌ /,'')); return; } // stays open
   m.done=true; m.result=res; m.read=true; render();
 }
 
@@ -467,11 +490,11 @@ function offseasonMoves(){
   f.offseasonNews={left, retired};
 }
 // "next season" button: warn about contract talks that will end with the player leaving
-function confirmNextSeason(){
+function confirmNextSeason(go){
   ensure();
   const open=fm().inbox.filter(m=>!m.done && m.actions.some(a=>a.fn==='renew'));
-  if(!open.length) return true;
-  return confirm(`재계약 협상 ${open.length}건이 남아 있습니다 (${open.map(m=>m.actions[0].arg.n).join(', ')}).\n지금 다음 시즌을 시작하면 이 선수들은 FA로 떠납니다. 계속할까요?`);
+  if(!open.length){ go(); return; }
+  ask(`재계약 협상 ${open.length}건이 남아 있습니다 (${open.map(m=>m.actions[0].arg.n).join(', ')}).\n지금 다음 시즌을 시작하면 이 선수들은 FA로 떠납니다.`, '다음 시즌 시작', go);
 }
 function onNewSeason(){
   const f=fm(); seasonStart(false);
@@ -488,7 +511,7 @@ function recentRecord(){
 }
 function meetingReady(){ return userGamesPlayed()-fm().lastMeeting>=10; }
 function teamMeeting(){
-  if(!meetingReady()){ alert('팀 미팅은 10경기에 한 번만 열 수 있습니다.'); return; }
+  if(!meetingReady()){ notify('팀 미팅은 10경기에 한 번만 열 수 있습니다.'); return; }
   const rr=recentRecord();
   modal(`<span class="closeX" onclick="App.closeModal()">×</span><h2>📣 팀 미팅</h2>
     <div class="muted">최근 5경기 ${rr.w}승 ${rr.l}패 · 선수단 평균 사기 ${moraleLabel(avgMorale(USER))}</div>
@@ -521,7 +544,7 @@ function meeting(kind){
 function talk(n, kind){
   const p=findPlayer(USER,n); if(!p) return;
   const f=fm(), ug=userGamesPlayed(), key='talk|'+n;
-  if(ug-(f.lastTalk[key]||-99)<10){ alert('같은 선수와의 면담은 10경기에 한 번만 할 수 있습니다.'); return; }
+  if(ug-(f.lastTalk[key]||-99)<10){ notify('같은 선수와의 면담은 10경기에 한 번만 할 수 있습니다.'); return; }
   f.lastTalk[key]=ug;
   const rt=ratingsOf(USER,n), form=rt&&rt.last.length? rt.last.reduce((a,b)=>a+b,0)/rt.last.length : 6.3;
   const k=pers(p).k; let d, msg;
@@ -538,10 +561,13 @@ function setAutoRest(v){ fm().autoRest=!!v; render(); }
 function releasePlayer(n){
   const p=findPlayer(USER,n); if(!p) return;
   const r=K.ROSTERS[USER];
-  if(p.type==='B' && r.batters.filter(x=>!K.isInjured(x)).length<=10){ alert('타자가 부족해 방출할 수 없습니다 (최소 10명).'); return; }
-  if(p.type==='P' && r.pitchers.filter(x=>!K.isInjured(x)).length<=8){ alert('투수가 부족해 방출할 수 없습니다 (최소 8명).'); return; }
+  if(p.type==='B' && r.batters.filter(x=>!K.isInjured(x)).length<=10){ notify('타자가 부족해 방출할 수 없습니다 (최소 10명).'); return; }
+  if(p.type==='P' && r.pitchers.filter(x=>!K.isInjured(x)).length<=8){ notify('투수가 부족해 방출할 수 없습니다 (최소 8명).'); return; }
   const cost=Math.round(p.sal*Math.max(1,p.yrs)*0.5*10)/10;
-  if(!confirm(`${n}을(를) 방출합니다. 잔여 계약의 절반인 ${cost}억 원을 위약금으로 지급합니다. 계속할까요?`)) return;
+  ask(`${n}을(를) 방출합니다. 잔여 계약의 절반인 ${cost}억 원을 위약금으로 지급합니다.`, '방출', ()=>doRelease(p,n,cost));
+}
+function doRelease(p,n,cost){
+  const r=K.ROSTERS[USER];
   if(p.type==='B') r.batters=r.batters.filter(x=>x!==p); else r.pitchers=r.pitchers.filter(x=>x!==p);
   const f=fm(); f.fin.balance-=cost; f.fin.exp+=cost;
   f.promises=f.promises.filter(pr=>pr.n!==n); f.restNext=f.restNext.filter(x=>x!==n);
@@ -746,7 +772,7 @@ function showProfile(team,name){
     ${actions}`);
 }
 
-window.FM={ ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ notify, ask, answer, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeBudget, doTrade, payroll, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance };
