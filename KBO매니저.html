@@ -93,13 +93,20 @@ footer{text-align:center;color:var(--dim);font-size:11px;margin-top:30px;line-he
 .mu-tag{display:inline-block;color:#fff;font-size:11px;font-weight:800;border-radius:4px;padding:1px 4px;margin-right:5px;vertical-align:1px}
 .mu-vs{color:var(--dim);font-weight:800;font-size:16px;opacity:.55;letter-spacing:1px}
 .bc{border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
-.bc-cap{padding:10px 12px;font-size:14px;background:var(--panel2)}
+.bc-cap{padding:11px 12px;font-size:14px;background:var(--panel2);min-height:74px}
+.cm-now{font-size:15px;font-weight:700;line-height:1.45;transform-origin:left center}
+.cm-quiet{color:var(--txt);font-weight:600}
+.cm-tense{color:var(--accent2)}
+.cm-big{color:var(--accent2);font-size:17px;font-weight:800;animation:cmPop .45s ease-out}
+.cm-prev{font-size:12px;color:var(--dim);margin-top:4px;line-height:1.4}
+@keyframes cmPop{0%{transform:scale(.94);opacity:.3}60%{transform:scale(1.03)}100%{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.cm-big{animation:none}}
 .wp{padding:10px 12px 8px;border-top:1px solid var(--line)}
 .wp-line{font-size:14px;margin-bottom:7px}
 .wp-bar{height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.12)}
 .wp-bar span{display:block;height:100%;transition:width .4s}
 .pl-list{padding:4px 12px 12px;display:flex;flex-direction:column;gap:6px;max-height:156px;overflow:auto}
-.pl-row{display:grid;grid-template-columns:20px 62px 1fr auto;align-items:center;gap:8px;font-size:13px}
+.pl-row{display:grid;grid-template-columns:20px 76px 1fr auto;align-items:center;gap:8px;font-size:13px}
 .pl-no{width:19px;height:19px;border-radius:50%;color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center}
 .pl-velo,.pl-cnt{color:var(--dim);font-variant-numeric:tabular-nums}
 .mu-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11.5px;color:var(--dim);margin:10px 0}
@@ -345,11 +352,11 @@ function openPreview(){
 }
 
 // ---------- live relay ----------
-const Match={ game:null, idx:null, timer:null, speed:650, paused:true, _ended:false, panel:null, ab:null, feed:null,
+const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[], _mult:1, _ended:false, panel:null, ab:null, feed:null,
   start(){
     const idx=state.pendingGame; const g=state.schedule[idx];
     this.idx=idx; this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away));
-    this._ended=false; this.paused=false; this.panel=null; this.feed=[]; this.ab=null;
+    this._ended=false; this.paused=false; this.panel=null; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
     closeModal();
     let o=document.getElementById('relay'); if(o)o.remove();
     o=el('<div id="relay" class="modal-bg" style="align-items:stretch;padding:0"></div>');
@@ -357,18 +364,28 @@ const Match={ game:null, idx:null, timer:null, speed:650, paused:true, _ended:fa
     this.renderLive();
     this._tick();
   },
-  _tick(){ if(this.paused) return; this._do(); if(!this._ended) this.timer=setTimeout(()=>this._tick(), this.speed); },
+  _tick(){ if(this.paused) return; this._do(); if(!this._ended) this.timer=setTimeout(()=>this._tick(), this.speed*(this._mult||1)); },
+  _say(line){ this.comm.unshift(line); this.comm.length=Math.min(this.comm.length,4); this._mult=line.wait||1; },
+  // one beat of the broadcast: batter intro → (lead-in line → pitch) × n → [batted-ball suspense] → result
   _do(){
-    const g=this.game;
-    if(g.over && (!this.ab || this.ab.committed)){ this.end(); return; }
-    if(!this.ab){ const p=g.prepareAB(); if(!p){ this.end(); return; } this.ab={pitches:p.pitches,shown:0,committed:false,pitName:p.pitName,batName:p.batName,off:p.off,def:p.def,slot:p.slot,ev:null,wp0:winProb(g)}; this.renderLive(); return; }
-    if(this.ab.shown < this.ab.pitches.length){ this.ab.shown++; this.renderLive(); return; }
-    if(!this.ab.committed){ const ev=g.commitAB(); this.ab.committed=true; this.ab.ev=ev; if(ev)this.feed.unshift(ev); this.renderLive(); return; }
-    this.ab=null; this.renderLive();
+    const g=this.game, ab=this.ab;
+    if(g.over && (!ab || ab.committed)){ this.end(); return; }
+    if(!ab){ const p=g.prepareAB(); if(!p){ this.end(); return; }
+      this.ab={pitches:p.pitches,shown:0,pre:false,susp:false,committed:false,pitName:p.pitName,batName:p.batName,off:p.off,def:p.def,slot:p.slot,oc:p.oc,ev:null,wp0:winProb(g)};
+      this._say(Comm.intro(g,this.ab)); this.renderLive(); return; }
+    if(ab.shown < ab.pitches.length){
+      if(!ab.pre){ ab.pre=true; this._say(Comm.prePitch(g,ab)); this.renderLive(); return; }
+      ab.pre=false; ab.shown++; this._say(Comm.pitch(g,ab)); this.renderLive(); return; }
+    if(!ab.committed){
+      if(ab.pitches[ab.pitches.length-1].res==='IP' && !ab.susp){ ab.susp=true; this._say(Comm.suspense(g,ab)); this.renderLive(); return; }
+      const ev=g.commitAB(); ab.committed=true; ab.ev=ev;
+      if(ev){ const line=Comm.result(g,ab,ev); ev.call=line.t; this.feed.unshift(ev); this._say(line); }
+      this.renderLive(); return; }
+    this.ab=null; this._mult=0.5; this.renderLive();
   },
   play(){ if(this._ended)return; this.paused=false; this.renderLive(); this._tick(); },
   pause(){ this.paused=true; clearTimeout(this.timer); this.renderLive(); },
-  stepOne(){ this.paused=true; clearTimeout(this.timer); this._do(); },
+  stepOne(){ this.paused=true; clearTimeout(this.timer); this._do(); while(!this._ended&&this.ab&&(this.ab.pre||(this.ab.susp&&!this.ab.committed))) this._do(); },
   toEnd(){ this.paused=true; clearTimeout(this.timer);
     if(this.ab && !this.ab.committed){ const ev=this.game.commitAB(); if(ev)this.feed.unshift(ev); }
     this.ab=null;
@@ -522,6 +539,106 @@ function pitchList(pitches){
   return `<div class="pl-list">${rows.reverse().join('')}</div>`;
 }
 
+// ----- play-by-play commentary (FM-style text lines) -----
+// each line: {t:text, k:'quiet'|'call'|'tense'|'big', wait: how long the next beat waits, as a multiple of the speed}
+const Comm={
+  pick(a){ return a[Math.floor(Math.random()*a.length)]; },
+  outsTxt(n){ return n===0?'무사':n+'사'; },
+  basesTxt(b){ const on=[b[0]?1:0,b[1]?2:0,b[2]?3:0].filter(Boolean); return !on.length?'주자 없음':on.length===3?'만루':on.join(',')+'루'; },
+  // what rides on this plate appearance, from the batting side's view
+  stakes(g,off){
+    const def=off===g.h?g.a:g.h, diff=g.score[off]-g.score[def], onBase=g.bases.filter(Boolean).length, late=g.inning>=7;
+    if(g.half==='bottom'&&g.inning>=9&&off===g.h&&diff<=0&&onBase+1>-diff) return {t:diff===0?'끝내기 찬스!':'한 방이면 끝내기 역전!',hot:true};
+    if(diff<0&&onBase+1>-diff) return {t:'한 방이면 역전!',hot:late||onBase>=2};
+    if(diff<0&&onBase+1===-diff) return {t:'동점 주자가 타석에 있습니다.',hot:late};
+    if(diff===0&&onBase&&late) return {t:'균형을 깰 기회!',hot:true};
+    if(onBase===3) return {t:'만루 찬스!',hot:true};
+    if((g.bases[1]||g.bases[2])&&late&&Math.abs(diff)<=2) return {t:'득점권 찬스.',hot:true};
+    return null;
+  },
+  intro(g,ab){
+    const x=g.box[ab.off].bat[ab.batName], today=x&&x.PA?`오늘 ${x.AB}타수 ${x.H}안타`:'오늘 첫 타석';
+    const st=this.stakes(g,ab.off);
+    return {t:`${ab.slot}번 타자 ${ab.batName}, 타석에 들어섭니다. ${today}. ${this.outsTxt(g.outs)} ${this.basesTxt(g.bases)}${st?' — '+st.t:''}`, k:st&&st.hot?'tense':'quiet', wait:1.2};
+  },
+  prePitch(g,ab){
+    const c=countOf(ab.pitches.slice(0,ab.shown)), n=ab.shown+1, P=ab.pitName, B=ab.batName;
+    const st=this.stakes(g,ab.off), hot=!!(st&&st.hot);
+    if(c.b===3&&c.s===2) return {t:`풀카운트… ${P}, 운명의 ${n}구!`,k:'tense',wait:1.1};
+    if(c.s===2) return {t:this.pick([`투 스트라이크. ${P}, 결정구를 고릅니다…`,`${B}, 몰렸습니다. ${n}구째…`,`승부구가 들어갑니다…`]),k:hot?'tense':'call',wait:0.9};
+    if(c.b===3) return {t:this.pick([`쓰리 볼. 스트라이크가 필요한 ${P}…`,`볼넷 위기, ${P}의 ${n}구…`]),k:'call',wait:0.9};
+    if(g.bases.some(Boolean)&&Math.random()<0.4) return {t:this.pick(['세트포지션… 주자를 한번 쳐다봅니다.','짧은 세트포지션에서…']),k:hot?'tense':'quiet',wait:0.8};
+    return {t:this.pick([`${P}, 사인을 교환합니다…`,`${P}, 와인드업…`,`${P}, ${n}구째…`,`${B}, 배트를 고쳐 쥡니다…`,'포수가 미트를 내밀고…']),k:hot?'tense':'quiet',wait:0.75};
+  },
+  // location in the batter's terms (inside/outside depends on which box he stands in)
+  where(p,ab){
+    const rh=batSide(ab.batName,ab.pitName)!=='좌', inX=rh?p.x<0.42:p.x>0.58, outX=rh?p.x>0.58:p.x<0.42;
+    const v=p.y<0.36?'높은 ':p.y>0.64?'낮은 ':'';
+    return (inX?'몸쪽 ':outX?'바깥쪽 ':(v?'':'한가운데 '))+v;
+  },
+  pitch(g,ab){
+    const p=ab.pitches[ab.shown-1], c=countOf(ab.pitches.slice(0,ab.shown)), loc=this.where(p,ab);
+    const sp=p.type==='직구'&&p.velo>=150?`${p.velo}km 강속구`:`${p.velo}km ${p.type}`, cnt=` (${c.b}-${Math.min(c.s,2)})`;
+    // strikeouts get the big treatment only when something rides on them
+    const st=this.stakes(g,ab.off), kk=st&&st.hot?'big':'tense';
+    const inZone=p.x>=0.33&&p.x<=0.67&&p.y>=0.3&&p.y<=0.7, near=!inZone&&p.x>0.27&&p.x<0.73&&p.y>0.24&&p.y<0.76;
+    switch(p.res){
+      case 'B': if(c.b>=4) return {t:`${loc}${sp}… 볼! 볼넷입니다.`,k:'call'};
+        return near?{t:`${loc}${sp}… 아슬아슬하게 빠집니다. 볼!${cnt}`,k:'call'}:{t:`${loc}${sp}, 빠집니다. 볼.${cnt}`,k:'quiet'};
+      case 'S': return c.s>=3?{t:`${loc}${sp}! 루킹 삼진!! 방망이가 나오지 않습니다.`,k:kk,wait:1.3}:{t:`${loc}${sp}, 그대로 꽂힙니다. 스트라이크!${cnt}`,k:'call'};
+      case 'SW': return c.s>=3?{t:`${sp}에 헛스윙! 삼진!!`,k:kk,wait:1.3}:{t:`${loc}${sp}에 헛스윙!${cnt}`,k:'call'};
+      case 'F': return {t:this.pick(['뒤로 넘어가는 파울.','3루 쪽 관중석으로 파울.','1루 쪽 파울.','걷어냅니다, 파울.'])+cnt,k:'quiet'};
+      case 'IP': return {t:`${loc}${sp}… 쳤습니다!`,k:'tense',wait:0.7};
+      case 'HBP': return {t:`아! ${sp}가 몸에 맞습니다!`,k:'call'};
+    }
+    return {t:sp,k:'quiet'};
+  },
+  // beat between contact and the result; the wording sets how the play can end (a "deep" ball can't become a double play)
+  suspense(g,ab){
+    const oc=ab.oc, dpPossible=g.bases[0]&&g.outs<2;
+    let opts;
+    if(oc==='HR') opts=[['높이 떴습니다! 멀리, 멀리…','deep'],['잘 맞았습니다! 외야로 쭉 뻗어갑니다…','deep']];
+    else if(oc==='2B'||oc==='3B') opts=[['날카로운 타구! 외야로…','sharp'],['잘 맞았습니다! 외야로 쭉 뻗어갑니다…','deep']];
+    else if(oc==='1B') opts=[['날카로운 타구!','sharp'],['빗맞은 타구…','weak'],['맞았습니다! 타구는…','any']];
+    else opts=[['맞았습니다! 타구는…','any'],['빗맞은 타구…','weak'],['날카로운 타구!','sharp']].concat(dpPossible?[]:[['높이 떴습니다! 멀리, 멀리…','deep']]);
+    const o=this.pick(opts); ab.flavor=o[1];
+    return {t:o[0],k:'tense',wait:o[1]==='deep'?1.5:1.1};
+  },
+  result(g,ab,ev){
+    const P=a=>this.pick(a), off=ev.off, def=ev.def, before=ev.score[off]-ev.runs, other=ev.score[def], fl=ab.flavor;
+    let t='', k='call', wait=1.5;
+    switch(ev.oc){
+      case 'K': t='삼진 아웃.'; wait=1.1; break;
+      case 'BB': t=ev.runs?'밀어내기 볼넷! 한 점이 들어옵니다.':'볼넷으로 걸어 나갑니다.'; break;
+      case 'HBP': t=ev.runs?'밀어내기 사구! 한 점이 들어옵니다.':'몸에 맞는 공으로 1루에 나갑니다.'; break;
+      case 'GIDP': { const d=P([['유격수','6-4-3'],['2루수','4-6-3'],['3루수','5-4-3']]); t=`${d[0]} 땅볼… ${d[1]} 병살타! 두 개를 잡아냅니다.`; k='big'; break; }
+      case 'SF': t=`${P(['좌익수','중견수','우익수'])} 희생플라이! 3루 주자 홈인.`; break;
+      case 'OUT': {
+        const of=P(['좌익수','중견수','우익수']), inf=P(['유격수','2루수','3루수','1루수','투수']);
+        if(fl==='deep'){ t=`${of}, 뒤로… 뒤로… 담장 앞에서 잡아냅니다! 아웃.`; k='tense'; }
+        else if(fl==='weak') t=P([`${inf} 앞 땅볼, 1루에서 아웃.`,`내야 플라이, ${inf}가 잡습니다.`]);
+        else if(fl==='sharp') t=P([`${inf} 정면 직선타! 아웃.`,`${of} 정면으로 가는 타구, 잡혔습니다.`,`${inf}, 몸을 날려 잡아냅니다! 아웃!`]);
+        else t=P([`${inf} 땅볼, 1루에서 아웃.`,`${of} 플라이 아웃.`,`${inf} 땅볼, 깔끔하게 처리합니다.`]);
+        break; }
+      case '1B': t=fl==='weak'?P(['빗맞았지만 코스가 좋습니다! 안타!','내야 안타! 1루에서 살았습니다!']):P(['중전 안타!','3유간을 빠지는 좌전 안타!','1-2루간을 꿰뚫는 우전 안타!','투수 옆을 스치는 중전 안타!']); break;
+      case '2B': t=P(['좌중간을 가르는 2루타!','우익선상 2루타!','좌익선상을 타고 흐르는 2루타!','우중간 펜스까지 굴러가는 2루타!']); k='tense'; break;
+      case '3B': t=P(['우중간 깊숙한 3루타!','펜스 맞고 튀는 사이 3루까지! 3루타!']); k='tense'; break;
+      case 'HR': t=`넘어갔습니다!!! ${P(['좌측','가운데','우측'])} 담장을 넘기는 ${ev.batter}의 ${['','솔로 홈런','투런 홈런','쓰리런 홈런','만루 홈런'][ev.runs]||'홈런'}!`; k='big'; wait=2.4; break;
+    }
+    if(ev.runs&&ev.oc!=='HR'){ t+=` ${ev.runs}점 득점!`; wait=Math.max(wait,1.9); if(k==='call')k='tense'; }
+    if(ev.runs){
+      if(before<other&&ev.score[off]>other){ t+=' 역전!!'; k='big'; wait=2.4; }
+      else if(before<other&&ev.score[off]===other){ t+=' 동점!'; k='big'; wait=2.2; }
+      t+=` (${g.a} ${ev.score[g.a]} : ${ev.score[g.h]} ${g.h})`;
+    }
+    if(ev.walkoff){ t+=' 끝내기!!! 경기 끝!'; k='big'; wait=2.6; }
+    else if(g.over) t+=' 경기 종료!';
+    else if(ev.half!==g.half||ev.inning!==g.inning) t+=' 공수 교대.';
+    else if(['K','OUT','GIDP','SF'].includes(ev.oc)) t+=` ${g.outs}아웃.`;
+    return {t,k,wait};
+  }
+};
+
 function relayHTML(game,feed,M){
   if(!game) return '';
   const h=game.h, a=game.a, ab=M.ab;
@@ -566,8 +683,8 @@ function relayHTML(game,feed,M){
     <div style="${userPitching?'box-shadow:inset 0 0 0 1px var(--accent)':''}">${pSeason&&pSeason.G?`${pSeason.W}승 ${pSeason.L}패 · 평균자책 ${fmtEra(pSeason.ER,pSeason.OUT)}`:'시즌 첫 등판'}<br>오늘 ${psl?`${ipStr(psl.OUT)}이닝 · ${psl.SO}K · ${psl.ER}실점`:'0이닝'} · ${ptot}구 <span style="opacity:.7">(S${pstr} B${pball})</span></div>
     <div style="${userBatting?'box-shadow:inset 0 0 0 1px var(--accent)':''}">시즌 타율 ${matchAvg}${bSeason&&bSeason.AB>0?` · ${bSeason.HR}홈런 ${bSeason.RBI}타점`:''}<br>오늘 ${bToday&&bToday.PA?`${bToday.AB}타수 ${bToday.H}안타${bToday.HR?' '+bToday.HR+'홈런':''}${bToday.RBI?' '+bToday.RBI+'타점':''}`:'첫 타석'}</div>
   </div>`;
-  const lastP = shown[shown.length-1];
-  const caption = ab ? (committed&&ab.ev ? `<b>${batName}</b> : ${ab.ev.desc}` : lastP ? `<b>${batName}</b> : ${shown.length}구째 ${PITCHLABEL[lastP.res]||''}` : `<b>${batName}</b> 타석 입장`) : (game.over?'경기 종료':'다음 타자 준비 중');
+  const cm=M.comm||[], cur=cm[0];
+  const caption = cur ? `<div class="cm-now cm-${cur.k||'call'}">${cur.t}</div>${cm.slice(1,3).map(l=>`<div class="cm-prev">${l.t}</div>`).join('')}` : (game.over?'경기 종료':'플레이볼!');
   // win probability for the user's club, and how much the last play moved it
   const wpH=winProb(game), wpU=USER===h?wpH:1-wpH;
   let wpDelta='';
@@ -581,10 +698,10 @@ function relayHTML(game,feed,M){
         <button class="btn" onclick="Match.stepOne()">⏭ 한 구</button>
         <button class="btn" onclick="Match.toEnd()">⏩ 끝까지</button>
         <select onchange="Match.setSpeed(this.value)">
-          <option value="1100" ${M.speed==1100?'selected':''}>느리게</option>
-          <option value="650" ${M.speed==650?'selected':''}>보통</option>
-          <option value="300" ${M.speed==300?'selected':''}>빠르게</option>
-          <option value="90" ${M.speed==90?'selected':''}>매우 빠르게</option>
+          <option value="1900" ${M.speed==1900?'selected':''}>느리게</option>
+          <option value="1300" ${M.speed==1300?'selected':''}>보통</option>
+          <option value="700" ${M.speed==700?'selected':''}>빠르게</option>
+          <option value="250" ${M.speed==250?'selected':''}>매우 빠르게</option>
         </select>
       </div>`;
 
@@ -618,7 +735,7 @@ function relayHTML(game,feed,M){
     const big = (e.oc==='HR'||e.runs>0)?'font-weight:700;':'';
     return `<div style="padding:5px 8px;border-bottom:1px solid var(--line);font-size:13px;${big}">
       <span class="muted" style="font-size:11px">${e.inning}회${e.half==='top'?'초':'말'}</span>
-      <span style="color:${tcolor}">[${e.off}]</span> ${e.batter} — ${e.desc}
+      <span style="color:${tcolor}">[${e.off}]</span> ${e.batter} — ${e.call||e.desc}
       ${e.walkoff?'<span style="color:var(--accent2)"> 끝내기!</span>':''}
       <span class="muted" style="float:right">${e.score[a]}:${e.score[h]}</span></div>`;
   }).join('');
@@ -634,7 +751,7 @@ function relayHTML(game,feed,M){
     ${sb}
     ${resultBanner}
     ${matchup}
-    <div class="bc">${relayScene(game,shown,offId,defId,batName,pitName)}<div class="bc-cap">${caption}</div>${wpBox}${pitchList(shown)}</div>
+    <div class="bc">${relayScene(game,shown,offId,defId,batName,pitName)}<div class="bc-cap" aria-live="polite">${caption}</div>${wpBox}${pitchList(shown)}</div>
     ${stats}
     ${ctrl}
     ${interv}
