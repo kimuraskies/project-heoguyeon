@@ -687,8 +687,8 @@ IP.defId=function(){return this.half==='top'?this.h:this.a;};
 IP.dueBatterName=function(){var o=this.offId();return this.lineup[o][this.order[o]%this.lineup[o].length];};
 IP.dueBatter=function(){return getB(this.offId(), this.dueBatterName());};
 IP.curPitcher=function(){return getP(this.defId(), this.pitcher[this.defId()]);};
-IP.bench=function(t){var lu=this.lineup[t];return ROSTERS[t].batters.filter(function(b){return lu.indexOf(b.n)<0;});};
-IP.availPitchers=function(t){var used=this.pUsed[t];return ROSTERS[t].pitchers.filter(function(p){return used.indexOf(p.n)<0;});};
+IP.bench=function(t){var lu=this.lineup[t];return ROSTERS[t].batters.filter(function(b){return lu.indexOf(b.n)<0 && !isInjured(b);});};
+IP.availPitchers=function(t){var used=this.pUsed[t];return ROSTERS[t].pitchers.filter(function(p){return used.indexOf(p.n)<0 && !isInjured(p);});};
 IP.subPitcher=function(t,name){ if(this.pUsed[t].indexOf(name)>=0)return false; var p=getP(t,name); if(!p)return false; this.pitcher[t]=name; this.pUsed[t].push(name); this.pBF[t]=0; this.pRuns[t]=0; this.ptot[t]=0; this.pstr[t]=0; this.pball[t]=0; return true;};
 IP.pinchHit=function(t,name){ var lu=this.lineup[t]; if(lu.indexOf(name)>=0)return false; var p=getB(t,name); if(!p)return false; lu[this.order[t]%lu.length]=name; return true;};
 IP._autoManage=function(){
