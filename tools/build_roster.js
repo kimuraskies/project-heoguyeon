@@ -163,6 +163,8 @@ function pitcherRatings(p) {
 
 // ---- profile info ----
 function age(id) { const b = raw.info[id] && raw.info[id].birth; return b ? SEASON - +b.slice(0, 4) : 27; }
+// foreign players are paid in dollars on their KBO profile
+const isForeign = id => !!(raw.info[id] && raw.info[id].salary && raw.info[id].salary.unit === '달러');
 function salary(id) {
   const s = raw.info[id] && raw.info[id].salary; if (!s) return null;
   const eok = s.unit === '달러' ? s.amount * USD_KRW / 1e8 : s.amount / 1e4;
@@ -237,10 +239,12 @@ for (const [code, [key, name, color]] of Object.entries(TEAMS)) {
 }
 block += `};\n`;
 block += `var LEAGUE = ${JSON.stringify(LEAGUE)}; // ${SEASON} league rates the sim reproduces at all-70 ratings\n`;
+const foreign = Object.values(teams).flatMap(t => t.batters.concat(t.pitchers)).filter(p => isForeign(p.id)).map(p => p.n);
+block += `var FOREIGN = ${JSON.stringify(foreign)}; // paid in dollars = foreign-player quota\n`;
 const coreFile = path.join(ROOT, 'core.js');
 let core = fs.readFileSync(coreFile, 'utf8');
 const EOL = core.includes('\r\n') ? '\r\n' : '\n';
-const re = /var ROSTERS = \{[\s\S]*?\r?\n\};\r?\n(?:var LEAGUE = .*\r?\n)?/;
+const re = /var ROSTERS = \{[\s\S]*?\r?\n\};\r?\n(?:var LEAGUE = .*\r?\n)?(?:var FOREIGN = .*\r?\n)?/;
 if (!re.test(core)) { console.error('ROSTERS block not found in core.js'); process.exit(1); }
 core = core.replace(re, () => block.replace(/\n/g, EOL));
 fs.writeFileSync(coreFile, core);
