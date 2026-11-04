@@ -382,11 +382,38 @@ function positionIssues(teamId, lineup, positions){
   return out;
 }
 
+// ---- tactics ----
+// atk: 타격 성향, run: 주루, bunt: 희생번트, teamBat: 팀배팅(진루타), shift: 수비 시프트, bat: 배터리 볼배합, ibb: 고의4구, hook: 투수 교체 타이밍
+var DEFAULT_TAC={atk:"normal", run:"normal", bunt:"normal", teamBat:false, shift:"normal", bat:"normal", ibb:false, hook:"normal"};
+var TAC_LABELS={
+  atk:{normal:"보통", aggr:"초구부터 적극 타격", patient:"공 많이 보기"},
+  run:{normal:"보통", aggr:"적극 주루·도루", hold:"주루 자제"},
+  bunt:{normal:"접전 후반만", often:"적극 희생번트", never:"번트 없음"},
+  shift:{normal:"정상 수비", dp:"병살 시프트", infieldIn:"전진 수비", deep:"외야 깊게"},
+  bat:{normal:"보통", attack:"정면 승부", nibble:"유인구 위주"},
+  hook:{normal:"보통", quick:"빠른 교체", long:"길게 맡김"}
+};
+function tacOf(cfg){ var t={}, k; for(k in DEFAULT_TAC) t[k]=DEFAULT_TAC[k]; if(cfg&&cfg.tac) for(k in cfg.tac) if(cfg.tac[k]!=null) t[k]=cfg.tac[k]; return t; }
+// rate shifts for one plate appearance from both dugouts' settings and the base/out state
+function paMods(offTac, defTac, bases, outs){
+  var m={K:0,BB:0,HR:0,BIP:0,X2:0};
+  if(offTac.atk==="aggr"){ m.BB-=0.015; m.K-=0.008; m.HR+=0.002; m.BIP-=0.004; }
+  else if(offTac.atk==="patient"){ m.BB+=0.015; m.K+=0.012; m.HR-=0.001; }
+  if(offTac.teamBat && bases[1] && !bases[2] && outs===0){ m.K-=0.02; m.HR-=0.006; m.BIP-=0.006; }
+  if(defTac.bat==="attack"){ m.BB-=0.012; m.K-=0.004; m.HR+=0.003; m.BIP+=0.004; }
+  else if(defTac.bat==="nibble"){ m.BB+=0.014; m.K+=0.008; m.HR-=0.003; m.BIP-=0.004; }
+  if(defTac.shift==="infieldIn" && bases[2] && outs<2) m.BIP+=0.03;
+  else if(defTac.shift==="dp" && bases[0] && outs<2) m.BIP+=0.008;
+  else if(defTac.shift==="deep"){ m.X2-=0.05; m.BIP+=0.012; }
+  return m;
+}
+
 // ---- plate appearance simulation ----
 // engine calibration on top of LEAGUE (rate offsets; tuned with enginecheck, not data)
 var CAL = {K:0.017, BB:-0.005, HR:-0.0022, BIP:0};
 // returns one of: K,BB,HBP,HR,1B,2B,3B,OUT. def = fielding team's defense (70 = average)
-function simPA(bat, pit, fatigue, def){
+function simPA(bat, pit, fatigue, def, mods){
+  mods=mods||{K:0,BB:0,HR:0,BIP:0,X2:0};
   var fpen = Math.max(-3, (fatigue||0) + pitCarryFatigue(pit) - moraleMod(pit)); // reduces pitcher
   var stu = pit.stu - fpen, ctl = pit.ctl - fpen, mov = pit.mov - fpen*0.6;
   var bm = batTiredMod(bat) + moraleMod(bat);
@@ -394,14 +421,14 @@ function simPA(bat, pit, fatigue, def){
   var d = (def==null?70:def) - 70;
   // LEAGUE holds the real league rates; CAL offsets the in-game fatigue that keeps pitchers below their ratings,
   // so whole-season sims land on the real league numbers (tools/enginecheck.js --fatigue)
-  var pK  = clamp(LEAGUE.K + CAL.K + 0.0048*(stu - con), 0.03, 0.42);
-  var pBB = clamp(LEAGUE.BB + CAL.BB + 0.0040*(eye - ctl), 0.02, 0.21);
+  var pK  = clamp(LEAGUE.K + CAL.K + 0.0048*(stu - con) + mods.K, 0.03, 0.42);
+  var pBB = clamp(LEAGUE.BB + CAL.BB + 0.0040*(eye - ctl) + mods.BB, 0.02, 0.21);
   var pHBP= LEAGUE.HBP;
-  var pHR = clamp(LEAGUE.HR + CAL.HR + 0.0014*(pow-70) - 0.0011*(mov-70), 0.004, 0.10);
+  var pHR = clamp(LEAGUE.HR + CAL.HR + 0.0014*(pow-70) - 0.0011*(mov-70) + mods.HR, 0.004, 0.10);
   var rest = 1 - pK - pBB - pHBP - pHR;
   if(rest<0.05) rest=0.05;
   // fielders turn balls in play into outs: about 2 points of BABIP per point of team defense
-  var babip = clamp(LEAGUE.BIP + CAL.BIP + 0.0024*(con-70) + 0.0016*(bat.spd-70) - 0.0019*(mov-70) - 0.0020*d, 0.220, 0.400);
+  var babip = clamp(LEAGUE.BIP + CAL.BIP + 0.0024*(con-70) + 0.0016*(bat.spd-70) - 0.0019*(mov-70) - 0.0020*d + mods.BIP, 0.220, 0.400);
   var pHit = rest*babip;
   var r = rnd();
   if(r < pK) return "K";
@@ -414,7 +441,7 @@ function simPA(bat, pit, fatigue, def){
   r -= pHR;
   if(r < pHit){
     // good outfield arms and range hold extra-base hits to singles
-    var dShare = clamp(LEAGUE.X2 + 0.004*(pow-70) - 0.002*d, 0.12, 0.34);
+    var dShare = clamp(LEAGUE.X2 + 0.004*(pow-70) - 0.002*d + mods.X2, 0.08, 0.34);
     var tShare = clamp(LEAGUE.X3 + 0.0018*(bat.spd-70), 0.004, 0.05);
     var rr = rnd();
     if(rr < tShare) return "3B";
@@ -463,7 +490,7 @@ function applyOutcome(state, outcome, batter){
 }
 
 // blank stat lines
-function newBatStat(){return {G:0,PA:0,AB:0,H:0,_2B:0,_3B:0,HR:0,BB:0,HBP:0,SO:0,RBI:0,R:0,SB:0,CS:0};}
+function newBatStat(){return {G:0,PA:0,AB:0,H:0,_2B:0,_3B:0,HR:0,BB:0,HBP:0,SO:0,RBI:0,R:0,SB:0,CS:0,SH:0,IBB:0,GDP:0};}
 function newPitStat(){return {G:0,GS:0,W:0,L:0,SV:0,HD:0,OUT:0,H:0,R:0,ER:0,BB:0,SO:0,HR:0,BF:0,NP:0};}
 
 // ---- lineup building ----
@@ -538,7 +565,7 @@ function closerReady(teamId, name, used){
   return !!p && used.indexOf(name)<0 && !isInjured(p) && cond(p)>=TIRED_RP;
 }
 // how many pitches a starter throws before the manager goes to the pen
-function pitchLimit(p){ return clamp(Math.round(88 + (p.sta-70)*0.9), 70, 112); }
+function pitchLimit(p,hook){ return clamp(Math.round(88 + (p.sta-70)*0.9 + (hook==="quick"?-12:hook==="long"?10:0)), 60, 120); }
 
 // Simulate a full game without the play-by-play. cfg = {teamId, lineup[], positions[], spName, bullpen[], closer}
 // opts.maxInnings: 12 in the regular season (ties allowed), 15 in the postseason.
@@ -638,13 +665,17 @@ function locFor(res){
   return inZone();
 }
 function makePitch(pit,res){ var t=pickType(pit), loc=locFor(res); return {type:t.k,velo:pitchVelo(pit,t),res:res,x:loc.x,y:loc.y}; }
-function genPitchSeq(bat,pit,oc){
+function genPitchSeq(bat,pit,oc,extra){
   var seq=[],balls=0,strikes=0;
   function push(res){ seq.push(makePitch(pit,res)); }
   if(oc==='BB'){ var ts=Math.floor(rnd()*3); while(balls<4){ if(strikes<ts&&rnd()<0.4){push('S');strikes++;} else {push('B');balls++;} } }
   else if(oc==='K'){ var tb=Math.floor(rnd()*3),g=0; while(strikes<3&&g<10){ g++; if(balls<tb&&rnd()<0.45){push('B');balls++;} else { if(strikes===2&&rnd()<0.35){push('F');} else {push(rnd()<0.5?'SW':'S');strikes++;} } } }
   else if(oc==='HBP'){ var n=Math.floor(rnd()*2); for(var i=0;i<n;i++){ if(rnd()<0.5){push('B');balls++;}else{push('S');strikes++;} if(balls>=3||strikes>=2)break; } push('HBP'); }
   else { var tb2=Math.floor(rnd()*3),ts2=Math.floor(rnd()*3),g2=0; while((balls<tb2||strikes<ts2)&&g2<8){ g2++; if(balls<tb2&&(strikes>=ts2||rnd()<0.5)){push('B');balls++;} else { if(strikes===2&&rnd()<0.3){push('F');} else {push('S');strikes++;} } } push('IP'); }
+  if(extra && rnd()<extra && seq.length>=2){
+    var s2=0; for(var i=0;i<seq.length-1;i++){ var r=seq[i].res; if(r==='S'||r==='SW'||(r==='F'&&s2<2)) s2++; }
+    if(s2>=2) seq.splice(seq.length-1,0,makePitch(pit,'F'));
+  }
   return seq;
 }
 
@@ -662,6 +693,8 @@ function InteractiveGame(cfgH, cfgA, opts){
   this.lineup=both(function(c){return c.lineup.slice();});
   this.pos=both(function(c,t){ return (c.positions&&c.positions.length===c.lineup.length)? c.positions.slice() : autoPositions(t,c.lineup); });
   this.removed=both(function(){return [];}); // batters taken out of the game (pinch-hit for) can't come back
+  this.tac=both(function(c){return tacOf(c);});  // live tactics, changeable mid-game
+  this.cmd=both(function(){return null;});        // one-off order for the next plate appearance: 'bunt' | 'steal' | 'ibb'
   this.pitcher=both(function(c){return c.spName;}); this.pUsed=both(function(c){return [c.spName];});
   this.pBF=both(function(){return 0;}); this.pRuns=both(function(){return 0;});
   this.ptot=both(function(){return 0;}); this.pstr=both(function(){return 0;}); this.pball=both(function(){return 0;});
@@ -685,6 +718,8 @@ IP.dueBatterName=function(){var o=this.offId();return this.lineup[o][this.order[
 IP.dueBatter=function(){return getB(this.offId(), this.dueBatterName());};
 IP.curPitcher=function(){return getP(this.defId(), this.pitcher[this.defId()]);};
 IP.defense=function(t){ return teamDefense(t, this.lineup[t], this.pos[t]); };
+IP.setTac=function(t,k,v){ this.tac[t][k]=v; };
+IP.orderCmd=function(t,c){ this.cmd[t]=c; };
 IP.catcher=function(t){ var i=this.pos[t].indexOf('C'); return i>=0? getB(t,this.lineup[t][i]) : null; };
 IP.bench=function(t){var lu=this.lineup[t], gone=this.removed[t];return ROSTERS[t].batters.filter(function(b){return lu.indexOf(b.n)<0 && gone.indexOf(b.n)<0 && !isInjured(b);});};
 IP.availPitchers=function(t){var used=this.pUsed[t];return ROSTERS[t].pitchers.filter(function(p){return used.indexOf(p.n)<0 && !isInjured(p);});};
@@ -713,7 +748,8 @@ IP._autoManage=function(){
   var isSP=p.role==='SP' && this.pitcher[def]===this.sp[def];
   var change=false;
   if(isSP){
-    change = this.ptot[def]>=pitchLimit(p) || this.pRuns[def]>=5 || this.pBF[def]>=20+Math.round(p.sta*0.15);
+    var hk=this.tac[def].hook, runCap=hk==="quick"?4:hk==="long"?6:5;
+    change = this.ptot[def]>=pitchLimit(p,hk) || this.pRuns[def]>=runCap || this.pBF[def]>=20+Math.round(p.sta*0.15)+(hk==="long"?3:hk==="quick"?-3:0);
   } else {
     // a reliever gets about an inning: swap him at the start of a new inning once he has his three outs
     var newInning = this.outs===0 && !this.bases[0] && !this.bases[1] && !this.bases[2] && this.inning>this.pInn[def];
@@ -769,16 +805,38 @@ IP._decide=function(){
   this.decisions=dec;
 };
 // a stolen-base try instead of a pitch to the batter: fast runner on first, second open
-IP._stealTry=function(off,def){
-  var r=this.bases[0]; if(!r || this.bases[1] || this.outs>=2 && rnd()<0.5) return null;
+IP._stealTry=function(off,def,forced){
+  var r=this.bases[0]; if(!r || this.bases[1]) return null;
   var p=getB(off,r.n); if(!p) return null;
-  var diff=this.score[off]-this.score[def];
-  if(this.inning>=7 && Math.abs(diff)>=4) return null;
-  var tryP = p.spd>=72? (p.spd-64)*0.02 : 0.012;
-  if(rnd()>=tryP) return null;
+  if(!forced){
+    if(this.outs>=2 && rnd()<0.5) return null;
+    var diff=this.score[off]-this.score[def];
+    if(this.inning>=7 && Math.abs(diff)>=4) return null;
+    var run=this.tac[off].run;
+    var tryP = (p.spd>=72? (p.spd-64)*0.02 : 0.012) * (run==="aggr"?1.8:run==="hold"?0.25:1);
+    if(rnd()>=tryP) return null;
+  }
   var c=this.catcher(def), arm=c? c.arm-posFit(c,'C')*0.5 : 60;
-  var ok = rnd() < clamp(0.66 + (p.spd-75)*0.009 - (arm-70)*0.007, 0.45, 0.93);
+  var ok = rnd() < clamp(0.66 + (p.spd-75)*0.009 - (arm-70)*0.007 - (this.tac[off].run==="aggr"?0.04:0), 0.4, 0.93);
   return {runner:r.n, oc: ok?'SB':'CS'};
+};
+// sacrifice bunt: runner on first or second, nobody out (one out on the dugout's sign), weak bat or a tight late game
+IP._buntCall=function(off,def,bat,slot){
+  var b=this.bases, forced=this.cmd[off]==='bunt';
+  if(!(b[0]||b[1]) || this.outs>=2 || (!forced && this.outs>0)) return false;
+  if(forced) return true;
+  var mode=this.tac[off].bunt; if(mode==="never") return false;
+  var diff=this.score[off]-this.score[def], close=diff<=1&&diff>=-2;
+  if(mode==="often") return close && (batValue(bat)<72 || slot>=7) && rnd()<0.6;
+  return this.inning>=7 && diff<=0 && diff>=-1 && batValue(bat)<68 && rnd()<0.7;
+};
+// intentional walk: first base open, runner in scoring position, a dangerous hitter late in a close game
+IP._ibbCall=function(off,def,bat){
+  var b=this.bases;
+  if(this.cmd[def]==='ibb') return true;
+  if(!this.tac[def].ibb || b[0] || !(b[1]||b[2])) return false;
+  var diff=this.score[def]-this.score[off];
+  return this.inning>=7 && Math.abs(diff)<=2 && batValue(bat)>=78;
 };
 IP.prepareAB=function(){
   if(this.over) return null;
@@ -787,15 +845,28 @@ IP.prepareAB=function(){
   var pit=getP(def,this.pitcher[def]);
   var batName=this.dueBatterName(), bat=getB(off,batName);
   var slot=(this.order[off]%this.lineup[off].length)+1;
-  var st=this._stealTry(off,def);
+  if(this._ibbCall(off,def,bat)){
+    this.cmd[def]=null;
+    this._pending={kind:'ibb',off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:'IBB',pitches:[{type:'고의4구',velo:0,res:'IBB',x:0.5,y:0.5}],slot:slot};
+    return this._pending;
+  }
+  if(this._buntCall(off,def,bat,slot)){
+    this.cmd[off]=null;
+    var r=rnd(), boc = r < clamp(0.74+(bat.con-70)*0.004,0.55,0.9) ? 'SAC' : r < 0.95 ? 'FC' : 'BUNT1B';
+    var bp=[]; if(rnd()<0.35) bp.push(makePitch(pit,rnd()<0.5?'B':'F')); bp.push(makePitch(pit,'IP'));
+    this._pending={kind:'bunt',off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:boc,pitches:bp,slot:slot};
+    return this._pending;
+  }
+  var forcedSteal=this.cmd[off]==='steal'; if(forcedSteal) this.cmd[off]=null;
+  var st=this._stealTry(off,def,forcedSteal);
   if(st){
     this._pending={kind:'steal',off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:st.oc,runner:st.runner,
       pitches:[makePitch(pit, rnd()<0.6?'B':'S')],slot:slot};
     return this._pending;
   }
   var fatigue=Math.max(0,(this.pBF[def]-(pit.role==='SP'?18:4))*0.7);
-  var oc=simPA(bat,pit,fatigue,this.defense(def));
-  var pitches=genPitchSeq(bat,pit,oc);
+  var oc=simPA(bat,pit,fatigue,this.defense(def),paMods(this.tac[off],this.tac[def],this.bases,this.outs));
+  var pitches=genPitchSeq(bat,pit,oc,(this.tac[off].atk==="patient"?0.35:0)+(this.tac[def].bat==="nibble"?0.35:0));
   this._pending={off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:oc,pitches:pitches,slot:slot};
   return this._pending;
 };
@@ -819,24 +890,52 @@ IP.commitAB=function(){
   var bs=this._ensureBat(off,batName);
   bs.PA++; ps.BF++;
   var me={n:batName, p:p.pitName};
+  if(p.kind==='ibb'){
+    bs.BB++; ps.BB++; bs.IBB=(bs.IBB||0)+1;
+    var resI=applyOutcome(this,'BB',me); if(resI.runs){ bs.RBI+=resI.runs; resI.scorers.forEach(function(r){ self._run(off,def,r,false); }); ev.runs=resI.runs; }
+    ev.desc='고의4구';
+  } else if(p.kind==='bunt'){
+    var b=this.bases;
+    if(oc==='SAC'){ // batter out, everyone moves up
+      bs.SH=(bs.SH||0)+1; this._out(def);
+      var sc=[]; if(b[2]&&b[1]&&b[0]){ sc.push(b[2]); b[2]=null; }
+      if(b[1]&&!b[2]){ b[2]=b[1]; b[1]=null; } if(b[0]&&!b[1]){ b[1]=b[0]; b[0]=null; }
+      if(this.outs<3) sc.forEach(function(r){ bs.RBI++; self._run(off,def,r,false); ev.runs++; });
+      ev.desc='희생번트';
+    } else if(oc==='FC'){ // lead runner forced, batter safe at first
+      bs.AB++; this._out(def);
+      if(b[1]&&b[0]){ b[1]=b[0]; } else if(b[1]){ b[1]=null; }
+      b[0]=me; ev.desc='번트 실패 (선행 주자 아웃)';
+    } else { // bunt single
+      bs.AB++; bs.H++; ps.H++; this.hits[off]++;
+      var resB=applyOutcome(this,'BB',me); if(resB.runs){ bs.RBI+=resB.runs; resB.scorers.forEach(function(r){ self._run(off,def,r,false); }); ev.runs=resB.runs; }
+      ev.desc='번트 안타';
+    }
+  }
+  if(p.kind==='ibb'||p.kind==='bunt'){
+    if(this.half==='bottom'&&this.inning>=9&&this.score[this.h]>this.score[this.a]){ this.line[this.h].push(this.runsThisHalf); this.runsThisHalf=0; ev.walkoff=true; this.walkoff=true; this._finish(this.h); }
+    else if(this.outs>=3) this._endHalf();
+    ev.score={}; ev.score[this.h]=this.score[this.h]; ev.score[this.a]=this.score[this.a];
+    return ev;
+  }
   function credit(res,rbi,unearned){ if(!res.runs)return; if(rbi) bs.RBI+=res.runs; res.scorers.forEach(function(r){ self._run(off,def,r,unearned); }); ev.runs=res.runs; }
   var rbiTxt=function(){return ev.runs?' ('+ev.runs+'타점)':'';};
   var dfn=this.defense(def);
   if(oc==='OUT'){
-    var dp=clamp(0.12 + (dfn-70)*0.002 - (bat.spd-70)*0.002, 0.05, 0.2);
+    var dp=clamp(0.12 + (dfn-70)*0.002 - (bat.spd-70)*0.002 + (this.tac[def].shift==="dp"?0.05:0) - (this.tac[off].run==="aggr"?0.02:0), 0.04, 0.26);
     var err=clamp(0.03 - (dfn-70)*0.0009, 0.012, 0.05);
     if(rnd()<err){ oc='E'; ev.oc='E'; }
-    else if(this.bases[0]&&this.outs<2&&rnd()<dp){ this.bases[0]=null; this._out(def,2); bs.AB++; ev.oc='GIDP'; ev.desc='병살타'; oc='DONE'; }
+    else if(this.bases[0]&&this.outs<2&&rnd()<dp){ this.bases[0]=null; this._out(def,2); bs.AB++; ev.oc='GIDP'; ev.desc='병살타'; bs.GDP++; oc='DONE'; }
   }
   if(oc==='DONE'){}
   else if(oc==='K'){ bs.AB++; bs.SO++; ps.SO++; this._out(def); ev.desc='삼진 아웃'; }
   else if(oc==='E'){ bs.AB++; me.ue=true; credit(applyOutcome(this,'E',me),false,true); ev.desc='실책 출루'+(ev.runs?' ('+ev.runs+'점)':''); }
   else if(oc==='OUT'){
-    if(this.bases[2]&&this.outs<2&&rnd()<0.30){ var runner=this.bases[2]; this.bases[2]=null; bs.RBI++; this._out(def); this._run(off,def,runner,false); ev.oc='SF'; ev.runs=1; ev.desc='희생플라이 (1타점)'; }
+    if(this.bases[2]&&this.outs<2&&rnd()<(this.tac[def].shift==="infieldIn"?0.14:0.30)){ var runner=this.bases[2]; this.bases[2]=null; bs.RBI++; this._out(def); this._run(off,def,runner,false); ev.oc='SF'; ev.runs=1; ev.desc='희생플라이 (1타점)'; }
     else {
       bs.AB++; this._out(def); ev.desc='범타 아웃';
       // productive out: a runner on second moves up to third
-      if(this.outs<3 && this.bases[1] && !this.bases[2] && rnd()<0.35){ this.bases[2]=this.bases[1]; this.bases[1]=null; ev.adv=true; }
+      if(this.outs<3 && this.bases[1] && !this.bases[2] && rnd()<(this.tac[off].teamBat?0.7:0.35)){ this.bases[2]=this.bases[1]; this.bases[1]=null; ev.adv=true; }
     }
   }
   else if(oc==='BB'){ bs.BB++; ps.BB++; credit(applyOutcome(this,'BB',me),true); ev.desc='볼넷'+rbiTxt(); }
@@ -847,7 +946,7 @@ IP.commitAB=function(){
   else if(oc==='HR'){ bs.AB++; bs.H++; bs.HR++; ps.HR++; ps.H++; this.hits[off]++; credit(applyOutcome(this,'HR',me),true); ev.desc=(ev.runs>1?ev.runs+'점 ':'')+'홈런!'; }
   // walk-off or half end
   if(this.half==='bottom'&&this.inning>=9&&this.score[this.h]>this.score[this.a]){
-    this.line[this.h].push(this.runsThisHalf); this.runsThisHalf=0; ev.walkoff=true; this._finish(this.h);
+    this.line[this.h].push(this.runsThisHalf); this.runsThisHalf=0; ev.walkoff=true; this.walkoff=true; this._finish(this.h);
   } else if(this.outs>=3){ this._endHalf(); }
   ev.score={}; ev.score[this.h]=this.score[this.h]; ev.score[this.a]=this.score[this.a];
   return ev;
@@ -858,7 +957,8 @@ IP.result=function(){
     homeHits:this.hits[this.h],awayHits:this.hits[this.a],box:this.box,
     winner:this.score[this.h]>this.score[this.a]?this.h:(this.score[this.a]>this.score[this.h]?this.a:null),
     homeSP:this.sp[this.h],awaySP:this.sp[this.a],decisions:this.decisions,
-    homePitchers:this.pUsed[this.h],awayPitchers:this.pUsed[this.a]};
+    homePitchers:this.pUsed[this.h],awayPitchers:this.pUsed[this.a],
+    line:this.line, innings:this.inning, walkoff:!!this.walkoff, lineup:this.lineup, positions:this.pos};
 };
 
 // foreign-player flag for the quota (FOREIGN comes from the roster build; signings set p.f themselves)
@@ -870,6 +970,7 @@ global.KBO = {
   newBatStat:newBatStat, newPitStat:newPitStat,
   getB:getB, getP:getP, InteractiveGame:InteractiveGame,
   cond:cond, mor:mor, isInjured:isInjured, applyFatigue:applyFatigue, restAdjust:restAdjust,
+  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf,
   POS_LIST:POS_LIST, posFit:posFit, fieldVal:fieldVal, teamDefense:teamDefense, autoPositions:autoPositions, positionIssues:positionIssues
 };
 

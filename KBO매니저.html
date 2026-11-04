@@ -134,6 +134,7 @@ footer{text-align:center;color:var(--dim);font-size:11px;margin-top:30px;line-he
 </div>
 
 <script src="core.js"></script>
+<script src="career.js"></script>
 <script src="fm.js"></script>
 <script>
 "use strict";
@@ -198,7 +199,7 @@ function initState(){
     season: {},
     schedule: buildSchedule(),
     gameIdx: 0,
-    phase: "regular", // regular | postseason | offseason
+    phase: "stove", // stove (스토브리그·전지훈련) | spring (시범경기) | regular | postseason | offseason
     history: [],
     champion: null,
     postseason: null,
@@ -223,6 +224,7 @@ function accumulate(res){
     for(const n in bx.bat){ const src=bx.bat[n]; const t=eBat(team,n); mergeNum(t,src); if(src.PA>0)t.G++; }
     for(const n in bx.pit){ mergeNum(ePit(team,n), bx.pit[n]); }
   });
+  FM.logGame(res);
   const s=state.season;
   s[res.home].RF+=res.homeRuns; s[res.home].RA+=res.awayRuns;
   s[res.away].RF+=res.awayRuns; s[res.away].RA+=res.homeRuns;
@@ -233,7 +235,8 @@ function accumulate(res){
 
 function buildCfg(team){
   const c=state.cfgs[team];
-  return FM.prepareCfg(team, {teamId:team, lineup:c.lineup, positions:c.positions, bullpen:c.bullpen, closer:c.closer, spName:projectedSP(team)});
+  const tac = team===USER? (state.matchTac||c.tac) : (c.tac||FM.aiTactics(team));
+  return FM.prepareCfg(team, {teamId:team, lineup:c.lineup, positions:c.positions, bullpen:c.bullpen, closer:c.closer, spName:projectedSP(team), tac});
 }
 function playGame(idx, detail){
   const g=state.schedule[idx];
@@ -242,6 +245,7 @@ function playGame(idx, detail){
   const res=K.simGame(hc,ac,{});
   g.played=true; g.hr=res.homeRuns; g.ar=res.awayRuns;
   accumulate(res);
+  if(g.home===USER||g.away===USER) FM.gameReport(res,'regular');
   teamGameCount[g.home]++; teamGameCount[g.away]++;
   return res;
 }
@@ -249,6 +253,7 @@ function playGame(idx, detail){
 // ---------- sim controls ----------
 // New flow: auto-sim other teams' games up to our next game, then show PREVIEW (entry submission).
 function startNextUserGame(){
+  if(state.phase==="spring"){ FM.springPlayNext(); return; }
   if(state.phase!=="regular"){ render(); return; }
   while(state.gameIdx<state.schedule.length){
     const g=state.schedule[state.gameIdx];
@@ -258,7 +263,7 @@ function startNextUserGame(){
   endRegularSeason(); render();
 }
 function advanceUserGames(n){
-  state.pendingGame=null; closeModal();
+  state.pendingGame=null; state.matchTac=null; closeModal();
   for(let i=0;i<n;i++){
     if(state.gameIdx>=state.schedule.length||state.phase!=="regular") break;
     let done=false;
@@ -288,16 +293,19 @@ function recentForm(team){
 }
 function projectedSP(team){
   const c=state.cfgs[team]; const rot=c.rotation.length?c.rotation:[c.bullpen[0]];
-  const n = state.phase==='postseason'&&state.postseason&&state.postseason.gc? (state.postseason.gc[team]||0) : teamGameCount[team];
+  const n = state.phase==='postseason'&&state.postseason&&state.postseason.gc? (state.postseason.gc[team]||0)
+    : state.phase==='spring'&&state.spring? (state.spring.gc[team]||0) : teamGameCount[team];
   return rot[n%rot.length];
 }
 // the user's game waiting for the entry submission: {home, away, ps, label}
 function pendingMatch(){
   if(state.pendingGame==='ps'){ const n=psNext(); return n? {home:n.home, away:n.away, ps:true, label:n.label} : null; }
+  if(state.pendingGame==='spring'){ const n=FM.springNext(); return n? {home:n.home, away:n.away, spring:true, label:n.label} : null; }
   const g=state.schedule[state.pendingGame]; return g? {home:g.home, away:g.away, ps:false, label:`${state.year} 시즌`} : null;
 }
 function openPreview(){
   const g=pendingMatch(); if(!g) return;
+  if(!state.matchTac) state.matchTac=Object.assign({}, K.DEFAULT_TAC, state.cfgs[USER].tac||{});
   const st=standings();
   const rankOf=t=>st.findIndex(x=>x.t===t)+1;
   const ps=state.postseason&&state.postseason.cur;
@@ -307,7 +315,7 @@ function openPreview(){
   const su=findPlayer(USER,spUser), so=findPlayer(opp,spOpp);
   const teamCard=(t)=>{ const s=state.season[t]; return `<div style="text-align:center;flex:1">
       ${teamDot(t)} <div style="font-size:16px;font-weight:800;margin:4px 0">${K.ROSTERS[t].name}</div>
-      <div class="muted" style="font-size:12px">${g.ps? `정규시즌 ${rankOf(t)}위 · 시리즈 ${t===ps.hi?ps.wHi-(ps.hiStart||0):ps.wLo}승` : (s.W+s.L+s.T? `${rankOf(t)}위 · ${s.W}승 ${s.L}패 ${s.T}무` : '개막전')}</div>
+      <div class="muted" style="font-size:12px">${g.spring? '시범경기' : g.ps? `정규시즌 ${rankOf(t)}위 · 시리즈 ${t===ps.hi?ps.wHi-(ps.hiStart||0):ps.wLo}승` : (s.W+s.L+s.T? `${rankOf(t)}위 · ${s.W}승 ${s.L}패 ${s.T}무` : '개막전')}</div>
       <div style="font-size:12px;margin-top:4px">최근5: ${recentForm(t)}</div></div>`; };
   const spStat=(t,n)=>{ const s=state.season[t].pit[n]; return s&&s.G>0? `${s.W}승 ${s.L}패 · ERA ${fmtEra(s.ER,s.OUT)}` : '시즌 첫 등판'; };
   const lineupList=(t)=>{ const c=state.cfgs[t]; const pos=c.positions||K.autoPositions(t,c.lineup); return c.lineup.map((n,i)=>`<div style="display:flex;gap:8px;font-size:12px;padding:2px 0"><span class="muted" style="width:16px">${i+1}</span><span class="pill pos" style="width:30px">${pos[i]||''}</span>${t===USER?pname(t,n):n}</div>`).join(''); };
@@ -329,6 +337,7 @@ function openPreview(){
       <div><div class="muted" style="font-weight:700;margin-bottom:4px">상대 예상 타선</div>${lineupList(opp)}</div>
     </div>
     ${FM.previewNote()}
+    ${FM.tacticsCard('match')}
     <div class="hint" style="margin-top:10px">라인업·선발을 바꾸려면 먼저 닫고 <b>라인업</b> 탭에서 수정하세요. 제출 후 실시간 중계가 시작됩니다.</div>
     <div class="row" style="justify-content:center;margin-top:14px;gap:8px">
       <button class="btn" onclick="App.closeModal();App.tab('lineup')">📋 라인업 수정</button>
@@ -340,7 +349,7 @@ function openPreview(){
 const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[], _mult:1, _ended:false, panel:null, ab:null, feed:null,
   start(){
     const g=pendingMatch(); if(!g) return;
-    this.idx=state.pendingGame; this.ps=g.ps;
+    this.idx=state.pendingGame; this.ps=g.ps; this.spring=!!g.spring;
     this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away), {maxInnings:g.ps?15:12});
     this._ended=false; this.paused=false; this.panel=null; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
     closeModal();
@@ -357,7 +366,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
     const g=this.game, ab=this.ab;
     if(g.over && (!ab || ab.committed)){ this.end(); return; }
     if(!ab){ const p=g.prepareAB(); if(!p){ this.end(); return; }
-      this.ab={pitches:p.pitches,shown:0,pre:false,susp:false,committed:false,pitName:p.pitName,batName:p.batName,off:p.off,def:p.def,slot:p.slot,oc:p.oc,ev:null,wp0:winProb(g),steal:p.kind==='steal',runner:p.runner};
+      this.ab={pitches:p.pitches,shown:0,pre:false,susp:false,committed:false,pitName:p.pitName,batName:p.batName,off:p.off,def:p.def,slot:p.slot,oc:p.oc,ev:null,wp0:winProb(g),steal:p.kind==='steal',runner:p.runner,kind:p.kind||'pa'};
       this._say(Comm.intro(g,this.ab)); this.renderLive(); return; }
     if(ab.shown < ab.pitches.length){
       if(!ab.pre){ ab.pre=true; this._say(Comm.prePitch(g,ab)); this.renderLive(); return; }
@@ -387,14 +396,19 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
     const res=this.game.result();
     const o=document.getElementById('relay'); if(o)o.remove();
     this.game=null; this.ab=null; state.pendingGame=null;
+    state.matchTac=null;
+    if(this.spring){ FM.springRecord(res); render(); return; }
     if(this.ps){ psRecord(res); render(); return; }
     const g=state.schedule[this.idx]; g.played=true; g.hr=res.homeRuns; g.ar=res.awayRuns;
     accumulate(res);
     teamGameCount[g.home]++; teamGameCount[g.away]++;
     state.gameIdx=this.idx+1;
+    FM.gameReport(res,'regular');
     if(state.gameIdx>=state.schedule.length) endRegularSeason();
     render();
   },
+  order(c){ this.game.orderCmd(USER,c); this.panel=null; this.feed.unshift({sysmsg:{bunt:'희생번트 사인',steal:'도루 사인',ibb:'고의4구 지시'}[c]+' (다음 타석)'}); this.renderLive(); },
+  setTac(k,v){ if(v==='true')v=true; if(v==='false')v=false; this.game.setTac(USER,k,v); this.feed.unshift({sysmsg:`작전 변경: ${FM.tacLabel(k,v)}`}); this.renderLive(); },
   renderLive(){ const o=document.getElementById('relay'); if(o) o.innerHTML=`<div class="modal" style="max-width:560px;width:100%;margin:auto;max-height:96vh;overflow:auto;padding:14px">${relayHTML(this.game,this.feed,this)}</div>`; }
 };
 
@@ -522,7 +536,7 @@ function pitchList(pitches){
   const rows=pitches.map((p,i)=>{
     if(p.res==='B')b++; else if(p.res==='F'){ if(st<2)st++; } else if(p.res==='S'||p.res==='SW')st++;
     const end=p.res==='IP'||p.res==='HBP'||b>=4||st>=3;
-    return `<div class="pl-row"><span class="pl-no" style="background:${PITCHCOLOR[p.res]||'#888'}">${i+1}</span><b>${PITCHLABEL[p.res]||''}</b><span class="pl-velo">${p.velo}km/h ${p.type}</span><span class="pl-cnt">${end?'':b+' - '+st}</span></div>`;
+    return `<div class="pl-row"><span class="pl-no" style="background:${PITCHCOLOR[p.res]||'#888'}">${i+1}</span><b>${PITCHLABEL[p.res]||''}</b><span class="pl-velo">${p.velo?p.velo+'km/h ':''}${p.type}</span><span class="pl-cnt">${end?'':b+' - '+st}</span></div>`;
   });
   return `<div class="pl-list">${rows.reverse().join('')}</div>`;
 }
@@ -546,12 +560,16 @@ const Comm={
   },
   intro(g,ab){
     if(ab.steal) return {t:`1루 주자 ${ab.runner}, 리드 폭을 크게 가져갑니다… 타석에는 ${ab.batName}.`, k:'tense', wait:1.1};
+    if(ab.kind==='ibb') return {t:`벤치에서 사인이 나옵니다… ${ab.batName}을(를) 거릅니다. 고의4구!`, k:'call', wait:1.2};
+    if(ab.kind==='bunt') return {t:`${ab.slot}번 ${ab.batName}, 타석에서 번트 자세를 잡습니다. ${this.outsTxt(g.outs)} ${this.basesTxt(g.bases)}.`, k:'tense', wait:1.2};
     const x=g.box[ab.off].bat[ab.batName], today=x&&x.PA?`오늘 ${x.AB}타수 ${x.H}안타`:'오늘 첫 타석';
     const st=this.stakes(g,ab.off);
     return {t:`${ab.slot}번 타자 ${ab.batName}, 타석에 들어섭니다. ${today}. ${this.outsTxt(g.outs)} ${this.basesTxt(g.bases)}${st?' — '+st.t:''}`, k:st&&st.hot?'tense':'quiet', wait:1.2};
   },
   prePitch(g,ab){
     if(ab.steal) return {t:`${ab.pitName}, 세트포지션에서… 주자 스타트!`, k:'tense', wait:0.9};
+    if(ab.kind==='ibb') return {t:'포수가 일어서서 옆으로 빠져 앉습니다…', k:'quiet', wait:0.8};
+    if(ab.kind==='bunt') return {t:'1·3루수 전진! 투수 투구…', k:'tense', wait:0.9};
     const c=countOf(ab.pitches.slice(0,ab.shown)), n=ab.shown+1, P=ab.pitName, B=ab.batName;
     const st=this.stakes(g,ab.off), hot=!!(st&&st.hot);
     if(c.b===3&&c.s===2) return {t:`풀카운트… ${P}, 운명의 ${n}구!`,k:'tense',wait:1.1};
@@ -571,6 +589,8 @@ const Comm={
     const sp=p.type==='직구'&&p.velo>=150?`${p.velo}km 강속구`:`${p.velo}km ${p.type}`, cnt=` (${c.b}-${Math.min(c.s,2)})`;
     // strikeouts get the big treatment only when something rides on them
     if(ab.steal) return {t:`${sp}… 포수, 2루로 송구!`,k:'tense',wait:1.3};
+    if(p.res==='IBB') return {t:`${ab.batName}, 1루로 걸어 나갑니다.`,k:'quiet'};
+    if(ab.kind==='bunt'&&p.res==='IP') return {t:'번트! 공을 굴립니다…',k:'tense',wait:0.8};
     const st=this.stakes(g,ab.off), kk=st&&st.hot?'big':'tense';
     const inZone=p.x>=0.33&&p.x<=0.67&&p.y>=0.3&&p.y<=0.7, near=!inZone&&p.x>0.27&&p.x<0.73&&p.y>0.24&&p.y<0.76;
     switch(p.res){
@@ -586,6 +606,7 @@ const Comm={
   },
   // beat between contact and the result; the wording sets how the play can end (a "deep" ball can't become a double play)
   suspense(g,ab){
+    if(ab.kind==='bunt'){ ab.flavor='bunt'; return {t:this.pick(['3루 쪽으로 구르는 타구, 투수 달려 나옵니다…','1루 쪽 번트, 1루수 대시!']),k:'tense',wait:1.0}; }
     const oc=ab.oc, dpPossible=g.bases[0]&&g.outs<2;
     let opts;
     // "deep" (warning-track) build-ups stay rare on outs so they keep their bite; homers sometimes start as an ordinary fly
@@ -606,6 +627,10 @@ const Comm={
       case 'HBP': t=ev.runs?'밀어내기 사구! 한 점이 들어옵니다.':'몸에 맞는 공으로 1루에 나갑니다.'; break;
       case 'GIDP': { const d=P([['유격수','6-4-3'],['2루수','4-6-3'],['3루수','5-4-3']]); t=`${d[0]} 땅볼… ${d[1]} 병살타! 두 개를 잡아냅니다.`; k='big'; break; }
       case 'SF': t=`${P(['좌익수','중견수','우익수'])} 희생플라이! 3루 주자 홈인.`; break;
+      case 'IBB': t=`고의4구. ${ev.runs?'밀어내기로 한 점이 들어옵니다.':'주자가 하나 늘어납니다.'}`; break;
+      case 'SAC': t=P(['1루에서 타자 아웃, 주자는 한 베이스씩 진루. 희생번트 성공!','침착하게 1루 송구, 아웃. 희생번트 성공입니다.']); break;
+      case 'FC': t=P(['선행 주자를 잡아냅니다! 번트 실패.','빠른 송구, 선행 주자 포스 아웃! 번트 작전 실패.']); k='tense'; break;
+      case 'BUNT1B': t=P(['기습 번트 안타! 1루에서 살았습니다!','번트가 절묘합니다! 내야 안타!']); k='tense'; break;
       case 'SB': t=P([`세이프! ${ev.runner}, 2루 도루 성공!`,`여유 있게 세이프! ${ev.runner}의 도루!`]); k='tense'; break;
       case 'CS': t=P([`아웃! 포수의 정확한 송구, ${ev.runner} 도루 실패!`,`태그 아웃! ${ev.runner}, 2루에서 잡힙니다.`]); k='big'; break;
       case 'E': t=`${P(['유격수','2루수','3루수','1루수'])} 실책! 공을 놓칩니다, 타자 주자 살아 나갑니다.`; k='tense'; break;
@@ -632,7 +657,7 @@ const Comm={
     if(ev.walkoff){ t+=' 끝내기!!! 경기 끝!'; k='big'; wait=2.6; }
     else if(g.over) t+=' 경기 종료!';
     else if(ev.half!==g.half||ev.inning!==g.inning) t+=' 공수 교대.';
-    else if(['K','OUT','GIDP','SF','CS'].includes(ev.oc)) t+=` ${g.outs}아웃.`;
+    else if(['K','OUT','GIDP','SF','CS','SAC','FC'].includes(ev.oc)) t+=` ${g.outs}아웃.`;
     return {t,k,wait};
   }
 };
@@ -708,11 +733,23 @@ function relayHTML(game,feed,M){
     const btns=[];
     if(userPitching) btns.push(`<button class="btn" onclick="Match.togglePanel('sub')">🔄 투수 교체</button>`);
     if(userBatting) btns.push(`<button class="btn" onclick="Match.togglePanel('pinch')">🏏 대타</button>`);
+    btns.push(`<button class="btn" onclick="Match.togglePanel('tac')">🎯 작전</button>`);
     interv = btns.length? `<div class="row" style="margin-top:8px;gap:6px">${btns.join('')}</div>`:'';
     if(M.panel==='sub'&&userPitching){
       const avail=game.availPitchers(USER).sort((x,y)=>K.ovr(y)-K.ovr(x));
       interv += `<div class="card" style="margin-top:8px;background:var(--panel2)"><div class="muted" style="margin-bottom:6px">교체할 투수 (현재: ${pitName})</div>
         <div class="row" style="gap:6px;flex-wrap:wrap">${avail.slice(0,12).map(p=>`<button class="btn" onclick="Match.doSub('${p.n}')">${p.n} <span class="muted">${p.role}·${K.ovr(p)}</span></button>`).join('')||'<span class="muted">없음</span>'}</div></div>`;
+    }
+    if(M.panel==='tac'){
+      const T=game.tac[USER], sel=(k,opts)=>`<label class="muted" style="font-size:12px">${FM.tacName(k)} <select onchange="Match.setTac('${k}',this.value)">${opts.map(o=>`<option value="${o}" ${String(T[k])===String(o)?'selected':''}>${FM.tacLabel(k,o)}</option>`).join('')}</select></label>`;
+      const canBunt=userBatting&&(game.bases[0]||game.bases[1])&&game.outs<2, canSteal=userBatting&&game.bases[0]&&!game.bases[1];
+      interv += `<div class="card" style="margin-top:8px;background:var(--panel2)"><div class="muted" style="margin-bottom:6px">${userBatting?'공격 작전':'수비 작전'} <span style="opacity:.7">· 일시정지 중 지시하면 다음 타석부터 적용</span></div>
+        <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">${userBatting
+          ? `<button class="btn" ${canBunt?'':'disabled'} onclick="Match.order('bunt')">🫳 희생번트</button><button class="btn" ${canSteal?'':'disabled'} onclick="Match.order('steal')">💨 도루</button>`
+          : `<button class="btn" onclick="Match.order('ibb')">🚶 고의4구</button>`}</div>
+        <div class="row" style="gap:10px;flex-wrap:wrap">${userBatting
+          ? sel('atk',['normal','aggr','patient'])+sel('run',['normal','aggr','hold'])+sel('teamBat',[false,true])
+          : sel('shift',['normal','dp','infieldIn','deep'])+sel('bat',['normal','attack','nibble'])+sel('hook',['normal','quick','long'])}</div></div>`;
     }
     if(M.panel==='pinch'&&userBatting){
       const bench=game.bench(USER).sort((x,y)=>K.ovr(y)-K.ovr(x));
@@ -751,7 +788,7 @@ function relayHTML(game,feed,M){
     ${sb}
     ${resultBanner}
     ${matchup}
-    <div class="bc">${relayScene(game,shown,offId,defId,batName,pitName)}<div class="bc-cap" aria-live="polite">${caption}</div>${wpBox}${pitchList(shown)}</div>
+    <div class="bc">${relayScene(game,shown.filter(p=>p.res!=='IBB'),offId,defId,batName,pitName)}<div class="bc-cap" aria-live="polite">${caption}</div>${wpBox}${pitchList(shown)}</div>
     ${stats}
     ${ctrl}
     ${interv}
@@ -801,16 +838,14 @@ function psNext(){
   const hiHome = c.hiHomeAll || n<2 || n>=4;
   return {home:hiHome?c.hi:c.lo, away:hiHome?c.lo:c.hi, label:`${c.name} ${n+1}차전`};
 }
-function psCfg(team){
-  const c=state.cfgs[team];
-  return FM.prepareCfg(team, {teamId:team, lineup:c.lineup, positions:c.positions, bullpen:c.bullpen, closer:c.closer, spName:projectedSP(team)});
-}
+function psCfg(team){ return buildCfg(team); }
 function psRecord(res){
   const ps=state.postseason, c=ps.cur;
   if(res.winner===c.hi) c.wHi++; else if(res.winner===c.lo) c.wLo++;
   c.games.push({home:res.home, away:res.away, hr:res.homeRuns, ar:res.awayRuns, winner:res.winner});
   ps.gc[res.home]++; ps.gc[res.away]++;
   FM.afterPsGame(res);
+  if(res.home===USER||res.away===USER) FM.gameReport(res,'ps');
   if(!psSeriesOver(c)) return;
   const hiWon = c.wLo<c.need;
   const r={winner:hiWon?c.hi:c.lo, loser:hiWon?c.lo:c.hi, wHi:c.wHi, wLo:c.wLo, games:c.games, bestOf:c.bestOf, hiStart:c.hiStart};
@@ -882,7 +917,8 @@ function nextSeason(){
   state.year++;
   state.schedule=buildSchedule();
   state.gameIdx=0;
-  state.phase="regular";
+  state.phase="stove";
+  state.spring=null;
   state.postseason=null;
   state.champion=null;
   state.pendingGame=null;
@@ -907,7 +943,7 @@ function nextSeason(){
 }
 
 // ================= RENDERING =================
-const TABS=[["dash","🏠 대시보드"],["inbox","📥 받은편지함"],["squad","👥 스쿼드"],["lineup","📋 라인업"],["sched","📅 일정/경기"],["stand","🏆 순위"],["leaders","📊 기록실"],["trade","🔁 트레이드"],["club","🏛 구단"]];
+const TABS=[["dash","🏠 대시보드"],["inbox","📥 받은편지함"],["feed","📰 피드"],["squad","👥 스쿼드"],["lineup","📋 라인업"],["sched","📅 일정/경기"],["stand","🏆 순위"],["leaders","📊 기록실"],["trade","🔁 트레이드"],["club","🏛 구단"]];
 
 function render(){
   FM.ensure();
@@ -925,10 +961,13 @@ function render(){
   else if(currentTab==="leaders") v.innerHTML=renderLeaders();
   else if(currentTab==="trade") v.innerHTML=renderTrade();
   else if(currentTab==="inbox") v.innerHTML=FM.renderInbox();
+  else if(currentTab==="feed") v.innerHTML=FM.renderFeed();
   else if(currentTab==="club") v.innerHTML=FM.renderClub();
 }
 function phaseLabel(){
   if(state.phase==="regular"){ const played=state.schedule.slice(0,state.gameIdx).filter(g=>g.home===USER||g.away===USER).length; return `정규시즌 ${played}/${SEASON_GAMES}경기`; }
+  if(state.phase==="stove") return "스토브리그";
+  if(state.phase==="spring") return `시범경기 ${state.spring?state.spring.played:0}/${FM.SPRING_GAMES}`;
   if(state.phase==="postseason") return "포스트시즌"+(state.postseason&&state.postseason.cur?" · "+state.postseason.cur.name:"");
   return "오프시즌 🏆"+(state.champion?` ${K.ROSTERS[state.champion].name} 우승`:"");
 }
@@ -959,7 +998,7 @@ function renderDash(){
       <span class="${t?'muted':(w?'win':'lose')}"><b>${t?'무':(w?'승':'패')}</b> ${us}:${them}</span></div>`;
   }).join("") : `<div class="muted">아직 경기 없음</div>`;
 
-  const ctrl = state.phase==="regular" ? `
+  const ctrl = state.phase==="stove"||state.phase==="spring" ? FM.preseasonControls() : state.phase==="regular" ? `
     <div class="row">
       <button class="btn primary" onclick="App.nextGame()">▶ 다음 경기 (프리뷰→중계)</button>
       <button class="btn" onclick="App.userGames(5)">⏩ 5경기 빠르게</button>
@@ -967,9 +1006,9 @@ function renderDash(){
       <button class="btn" onclick="App.simRest()">⏭ 시즌 끝까지</button>
     </div>`
     : state.phase==="postseason" ? psControls()
-    : `<div class="row"><button class="btn gold" onclick="App.showPS()">🏆 시즌 결과</button><button class="btn primary" onclick="App.nextSeason()">➡ 다음 시즌 시작</button></div>`;
+    : `<div class="row"><button class="btn gold" onclick="App.showPS()">🏆 시즌 결과</button><button class="btn primary" onclick="App.nextSeason()">➡ 스토브리그 시작</button></div>`;
 
-  const psn = state.phase==="postseason"? psNext() : null;
+  const psn = state.phase==="postseason"? psNext() : state.phase==="spring"? FM.springNext() : null;
   const nextHtml = psn ? `<div class="muted" style="text-align:center;font-size:12px">${psn.label}</div><div class="scoreboard">
       <div class="t">${teamDot(psn.home)}<div><b>${psn.home}</b></div><div class="muted" style="font-size:11px">${psn.home===USER?'우리':K.ROSTERS[psn.home].name}</div></div>
       <div class="muted">VS</div>
@@ -990,6 +1029,7 @@ function renderDash(){
   const topRBI=myBat.slice().sort((a,b)=>b.s.RBI-a.s.RBI)[0];
 
   return `
+  ${FM.preseasonCard()}
   <div class="grid cols3">
     <div class="card"><h3>다음 경기 <span class="tag">${state.year} 시즌</span></h3>${nextHtml}<div style="margin-top:12px">${ctrl}</div>
       <div class="progress"><i style="width:${Math.round(state.gameIdx/state.schedule.length*100)}%"></i></div>
@@ -1110,7 +1150,7 @@ function renderLineup(){
       <div class="row">${closerSel}</div>
       <div class="hint" style="margin-top:10px">선발은 투구수(체력에 따라 70~112구)나 5실점에서 교체됩니다. 불펜은 능력치 순으로 한 이닝씩 맡고, 지친 투수(컨디션 55% 미만)는 건너뜁니다. 9회 1~3점 차 리드 때 마무리가 등판합니다.</div>
     </div>
-  </div>` + FM.lineupCard();
+  </div>` + FM.tacticsCard('team') + FM.lineupCard();
 }
 
 function renderSched(){
@@ -1149,7 +1189,7 @@ function gb(top,x){ return ((top.W-x.W)+(x.L-top.L))/2 ? (((top.W-x.W)+(x.L-top.
 
 let leaderCat="avg";
 function renderLeaders(){
-  const cats=[["avg","타율"],["hr","홈런"],["rbi","타점"],["r","득점"],["h","안타"],["sb","도루"],["era","평균자책"],["w","다승"],["so","탈삼진"],["sv","세이브"],["hd","홀드"]];
+  const cats=[["avg","타율"],["hr","홈런"],["rbi","타점"],["r","득점"],["h","안타"],["sb","도루"],["ops","OPS"],["era","평균자책"],["whip","WHIP"],["w","다승"],["so","탈삼진"],["sv","세이브"],["hd","홀드"]];
   const tabs=`<div class="tabsm">${cats.map(([id,l])=>`<button class="${leaderCat===id?'active':''}" onclick="App.leaderCat('${id}')">${l}</button>`).join("")}</div>`;
   // gather
   let bat=[],pit=[];
@@ -1161,8 +1201,13 @@ function renderLeaders(){
   const minOut = Math.max(30, state.gameIdx/state.schedule.length*144*3); // 규정이닝: 팀 경기 수 x 1이닝 (아웃 3개)
   let rows="",head="";
   function brow(x,val,extra){return `<tr class="${x.t===USER?'me rankrow':''}"><td>${x.rank}</td><td class="name">${teamDot(x.t)} ${pname(x.t,x.n)}</td><td class="muted">${x.t}</td><td><b>${val}</b></td>${extra||''}</tr>`;}
-  if(["avg","hr","rbi","r","h","sb"].includes(leaderCat)){
+  if(["avg","hr","rbi","r","h","sb","ops"].includes(leaderCat)){
     let arr=bat.filter(x=>x.s.AB>0);
+    const ops=s=>(s.H+s.BB+s.HBP)/Math.max(1,s.AB+s.BB+s.HBP)+(s.H+s._2B+2*s._3B+3*s.HR)/s.AB;
+    if(leaderCat==="ops"){ arr=arr.filter(x=>x.s.AB>=minAB).sort((a,b)=>ops(b.s)-ops(a.s));
+      head=`<th>OPS</th><th>타율</th><th>HR</th><th>타점</th>`;
+      rows=arr.slice(0,15).map((x,i)=>{x.rank=i+1;return brow(x,ops(x.s).toFixed(3),`<td>${fmtAvg(x.s.H/x.s.AB)}</td><td>${x.s.HR}</td><td>${x.s.RBI}</td>`);}).join(""); }
+    else
     if(leaderCat==="avg"){ arr=arr.filter(x=>x.s.AB>=minAB).sort((a,b)=>(b.s.H/b.s.AB)-(a.s.H/a.s.AB));
       head=`<th>타율</th><th>AB</th><th>H</th><th>HR</th>`;
       rows=arr.slice(0,15).map((x,i)=>{x.rank=i+1;return brow(x,fmtAvg(x.s.H/x.s.AB),`<td>${x.s.AB}</td><td>${x.s.H}</td><td>${x.s.HR}</td>`);}).join("");}
@@ -1171,7 +1216,10 @@ function renderLeaders(){
       rows=arr.slice(0,15).map((x,i)=>{x.rank=i+1;return brow(x,x.s[key]||0,`<td>${fmtAvg(x.s.H/x.s.AB)}</td><td>${x.s.HR}</td><td>${x.s.RBI}</td>`);}).join("");}
   } else {
     let arr=pit.filter(x=>x.s.G>0);
-    if(leaderCat==="era"){ arr=arr.filter(x=>x.s.OUT>=minOut).sort((a,b)=>(a.s.ER/a.s.OUT)-(b.s.ER/b.s.OUT));
+    if(leaderCat==="whip"){ arr=arr.filter(x=>x.s.OUT>=minOut).sort((a,b)=>((a.s.H+a.s.BB)/a.s.OUT)-((b.s.H+b.s.BB)/b.s.OUT));
+      head=`<th>WHIP</th><th>ERA</th><th>IP</th><th>SO</th>`;
+      rows=arr.slice(0,15).map((x,i)=>{x.rank=i+1;return brow(x,((x.s.H+x.s.BB)*3/x.s.OUT).toFixed(2),`<td>${fmtEra(x.s.ER,x.s.OUT)}</td><td>${ipStr(x.s.OUT)}</td><td>${x.s.SO}</td>`);}).join(""); }
+    else if(leaderCat==="era"){ arr=arr.filter(x=>x.s.OUT>=minOut).sort((a,b)=>(a.s.ER/a.s.OUT)-(b.s.ER/b.s.OUT));
       head=`<th>ERA</th><th>IP</th><th>W</th><th>SO</th>`;
       rows=arr.slice(0,15).map((x,i)=>{x.rank=i+1;return brow(x,fmtEra(x.s.ER,x.s.OUT),`<td>${ipStr(x.s.OUT)}</td><td>${x.s.W}</td><td>${x.s.SO}</td>`);}).join("");}
     else { const key={w:"W",so:"SO",sv:"SV",hd:"HD"}[leaderCat]; arr=arr.sort((a,b)=>(b.s[key]||0)-(a.s[key]||0));
@@ -1302,7 +1350,7 @@ function showPS(){
     <div class="deal-result ${champ===USER||userRank<=5?'deal-ok':'deal-no'}">${userMsg}</div>
     <h3 style="margin-top:14px">포스트시즌</h3>${rounds}${curHtml}
     <div class="row" style="justify-content:center;margin-top:12px">
-      ${champ? `<button class="btn primary" onclick="App.nextSeason()">➡ ${state.year+1} 시즌 시작 (선수 성장/노화 반영)</button>` : `<button class="btn primary" onclick="App.closeModal()">닫기</button>`}
+      ${champ? `<button class="btn primary" onclick="App.nextSeason()">➡ ${state.year+1} 스토브리그 시작 (선수 성장/노화 반영)</button>` : `<button class="btn primary" onclick="App.closeModal()">닫기</button>`}
     </div>`);
 }
 
@@ -1392,6 +1440,7 @@ const App={
   setCloser:(v)=>{ state.cfgs[USER].closer=v; render(); },
   autoLineup:()=>{ const d=K.defaultLineup(USER); state.cfgs[USER].lineup=d.lineup.slice(); state.cfgs[USER].positions=d.positions.slice(); render(); },
   psNext:()=>psPlayNext(),
+  setTac:(scope,k,v)=>FM.setTac(scope,k,v),
   psAuto:(toEnd)=>psAuto(toEnd),
   tradeTeam:(t)=>{ tradeTeam=t; tradeIn.clear(); render(); },
   toggleOut:(n)=>{ tradeOut.has(n)?tradeOut.delete(n):tradeOut.add(n); render(); },
