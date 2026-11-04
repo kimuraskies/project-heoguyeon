@@ -350,7 +350,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
   start(){
     const g=pendingMatch(); if(!g) return;
     this.idx=state.pendingGame; this.ps=g.ps; this.spring=!!g.spring;
-    this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away), {maxInnings:g.ps?15:12});
+    this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away), {maxInnings:g.ps?15:g.spring?9:12});
     this._ended=false; this.paused=false; this.panel=null; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
     closeModal();
     let o=document.getElementById('relay'); if(o)o.remove();
@@ -376,21 +376,31 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
       const ev=g.commitAB(); ab.committed=true; ab.ev=ev;
       if(ev){ const line=Comm.result(g,ab,ev); ev.call=line.t; this.feed.unshift(ev); this._say(line); }
       this.renderLive(); return; }
-    this.ab=null; this._mult=0.5; this.renderLive();
+    this.ab=null; this._mult=0.5; this._flush(); this.renderLive();
   },
   play(){ if(this._ended)return; this.paused=false; this.renderLive(); this._tick(); },
   pause(){ this.paused=true; clearTimeout(this.timer); this.renderLive(); },
   stepOne(){ this.paused=true; clearTimeout(this.timer); this._do(); while(!this._ended&&this.ab&&(this.ab.pre||(this.ab.susp&&!this.ab.committed))) this._do(); },
   toEnd(){ this.paused=true; clearTimeout(this.timer);
     if(this.ab && !this.ab.committed){ const ev=this.game.commitAB(); if(ev)this.feed.unshift(ev); }
-    this.ab=null;
+    this.ab=null; this._flush();
     let n=0; while(!this.game.over && n<3000){ const ev=this.game.step(); if(ev)this.feed.unshift(ev); n++; }
     this.renderLive(); this.end();
   },
   setSpeed(v){ this.speed=parseInt(v,10); },
   togglePanel(p){ this.panel=this.panel===p?null:p; if(!this.paused)this.pause(); else this.renderLive(); },
-  doSub(name){ this.game.subPitcher(USER,name); this.panel=null; this.feed.unshift({sysmsg:`투수 교체 → ${name} (다음 타자부터)`}); this.renderLive(); },
-  doPinch(name){ if(!this.game.pinchHit(USER,name)){ FM.notify('이미 교체되어 나간 선수는 다시 출전할 수 없습니다.'); return; } this.panel=null; this.feed.unshift({sysmsg:`대타 예고 → ${name} (다음 타석)`}); this.renderLive(); },
+  // a change asked for mid at-bat: before the first pitch the at-bat restarts with the new man; after it, it waits
+  _change(fn, now, later){
+    const ab=this.ab;
+    if(ab && !ab.committed && ab.shown>0){ this.queued=(this.queued||[]).concat([fn]); this.feed.unshift({sysmsg:later}); this.panel=null; this.renderLive(); return; }
+    if(!fn()) return;
+    if(ab && !ab.committed) this.ab=null; // the prepared at-bat was dropped by the engine
+    this.feed.unshift({sysmsg:now}); this.panel=null; this.renderLive();
+  },
+  _flush(){ const q=this.queued||[]; this.queued=[]; q.forEach(fn=>fn()); },
+  doSub(name){ this._change(()=>this.game.subPitcher(USER,name), `투수 교체 → ${name}`, `투수 교체 예고 → ${name} (이 타석이 끝나면)`); },
+  doPinch(name){ this._change(()=>{ if(this.game.pinchHit(USER,name)) return true; FM.notify('이미 교체되어 나간 선수는 다시 출전할 수 없습니다.'); return false; },
+    `대타 → ${name}`, `대타 예고 → ${name} (다음 타석)`); },
   end(){ if(this._ended)return; this._ended=true; this.paused=true; clearTimeout(this.timer); this.renderLive(); },
   finalize(){
     const res=this.game.result();
@@ -753,7 +763,7 @@ function relayHTML(game,feed,M){
     }
     if(M.panel==='pinch'&&userBatting){
       const bench=game.bench(USER).sort((x,y)=>K.ovr(y)-K.ovr(x));
-      interv += `<div class="card" style="margin-top:8px;background:var(--panel2)"><div class="muted" style="margin-bottom:6px">대타 (현재: ${batName})</div>
+      interv += `<div class="card" style="margin-top:8px;background:var(--panel2)"><div class="muted" style="margin-bottom:6px">대타 (교체 대상: ${ab&&!committed&&ab.shown>0? game.lineup[USER][(game.order[USER]+1)%9]+' · 다음 타석' : (ab&&committed? game.dueBatterName() : batName)})</div>
         <div class="row" style="gap:6px;flex-wrap:wrap">${bench.slice(0,12).map(p=>`<button class="btn" onclick="Match.doPinch('${p.n}')">${p.n} <span class="muted">${p.pos}·${K.ovr(p)}</span></button>`).join('')||'<span class="muted">없음</span>'}</div></div>`;
     }
   }
@@ -1062,7 +1072,7 @@ function batRow(team,p,showStat){
   const o=K.ovr(p);
   let stat="";
   if(showStat){
-    if(s&&s.AB>0) stat=`<td>${s.G}</td><td>${s.AB}</td><td>${s.H}</td><td>${s.HR}</td><td>${s.RBI}</td><td>${s.R}</td><td>${s.BB}</td><td>${s.SO}</td><td>${s.SB||0}</td><td><b>${fmtAvg(s.H/s.AB)}</b></td><td>${fmtAvg((s.H+s.BB+s.HBP)/(s.AB+s.BB+s.HBP))}</td>`;
+    if(s&&s.AB>0) stat=`<td>${s.G}</td><td>${s.AB}</td><td>${s.H}</td><td>${s.HR}</td><td>${s.RBI}</td><td>${s.R}</td><td>${s.BB}</td><td>${s.SO}</td><td>${s.SB||0}</td><td><b>${fmtAvg(s.H/s.AB)}</b></td><td>${fmtAvg((s.H+s.BB+s.HBP)/(s.AB+s.BB+s.HBP+(s.SF||0)))}</td>`;
     else stat=`<td colspan="11" class="muted">기록 없음</td>`;
   }
   return `<tr><td class="name">${pname(team,p.n)}</td><td><span class="pill pos">${p.pos}</span></td><td>${p.age}</td>
@@ -1203,7 +1213,7 @@ function renderLeaders(){
   function brow(x,val,extra){return `<tr class="${x.t===USER?'me rankrow':''}"><td>${x.rank}</td><td class="name">${teamDot(x.t)} ${pname(x.t,x.n)}</td><td class="muted">${x.t}</td><td><b>${val}</b></td>${extra||''}</tr>`;}
   if(["avg","hr","rbi","r","h","sb","ops"].includes(leaderCat)){
     let arr=bat.filter(x=>x.s.AB>0);
-    const ops=s=>(s.H+s.BB+s.HBP)/Math.max(1,s.AB+s.BB+s.HBP)+(s.H+s._2B+2*s._3B+3*s.HR)/s.AB;
+    const ops=s=>(s.H+s.BB+s.HBP)/Math.max(1,s.AB+s.BB+s.HBP+(s.SF||0))+(s.H+s._2B+2*s._3B+3*s.HR)/s.AB;
     if(leaderCat==="ops"){ arr=arr.filter(x=>x.s.AB>=minAB).sort((a,b)=>ops(b.s)-ops(a.s));
       head=`<th>OPS</th><th>타율</th><th>HR</th><th>타점</th>`;
       rows=arr.slice(0,15).map((x,i)=>{x.rank=i+1;return brow(x,ops(x.s).toFixed(3),`<td>${fmtAvg(x.s.H/x.s.AB)}</td><td>${x.s.HR}</td><td>${x.s.RBI}</td>`);}).join(""); }
@@ -1435,7 +1445,7 @@ const App={
   // moving a hitter within the order keeps his position; a bench player takes over the slot's position
   setLineup:(i,v)=>{ const c=state.cfgs[USER], pos=userPositions();
     const old=c.lineup.indexOf(v); if(old>=0&&old!==i){ c.lineup[old]=c.lineup[i]; const tp=pos[old]; pos[old]=pos[i]; pos[i]=tp; } c.lineup[i]=v; render(); },
-  setPos:(i,v)=>{ const pos=userPositions(); const old=pos.indexOf(v); if(old>=0&&old!==i&&v!=='DH'){ pos[old]=pos[i]; } pos[i]=v; render(); },
+  setPos:(i,v)=>{ const pos=userPositions(); const old=pos.indexOf(v); if(old>=0&&old!==i){ pos[old]=pos[i]; } pos[i]=v; render(); },
   setRotation:(i,v)=>{ const c=state.cfgs[USER]; const old=c.rotation.indexOf(v); if(old>=0&&old!==i){c.rotation[old]=c.rotation[i];} c.rotation[i]=v; render(); },
   setCloser:(v)=>{ state.cfgs[USER].closer=v; render(); },
   autoLineup:()=>{ const d=K.defaultLineup(USER); state.cfgs[USER].lineup=d.lineup.slice(); state.cfgs[USER].positions=d.positions.slice(); render(); },

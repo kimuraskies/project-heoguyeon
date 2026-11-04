@@ -490,7 +490,7 @@ function applyOutcome(state, outcome, batter){
 }
 
 // blank stat lines
-function newBatStat(){return {G:0,PA:0,AB:0,H:0,_2B:0,_3B:0,HR:0,BB:0,HBP:0,SO:0,RBI:0,R:0,SB:0,CS:0,SH:0,IBB:0,GDP:0};}
+function newBatStat(){return {G:0,PA:0,AB:0,H:0,_2B:0,_3B:0,HR:0,BB:0,HBP:0,SO:0,RBI:0,R:0,SB:0,CS:0,SH:0,IBB:0,GDP:0,SF:0};}
 function newPitStat(){return {G:0,GS:0,W:0,L:0,SV:0,HD:0,OUT:0,H:0,R:0,ER:0,BB:0,SO:0,HR:0,BF:0,NP:0};}
 
 // ---- lineup building ----
@@ -723,10 +723,13 @@ IP.orderCmd=function(t,c){ this.cmd[t]=c; };
 IP.catcher=function(t){ var i=this.pos[t].indexOf('C'); return i>=0? getB(t,this.lineup[t][i]) : null; };
 IP.bench=function(t){var lu=this.lineup[t], gone=this.removed[t];return ROSTERS[t].batters.filter(function(b){return lu.indexOf(b.n)<0 && gone.indexOf(b.n)<0 && !isInjured(b);});};
 IP.availPitchers=function(t){var used=this.pUsed[t];return ROSTERS[t].pitchers.filter(function(p){return used.indexOf(p.n)<0 && !isInjured(p);});};
+IP.cancelPending=function(){ this._pending=null; };
 IP.subPitcher=function(t,name){ if(this.pUsed[t].indexOf(name)>=0)return false; var p=getP(t,name); if(!p)return false;
+  this._pending=null;
   this.pitcher[t]=name; this.pUsed[t].push(name); this.pBF[t]=0; this.pRuns[t]=0; this.ptot[t]=0; this.pstr[t]=0; this.pball[t]=0;
   this.pOuts[t]=0; this.pInn[t]=this.inning; this.entryLead[t][name]=this.score[t]-this.score[this.opp(t)]; this._ensurePit(t,name); return true;};
 IP.pinchHit=function(t,name){ var lu=this.lineup[t]; if(lu.indexOf(name)>=0||this.removed[t].indexOf(name)>=0)return false; var p=getB(t,name); if(!p)return false;
+  this._pending=null;
   var i=this.order[t]%lu.length; this.removed[t].push(lu[i]); lu[i]=name; return true;}; // the pinch hitter takes over the position too
 // one out recorded by the pitcher on the mound
 IP._out=function(def,n){ n=n||1; this.outs+=n; this._ensurePit(def,this.pitcher[def]).OUT+=n; this.pOuts[def]+=n; };
@@ -735,7 +738,8 @@ IP._run=function(off,def,runner,unearned){
   var before=this.score[off]-this.score[def];
   this.score[off]++; this.runsThisHalf++; this.pRuns[def]++;
   var rp=(runner&&runner.p&&this.box[def].pit[runner.p])? runner.p : this.pitcher[def];
-  var ps=this._ensurePit(def,rp); ps.R++; if(!unearned && !(runner&&runner.ue)) ps.ER++;
+  var ghost = this.outs + (this.errOuts||0) >= 3; // the inning would already be over without the error(s)
+  var ps=this._ensurePit(def,rp); ps.R++; if(!unearned && !ghost && !(runner&&runner.ue)) ps.ER++;
   if(runner&&runner.n) this._ensureBat(off,runner.n).R++;
   if(before===0) this.goAhead={team:off, winP:this.pitcher[off], loseP:rp};
   if(before===-1) this.blown[def+'|'+this.pitcher[def]]=true;
@@ -764,7 +768,7 @@ IP._autoManage=function(){
 IP._endHalf=function(){
   var off=this.offId();
   this.line[off].push(this.runsThisHalf); this.runsThisHalf=0;
-  this.bases=[null,null,null]; this.outs=0;
+  this.bases=[null,null,null]; this.outs=0; this.errOuts=0;
   if(this.half==='top'){
     if(this.inning>=9 && this.score[this.h]>this.score[this.a]){ this._finish(this.h); return; }
     this.half='bottom';
@@ -813,7 +817,7 @@ IP._stealTry=function(off,def,forced){
     var diff=this.score[off]-this.score[def];
     if(this.inning>=7 && Math.abs(diff)>=4) return null;
     var run=this.tac[off].run;
-    var tryP = (p.spd>=72? (p.spd-64)*0.02 : 0.012) * (run==="aggr"?1.8:run==="hold"?0.25:1);
+    var tryP = clamp((p.spd-60)*0.011, 0.01, 0.24) * (run==="aggr"?1.8:run==="hold"?0.25:1);
     if(rnd()>=tryP) return null;
   }
   var c=this.catcher(def), arm=c? c.arm-posFit(c,'C')*0.5 : 60;
@@ -874,8 +878,9 @@ IP.commitAB=function(){
   var p=this._pending; if(!p) return null; this._pending=null;
   var self=this, off=p.off, def=p.def, oc=p.oc, bat=p.bat, batName=p.batName;
   var strk=0,bll=0; p.pitches.forEach(function(x){ if(x.res==='B'||x.res==='HBP')bll++; else strk++; });
-  this.ptot[def]+=p.pitches.length; this.pstr[def]+=strk; this.pball[def]+=bll;
-  var ps=this._ensurePit(def,p.pitName); ps.NP+=p.pitches.length;
+  var thrown = p.kind==='ibb'? 0 : p.pitches.length; if(p.kind==='ibb'){ strk=0; bll=0; }
+  this.ptot[def]+=thrown; this.pstr[def]+=strk; this.pball[def]+=bll;
+  var ps=this._ensurePit(def,p.pitName); ps.NP+=thrown;
   var ev={inning:this.inning,half:this.half,batter:batName,pitcher:p.pitName,off:off,def:def,oc:oc,runs:0,desc:'',pitches:p.pitches};
   if(p.kind==='steal'){
     var rs=this._ensureBat(off,p.runner); ev.runner=p.runner; ev.steal=true;
@@ -929,9 +934,9 @@ IP.commitAB=function(){
   }
   if(oc==='DONE'){}
   else if(oc==='K'){ bs.AB++; bs.SO++; ps.SO++; this._out(def); ev.desc='삼진 아웃'; }
-  else if(oc==='E'){ bs.AB++; me.ue=true; credit(applyOutcome(this,'E',me),false,true); ev.desc='실책 출루'+(ev.runs?' ('+ev.runs+'점)':''); }
+  else if(oc==='E'){ bs.AB++; me.ue=true; this.errOuts=(this.errOuts||0)+1; credit(applyOutcome(this,'E',me),false,true); ev.desc='실책 출루'+(ev.runs?' ('+ev.runs+'점)':''); }
   else if(oc==='OUT'){
-    if(this.bases[2]&&this.outs<2&&rnd()<(this.tac[def].shift==="infieldIn"?0.14:0.30)){ var runner=this.bases[2]; this.bases[2]=null; bs.RBI++; this._out(def); this._run(off,def,runner,false); ev.oc='SF'; ev.runs=1; ev.desc='희생플라이 (1타점)'; }
+    if(this.bases[2]&&this.outs<2&&rnd()<(this.tac[def].shift==="infieldIn"?0.14:0.30)){ var runner=this.bases[2]; this.bases[2]=null; bs.RBI++; bs.SF++; this._out(def); this._run(off,def,runner,false); ev.oc='SF'; ev.runs=1; ev.desc='희생플라이 (1타점)'; }
     else {
       bs.AB++; this._out(def); ev.desc='범타 아웃';
       // productive out: a runner on second moves up to third

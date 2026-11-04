@@ -305,6 +305,7 @@ function seasonStart(first){
   const balance = f.fin? f.fin.balance : 30;
   f.fin={balance, budget:Math.round(pay*1.06+4), rev:0, exp:0, attTotal:0, homeGames:0};
   f.rt={}; f.promises=[]; f.restNext=[]; f.lastMeeting=-99; f.lastWarn=-99; f.lastOffer=-99; f.lastTalk={};
+  f.lastReport=0; f.lastMedia=-99; f.lastInterview=-99; f.lastFxNote=-99;
   send('구단 이사회','🏛',`${state.year} 시즌 목표: ${ex.label}`,
     `감독님, ${state.year} 시즌을 앞두고 이사회의 기대치를 전달드립니다.\n\n` +
     `• 전력 평가: 리그 ${sr}위권\n• 시즌 목표: ${ex.label}\n• 연봉 예산: ${f.fin.budget}억 원 (현재 연봉 총액 ${pay}억 원)\n\n` +
@@ -1006,7 +1007,7 @@ function maybeInterview(res, kind, x){
   const big = res.walkoff || (x.won&&x.th===0) || x.us>=10 || (x.pog&&x.pog.r>=8.3) || kind==='ps';
   const rr=recentRecord(), slump=!x.won&&rr.l>=4;
   if(!(big||slump) || (kind!=='ps' && ug-(f.lastInterview||-99)<4)) return;
-  f.lastInterview=ug;
+  if(kind!=='ps') f.lastInterview=ug;
   const q = slump? `연패가 길어지고 있습니다. 오늘 경기 어떻게 보셨습니까?`
     : x.won? `오늘 승리의 원동력은 무엇이라고 보십니까?${x.pog?` 특히 ${x.pog.n} 선수의 활약이 돋보였는데요.`:''}`
     : `아쉬운 패배입니다. 패인을 꼽으신다면?`;
@@ -1082,10 +1083,10 @@ function leagueEnv(){
   return {woba: woba||0.32, era, cFIP: era-fipRaw};
 }
 function batMetrics(s,env){
-  const PA=s.AB+s.BB+s.HBP+(s.SF||0)+(s.SH||0), avg=s.AB?s.H/s.AB:0, obp=(s.AB+s.BB+s.HBP)?(s.H+s.BB+s.HBP)/(s.AB+s.BB+s.HBP):0;
+  const SF=s.SF||0, PA=s.AB+s.BB+s.HBP+SF+(s.SH||0), avg=s.AB?s.H/s.AB:0, obp=(s.AB+s.BB+s.HBP+SF)?(s.H+s.BB+s.HBP)/(s.AB+s.BB+s.HBP+SF):0;
   const tb=s.H+s._2B+2*s._3B+3*s.HR, slg=s.AB?tb/s.AB:0, single=s.H-s._2B-s._3B-s.HR;
-  const woba=(s.AB+s.BB+s.HBP)? (0.69*s.BB+0.72*s.HBP+0.89*single+1.27*s._2B+1.62*s._3B+2.1*s.HR)/(s.AB+s.BB+s.HBP) : 0;
-  const bip=s.AB-s.SO-s.HR;
+  const woba=(s.AB+s.BB+s.HBP+SF)? (0.69*s.BB+0.72*s.HBP+0.89*single+1.27*s._2B+1.62*s._3B+2.1*s.HR)/(s.AB+s.BB+s.HBP+SF) : 0;
+  const bip=s.AB-s.SO-s.HR+SF;
   return {avg,obp,slg,ops:obp+slg,iso:slg-avg,babip:bip>0?(s.H-s.HR)/bip:0,k:PA?s.SO/PA:0,bb:PA?s.BB/PA:0,woba,wrc:env&&env.woba?Math.round(woba/env.woba*100):null};
 }
 function pitMetrics(s,env){
@@ -1116,7 +1117,7 @@ function seasonPanel(team,p){
 function careerPanel(team,p){
   const isB=p.type==='B', real=(window.KBO_CAREER&&window.KBO_CAREER[p.n]&&window.KBO_CAREER[p.n].t===p.type)? window.KBO_CAREER[p.n].y : [];
   const game=((state.hist||{})[p.n]||[]).filter(x=>isB? x.b : x.p);
-  const cur=isB? state.season[team].bat[p.n] : state.season[team].pit[p.n];
+  const cur=game.some(x=>x.y===state.year)? null : (isB? state.season[team].bat[p.n] : state.season[team].pit[p.n]);
   const rows=[], tot={};
   const addTot=o=>{ for(const k in o) if(typeof o[k]==='number') tot[k]=(tot[k]||0)+o[k]; };
   // real rows: B [y,team,G,PA,AB,R,H,2B,3B,HR,RBI,SB,CS,BB,HBP,SO], P [y,team,G,W,L,SV,HLD,OUT,H,HR,BB,HBP,SO,R,ER,TBF]
@@ -1500,7 +1501,7 @@ function showProfile(team,name){
   const rad = isB ? radar([p.con,p.pow,p.eye,p.spd,p.fld,p.arm].map(attr20),['컨택','파워','선구','주력','수비','송구'],ratColor(o))
                   : radar([p.stu,p.mov,p.ctl,p.sta].map(attr20),['구위','무브','제구','체력'],ratColor(o));
   const statLine = isB
-    ? ((s&&s.AB>0)? `<div class="kpi"><div class="k"><div class="v">${fmtAvg(s.H/s.AB)}</div><div class="l">타율</div></div><div class="k"><div class="v">${s.HR}</div><div class="l">홈런</div></div><div class="k"><div class="v">${s.RBI}</div><div class="l">타점</div></div><div class="k"><div class="v">${fmtAvg((s.H+s.BB+s.HBP)/(s.AB+s.BB+s.HBP))}</div><div class="l">출루율</div></div><div class="k"><div class="v">${s.G}</div><div class="l">경기</div></div></div>` : '<div class="muted">이번 시즌 출전 기록 없음</div>')
+    ? ((s&&s.AB>0)? `<div class="kpi"><div class="k"><div class="v">${fmtAvg(s.H/s.AB)}</div><div class="l">타율</div></div><div class="k"><div class="v">${s.HR}</div><div class="l">홈런</div></div><div class="k"><div class="v">${s.RBI}</div><div class="l">타점</div></div><div class="k"><div class="v">${fmtAvg((s.H+s.BB+s.HBP)/(s.AB+s.BB+s.HBP+(s.SF||0)))}</div><div class="l">출루율</div></div><div class="k"><div class="v">${s.G}</div><div class="l">경기</div></div></div>` : '<div class="muted">이번 시즌 출전 기록 없음</div>')
     : ((s&&s.G>0)? `<div class="kpi"><div class="k"><div class="v">${fmtEra(s.ER,s.OUT)}</div><div class="l">평균자책</div></div><div class="k"><div class="v">${s.W}-${s.L}</div><div class="l">승-패</div></div><div class="k"><div class="v">${s.SV}</div><div class="l">세이브</div></div><div class="k"><div class="v">${ipStr(s.OUT)}</div><div class="l">이닝</div></div><div class="k"><div class="v">${s.SO}</div><div class="l">탈삼진</div></div></div>` : '<div class="muted">이번 시즌 등판 기록 없음</div>');
   const form = rt&&rt.last.length? rt.last.map(r=>`<span class="pill" style="background:${rtColor(r)}33;color:${rtColor(r)};font-size:13px">${r.toFixed(1)}</span>`).join(' ') : '<span class="muted">기록 없음</span>';
   const c=Math.round(K.cond(p));
