@@ -597,10 +597,12 @@ const Comm={
   suspense(g,ab){
     const oc=ab.oc, dpPossible=g.bases[0]&&g.outs<2;
     let opts;
-    if(oc==='HR') opts=[['높이 떴습니다! 멀리, 멀리…','deep'],['잘 맞았습니다! 외야로 쭉 뻗어갑니다…','deep']];
-    else if(oc==='2B'||oc==='3B') opts=[['날카로운 타구! 외야로…','sharp'],['잘 맞았습니다! 외야로 쭉 뻗어갑니다…','deep']];
+    // "deep" (warning-track) build-ups stay rare on outs so they keep their bite; homers sometimes start as an ordinary fly
+    if(oc==='HR') opts=[['높이 떴습니다! 멀리, 멀리…','deep'],['잘 맞았습니다! 외야로 쭉 뻗어갑니다…','deep'],['외야로 뜬 타구…','fly']];
+    else if(oc==='2B'||oc==='3B') opts=[['날카로운 타구! 외야로…','sharp'],['잘 맞았습니다! 외야로 쭉 뻗어갑니다…','deep'],['외야로 뜬 타구…','fly']];
     else if(oc==='1B') opts=[['날카로운 타구!','sharp'],['빗맞은 타구…','weak'],['맞았습니다! 타구는…','any']];
-    else opts=[['맞았습니다! 타구는…','any'],['빗맞은 타구…','weak'],['날카로운 타구!','sharp']].concat(dpPossible?[]:[['높이 떴습니다! 멀리, 멀리…','deep']]);
+    else if(!dpPossible&&Math.random()<0.08) opts=[['높이 떴습니다! 멀리, 멀리…','deep']];
+    else opts=[['맞았습니다! 타구는…','any'],['빗맞은 타구…','weak'],['날카로운 타구!','sharp']].concat(dpPossible?[]:[['외야로 뜬 타구…','fly']]);
     const o=this.pick(opts); ab.flavor=o[1];
     return {t:o[0],k:'tense',wait:o[1]==='deep'?1.5:1.1};
   },
@@ -616,6 +618,7 @@ const Comm={
       case 'OUT': {
         const of=P(['좌익수','중견수','우익수']), inf=P(['유격수','2루수','3루수','1루수','투수']);
         if(fl==='deep'){ t=`${of}, 뒤로… 뒤로… 담장 앞에서 잡아냅니다! 아웃.`; k='tense'; }
+        else if(fl==='fly') t=P([`${of} 플라이 아웃.`,`${of}, 앞으로 달려 나와 잡습니다. 아웃.`,`${of}가 자리를 잡고… 잡았습니다. 아웃.`]);
         else if(fl==='weak') t=P([`${inf} 앞 땅볼, 1루에서 아웃.`,`내야 플라이, ${inf}가 잡습니다.`]);
         else if(fl==='sharp') t=P([`${inf} 정면 직선타! 아웃.`,`${of} 정면으로 가는 타구, 잡혔습니다.`,`${inf}, 몸을 날려 잡아냅니다! 아웃!`]);
         else t=P([`${inf} 땅볼, 1루에서 아웃.`,`${of} 플라이 아웃.`,`${inf} 땅볼, 깔끔하게 처리합니다.`]);
