@@ -157,7 +157,7 @@ const ACTIONS={
     const theirs=findPlayer(a.team,a.give), mine=findPlayer(USER,a.want);
     if(!theirs||!mine) return '선수 구성이 바뀌어 제안이 무효가 되었습니다.';
     const b=tradeBudget([a.want],a.team,[a.give]); if(!b.ok) return '❌ '+b.msg;
-    doTrade(a.team,[a.want],[a.give]);
+    const why=doTrade(a.team,[a.want],[a.give]); if(why) return '❌ '+why;
     return `트레이드 성사! ${a.want} ↔ ${a.give} (${K.ROSTERS[a.team].name}). 라인업이 자동 재구성되었습니다.`; },
   declineTrade(){ return '제안을 거절했습니다.'; },
   renew(m,a){ const p=findPlayer(USER,a.n); if(!p) return '이미 팀을 떠난 선수입니다.';
@@ -390,12 +390,14 @@ function rtColor(r){ return r>=7.5?'#36c275':r>=6.8?'#9fd26b':r>=6.2?'#d6e2c4':r
 // ---------- lineup preparation (rest, injuries, call-ups) ----------
 function callUp(t,type,pos){
   const f=farmOf(t);
+  const off=entryCount(t)>=ENTRY_MAX? clearSpot(t,type) : null;
   let p=f.filter(x=>x.type===type&&!K.isInjured(x)&&!(t===USER&&downLeft(x)))
-    .sort((a,b)=>(pos? (b.role===pos)-(a.role===pos) : 0) || K.ovr(b)-K.ovr(a))[0];
+    .filter(x=>x!==off).sort((a,b)=>(pos? (b.role===pos)-(a.role===pos) : 0) || K.ovr(b)-K.ovr(a))[0];
   if(p) doPromote(t,p);
   else { p=makeRookie(type,pos); ensurePlayer(p); if(type==='B') K.ROSTERS[t].batters.push(p); else K.ROSTERS[t].pitchers.push(p); }
   if(t===USER){ const fl=futLine(p); send('2군 감독','🧢',`${p.n} 1군 콜업`,
-    `부상자가 많아 2군에서 ${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})을(를) 올렸습니다.${fl? '\n'+fl : ''}`, []); }
+    `부상자가 많아 2군에서 ${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})을(를) 올렸습니다.${fl? '\n'+fl : ''}` +
+    (off? `\n엔트리 ${ENTRY_MAX}명을 지키려고 부상 중인 ${off.n}을(를) 말소했습니다.` : ''), []); }
   return p;
 }
 function prepareCfg(team, cfg){
@@ -450,7 +452,8 @@ function afterGame(res){
     maybeMedia(ug);
     checkForeignForm(ug);
     if(state.phase==='regular'){
-      farmGame();
+      // a Futures hiccup must never undo the 1군 game that was just recorded
+      try{ farmGame(); }catch(e){ console.error('Futures game skipped', e); }
       if(ug%TR_EVERY===0) trainingTick();
       if(ug%TR_REPORT===0) trainingReport();
       if(ug%24===0) farmReport();
@@ -540,7 +543,18 @@ function tradeBudget(outNames, team, inNames){
   return {ok: after<=limit || inn<=out, after:Math.round(after*10)/10, limit:Math.round(limit*10)/10,
     msg:`연봉 총액이 예산 한도를 넘습니다 (${after.toFixed(1)}억 > ${limit.toFixed(1)}억). 이사회가 승인하지 않습니다.`};
 }
+// can both clubs still field a legal 1군 after the swap? Checked when the deal is offered and
+// again when it runs, since a player may have been sent down or released in between.
+function tradeCheck(team, fromUser, fromThem){
+  if(!fromUser.length || !fromThem.length) return '양쪽 모두 선수를 한 명 이상 골라야 합니다.';
+  const on=(t,n)=>allPlayers(t).find(x=>x.n===n);
+  const gone=fromUser.filter(n=>!on(USER,n)).concat(fromThem.filter(n=>!on(team,n)));
+  if(gone.length) return `${gone.join(', ')}은(는) 지금 1군에 없어 트레이드할 수 없습니다.`;
+  const outP=fromUser.map(n=>on(USER,n)), inP=fromThem.map(n=>on(team,n));
+  return entryProblem(USER,outP,inP,'우리 팀 ') || entryProblem(team,inP,outP,`${K.ROSTERS[team].name} `);
+}
 function doTrade(team, fromUser, fromThem){
+  const why=tradeCheck(team, fromUser, fromThem); if(why) return why;
   function move(srcT,dstT,name){
     const r=K.ROSTERS[srcT]; let i=r.batters.findIndex(x=>x.n===name);
     if(i>=0){ const p=r.batters.splice(i,1)[0]; p.listed=false; p.bench=0; K.ROSTERS[dstT].batters.push(p); return; }
@@ -551,6 +565,7 @@ function doTrade(team, fromUser, fromThem){
   fromThem.forEach(n=>move(team,USER,n));
   fm().promises=fm().promises.filter(pr=>!!findPlayer(USER,pr.n));
   [USER,team].forEach(t=>{ const d=K.defaultLineup(t); state.cfgs[t]={teamId:t,lineup:d.lineup.slice(),positions:d.positions.slice(),rotation:d.rotation.slice(),bullpen:d.bullpen.slice(),closer:d.closer}; });
+  return '';
 }
 
 // ---------- coach report: what is costing games, and two things to change ----------
@@ -648,9 +663,10 @@ function signFA(i){
   ask(`${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})과 ${x.yrs}년 연봉 ${x.ask}억 원에 계약합니다.\n계약금 ${bonus}억 원은 구단 잔고에서 나갑니다.`, 'FA 계약', ()=>{
     f.fa.splice(f.fa.indexOf(x),1);
     p.sal=x.ask; p.yrs=x.yrs; p.mor=72; p.cond=100; p.inj=0; p.listed=false; p.bench=0;
-    if(p.type==='B') K.ROSTERS[USER].batters.push(p); else K.ROSTERS[USER].pitchers.push(p);
+    const where=joinClub(USER,p);
     f.fin.balance-=bonus; f.fin.exp+=bonus;
-    send('단장','✍️',`FA ${p.n} 영입`, `${p.n}과(와) ${x.yrs}년 연봉 ${x.ask}억 원에 계약했습니다. 계약금 ${bonus}억 원.`, []);
+    send('단장','✍️',`FA ${p.n} 영입`, `${p.n}과(와) ${x.yrs}년 연봉 ${x.ask}억 원에 계약했습니다. 계약금 ${bonus}억 원.` +
+      (where==='2군'? `\n1군 엔트리(${ENTRY_MAX}명)가 가득 차 2군에 등록했습니다.` : ''), []);
     render();
   });
 }
@@ -670,8 +686,11 @@ function aiSignFAs(){
 const FX_NAMES=['로페즈','마르테','브리토','오도넬','헤이워드','카펜터','레예스','몬테로','갈비스','스탠튼','라미레스','클라크','파울러','밀러','앤더슨','톰슨','로저스','하퍼','크루즈','벨트레','마차도','가르시아','소토','베탄코트','플로레스','에반스','콜','브룩스','그레이','토레스'];
 const FX_MAX=4, FX_SWAPS=2;
 function foreignOf(t){ return allPlayers(t).filter(p=>p.f); }
-function makeForeign(type){
-  const used=allNames(); let n=FX_NAMES.find(x=>!used.has(x)&&Math.random()<0.3)||FX_NAMES.find(x=>!used.has(x))||('외국인'+R(10,99));
+// `used` is shared across one batch of candidates so two of them never get the same name
+function makeForeign(type, used){
+  used=used||allNames(); let n=FX_NAMES.find(x=>!used.has(x)&&Math.random()<0.3)||FX_NAMES.find(x=>!used.has(x));
+  for(let i=0;!n||used.has(n);i++) n='외국인'+R(10,99)+(i>50?i:'');
+  used.add(n);
   const age=R(25,32);
   let p;
   if(type==='B'){ const pos=['1B','LF','RF','3B','CF','SS','2B'][R(0,6)];
@@ -683,7 +702,8 @@ function makeForeign(type){
 }
 function scoutList(){
   const f=fm(), ug=userGamesPlayed();
-  if(!f.scout || f.scout.year!==state.year || ug-f.scout.ug>=20) f.scout={year:state.year, ug, list:[makeForeign('P'),makeForeign('P'),makeForeign('B'),makeForeign('B')]};
+  if(!f.scout || f.scout.year!==state.year || ug-f.scout.ug>=20) { const used=allNames(); (f.fa||[]).forEach(x=>used.add(x.p.n));
+    f.scout={year:state.year, ug, list:['P','P','B','B'].map(t=>makeForeign(t,used))}; }
   return f.scout.list;
 }
 function fxWindowOpen(){ return state.phase==='stove' || (state.phase==='regular' && userGamesPlayed()<108); }
@@ -707,9 +727,12 @@ function fxSign(i,outName){
   if(after>limit){ notify(`연봉 총액이 한도를 넘습니다 (${after.toFixed(1)}억 > ${limit.toFixed(1)}억).`); return; }
   if(!out && foreignOf(USER).length>=FX_MAX){ notify('외국인 선수 정원이 찼습니다.'); return; }
   const fee=Math.round((cand.sal*0.2 + (out?out.sal*0.5:0))*10)/10;
-  const r=K.ROSTERS[USER];
-  if(out){ if(out.type==='B') r.batters=r.batters.filter(x=>x!==out); else r.pitchers=r.pitchers.filter(x=>x!==out); }
-  if(cand.type==='B') r.batters.push(cand); else r.pitchers.push(cand);
+  if(allNames().has(cand.n)){ notify(`같은 이름의 선수(${cand.n})가 이미 리그에 있습니다. 다른 후보를 고르세요.`); return; }
+  const r=K.ROSTERS[USER], onEntry=!!out && allPlayers(USER).indexOf(out)>=0;
+  const room=entryCount(USER)-(onEntry?1:0)<ENTRY_MAX;
+  const why=entryProblem(USER, onEntry?[out]:[], room?[cand]:[]); if(why){ notify(why); return; }
+  if(out){ if(out.type==='B') r.batters=r.batters.filter(x=>x!==out); else r.pitchers=r.pitchers.filter(x=>x!==out); r.farm=farmOf(USER).filter(x=>x!==out); }
+  joinClub(USER,cand);
   f.scout.list.splice(i,1);
   f.fxSwaps={year:state.year, n:(f.fxSwaps&&f.fxSwaps.year===state.year?f.fxSwaps.n:0)+(out&&state.phase==='regular'?1:0)};
   f.fin.balance-=fee; f.fin.exp+=fee;
@@ -1183,9 +1206,11 @@ function onSeasonEnd(){
   // contracts: one year off everyone's deal; the user negotiates expiring ones
   const toFA=[];
   f.fa=[];
-  K.TEAM_IDS.forEach(t=>allPlayers(t).forEach(p=>{
+  // 2군 players are under contract too; minor-league deals (under 1억) roll over a year on their own
+  K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(p=>{
     p.yrs=(p.yrs||1)-1;
     if(p.yrs>0) return;
+    if(isFarm(t,p) && (p.sal||0)<1){ p.yrs=1; return; }
     if(t!==USER){ // AI clubs re-sign most players; some veterans and imports test the market
       if((p.age>=28&&p.age<=34&&Math.random()<0.3) || (p.f&&Math.random()<0.25)){ toFA.push([t,p]); return; }
       p.yrs=2; p.sal=renewSalary(p); return; }
@@ -1198,7 +1223,7 @@ function onSeasonEnd(){
       `${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})의 계약이 만료됩니다.\n현재 연봉 ${p.sal}억 원 · 요구 연봉 ${ask}억 원 · 사기 ${moraleLabel(K.mor(p))}\n\n` +
       `다음 시즌 시작 전까지 결정하지 않으면 FA로 팀을 떠납니다.`, acts);
   }));
-  toFA.forEach(([t,p])=>{ const r=K.ROSTERS[t]; r.batters=r.batters.filter(x=>x!==p); r.pitchers=r.pitchers.filter(x=>x!==p); addFA(p,t); });
+  toFA.forEach(([t,p])=>{ const r=K.ROSTERS[t]; r.batters=r.batters.filter(x=>x!==p); r.pitchers=r.pitchers.filter(x=>x!==p); r.farm=farmOf(t).filter(x=>x!==p); addFA(p,t); });
   if(f.fa.length) send('단장','🆓',`FA 시장 개장 (${f.fa.length}명)`,
     `다른 구단과 재계약하지 않은 선수들이 FA 시장에 나왔습니다.\n\n${f.fa.slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).slice(0,6).map(x=>`• ${x.p.n} (${x.p.pos||x.p.role}, ${x.p.age}세, OVR ${K.ovr(x.p)}) 요구 ${x.yrs}년 ${x.ask}억`).join('\n')}\n\n구단 탭의 FA 시장에서 계약할 수 있습니다. 스토브리그가 끝나고 스프링캠프가 시작되면 남은 선수들은 다른 구단과 계약합니다.`, []);
 }
@@ -1228,7 +1253,7 @@ function offseasonMoves(){
     const r=K.ROSTERS[t];
     const out=p=>{ if(t===USER&&p.leaving){ left.push(p.n); addFA(p,USER); return true; }
       if(p.age>=39 && K.ovr(p)<72){ if(t===USER) retired.push(p.n); return true; } return false; };
-    r.batters=r.batters.filter(p=>!out(p)); r.pitchers=r.pitchers.filter(p=>!out(p));
+    r.batters=r.batters.filter(p=>!out(p)); r.pitchers=r.pitchers.filter(p=>!out(p)); r.farm=farmOf(t).filter(p=>!out(p));
     allPlayers(t).forEach(p=>{ p.cond=100; p.inj=0; p.bench=0; p.expiring=false; p.mor=clampN(p.mor*0.6+62*0.4,5,99); });
     // draft: four rookies a club join the farm; the farm fills any hole in the 1군
     const fx=offseasonFarm(t);
@@ -1316,15 +1341,23 @@ function setAutoRest(v){ fm().autoRest=!!v; render(); }
 // release a player: he leaves now, the club pays half of what's left on his deal
 function releasePlayer(n){
   const p=findPlayer(USER,n); if(!p) return;
-  const r=K.ROSTERS[USER];
-  if(p.type==='B' && r.batters.filter(x=>!K.isInjured(x)).length<=10){ notify('타자가 부족해 방출할 수 없습니다 (최소 10명).'); return; }
-  if(p.type==='P' && r.pitchers.filter(x=>!K.isInjured(x)).length<=8){ notify('투수가 부족해 방출할 수 없습니다 (최소 8명).'); return; }
+  const why=releaseBlock(p); if(why){ notify(why); return; }
   const cost=Math.round(p.sal*Math.max(1,p.yrs)*0.5*10)/10;
   ask(`${n}을(를) 방출합니다. 잔여 계약의 절반인 ${cost}억 원을 위약금으로 지급합니다.`, '방출', ()=>doRelease(p,n,cost));
 }
+// a 1군 release must leave a legal roster: the entry minimums, five starters, and enough healthy bodies
+function releaseBlock(p){
+  const r=K.ROSTERS[USER]; if(allPlayers(USER).indexOf(p)<0) return '';
+  if(p.type==='B' && r.batters.filter(x=>!K.isInjured(x)).length<=10) return '타자가 부족해 방출할 수 없습니다 (건강한 타자 최소 10명).';
+  if(p.type==='P' && r.pitchers.filter(x=>!K.isInjured(x)).length<=8) return '투수가 부족해 방출할 수 없습니다 (건강한 투수 최소 8명).';
+  const why=entryProblem(USER,[p],[]); return why? why+' 2군 선수를 먼저 올리세요.' : '';
+}
 function doRelease(p,n,cost){
   const r=K.ROSTERS[USER];
+  if(!findPlayer(USER,n)) return;
+  const why=releaseBlock(p); if(why){ notify(why); closeModal(); return; }
   if(p.type==='B') r.batters=r.batters.filter(x=>x!==p); else r.pitchers=r.pitchers.filter(x=>x!==p);
+  r.farm=farmOf(USER).filter(x=>x!==p);
   const f=fm(); f.fin.balance-=cost; f.fin.exp+=cost;
   f.promises=f.promises.filter(pr=>pr.n!==n); f.restNext=f.restNext.filter(x=>x!==n);
   const c=state.cfgs[USER];
@@ -1616,6 +1649,34 @@ const ENTRY_MAX=28, MIN_1B=12, MIN_1P=11, DOWN_GAMES=10, FARM_CAP=30;
 function farmOf(t){ const r=K.ROSTERS[t]; if(!r.farm) r.farm=[]; return r.farm; }
 function isFarm(t,p){ return farmOf(t).indexOf(p)>=0; }
 function entryCount(t){ const r=K.ROSTERS[t]; return r.batters.length+r.pitchers.length; }
+// would the 1군 still be legal after outP leave and inP arrive? Only a change that makes a
+// shortfall (or the overflow) worse is refused, so a club already short can still swap evenly.
+function entryProblem(t, outP, inP, who){
+  const before=allPlayers(t), after=before.filter(p=>outP.indexOf(p)<0).concat(inP);
+  const cnt=ps=>({b:ps.filter(p=>p.type==='B').length, p:ps.filter(p=>p.type==='P').length, sp:ps.filter(p=>p.type==='P'&&p.role==='SP').length, n:ps.length});
+  const a=cnt(after), b=cnt(before); who=who||'';
+  if(a.b<MIN_1B && a.b<b.b) return `${who}1군 타자가 ${a.b}명으로 줄어듭니다 (최소 ${MIN_1B}명).`;
+  if(a.p<MIN_1P && a.p<b.p) return `${who}1군 투수가 ${a.p}명으로 줄어듭니다 (최소 ${MIN_1P}명).`;
+  if(a.sp<5 && a.sp<b.sp) return `${who}선발투수가 ${a.sp}명으로 줄어듭니다 (최소 5명).`;
+  if(a.n>ENTRY_MAX && a.n>b.n) return `${who}1군 엔트리가 ${a.n}명이 됩니다 (최대 ${ENTRY_MAX}명). 먼저 다른 선수를 2군으로 내리세요.`;
+  return '';
+}
+// a new signing joins the 1군 when there is room, otherwise the farm
+function joinClub(t,p){
+  const r=K.ROSTERS[t];
+  if(entryCount(t)<ENTRY_MAX){ (p.type==='B'?r.batters:r.pitchers).push(p); return '1군'; }
+  farmOf(t).push(p); return '2군';
+}
+// an injured player goes off the entry to make room for a call-up
+function clearSpot(t,type){
+  const r=K.ROSTERS[t], hurt=(type==='B'?r.batters:r.pitchers).filter(p=>K.isInjured(p))
+    .concat((type==='B'?r.pitchers:r.batters).filter(p=>K.isInjured(p))).sort((a,b)=>b.inj-a.inj)[0];
+  if(!hurt) return null;
+  const arr=hurt.type==='B'?r.batters:r.pitchers; arr.splice(arr.indexOf(hurt),1); farmOf(t).push(hurt);
+  if(t===USER){ hurt.downUg=userGamesPlayed(); hurt.downYear=state.year; }
+  if(state.cfgs[t]) repairCfg(t);
+  return hurt;
+}
 function farmFromRow(row){
   const [n,type,pos,age,sal,a,b,c,d,e,g]=row;
   return type==='B'? {n,type,pos,age,sal,con:a,pow:b,eye:c,spd:d,fld:e,arm:g} : {n,type,role:pos,age,sal,stu:a,ctl:b,mov:c,sta:d};
@@ -1634,6 +1695,14 @@ function seedFarm(t){
   ((window.KBO_FARM||{})[t]||[]).forEach(row=>{ if(used.has(row[0])) return; f.push(farmFromRow(row)); used.add(row[0]); });
   fillFarm(t);
 }
+// a Futures club needs nine healthy bats, five healthy arms and a healthy starter; the
+// development squad fills any gap (the farm is trimmed back to size in the offseason)
+function farmTopUp(t){
+  const f=farmOf(t), ok=p=>!K.isInjured(p), add=(type,pos)=>{ const p=makeRookie(type,pos); ensurePlayer(p); f.push(p); };
+  while(f.filter(p=>p.type==='B'&&ok(p)).length<9) add('B');
+  while(f.filter(p=>p.type==='P'&&p.role==='SP'&&ok(p)).length<1) add('P','SP');
+  while(f.filter(p=>p.type==='P'&&ok(p)).length<5) add('P','RP');
+}
 function futures(){ const f=fm(); if(!f.fut||f.fut.year!==state.year) f.fut={year:state.year,W:0,L:0,T:0,g:0,bat:{},pit:{},log:[]}; return f.fut; }
 // one Futures game for the user's farm against another club's farm. The two squads are
 // mounted as temporary rosters so the normal engine (lineups, fatigue, injuries) runs them.
@@ -1641,13 +1710,17 @@ function farmGame(){
   const fu=futures(), others=K.TEAM_IDS.filter(t=>t!==USER), opp=others[fu.g%others.length];
   const H='F_'+USER, A='F_'+opp, RS=K.ROSTERS;
   const mount=t=>({name:RS[t].name+' 2군', color:RS[t].color, batters:farmOf(t).filter(p=>p.type==='B'), pitchers:farmOf(t).filter(p=>p.type==='P')});
+  // the clubs sitting out rest a day, so injured farmhands heal whether or not they play
+  others.filter(t=>t!==opp).forEach(t=>{ const id='F_'+t; RS[id]=mount(t); try{ K.applyFatigue(id,null); } finally { delete RS[id]; } });
+  [USER,opp].forEach(farmTopUp);
   RS[H]=mount(USER); RS[A]=mount(opp);
   try{
-    if([H,A].some(id=>RS[id].batters.filter(p=>!K.isInjured(p)).length<9 || RS[id].pitchers.filter(p=>!K.isInjured(p)).length<5)) return null;
-    const cfg=id=>{ const d=K.defaultLineup(id);
-      return K.restAdjust(id,{teamId:id, lineup:d.lineup, positions:d.positions, rotation:d.rotation, bullpen:d.bullpen, closer:d.closer, spName:d.rotation[fu.g%Math.max(1,d.rotation.length)]},{restBelow:65}); };
+    const cfg=id=>{ const d=K.defaultLineup(id), healthy=n=>{ const p=RS[id].pitchers.find(x=>x.n===n); return p&&!K.isInjured(p); };
+      const rot=d.rotation.filter(healthy), spare=RS[id].pitchers.filter(p=>!K.isInjured(p)).sort((a,b)=>K.cond(b)*b.sta-K.cond(a)*a.sta)[0];
+      const spName=rot.length? rot[fu.g%rot.length] : spare.n;
+      return K.restAdjust(id,{teamId:id, lineup:d.lineup, positions:d.positions, rotation:d.rotation, bullpen:d.bullpen.filter(n=>n!==spName), closer:d.closer===spName?d.bullpen.find(n=>n!==spName):d.closer, spName},{restBelow:65}); };
     const home=fu.g%2===0, res=K.simGame(home?cfg(H):cfg(A), home?cfg(A):cfg(H), {maxInnings:9});
-    K.applyFatigue(H,res.box);
+    K.applyFatigue(H,res.box); K.applyFatigue(A,res.box);
     const bx=res.box[H], add=(dst,src)=>{ for(const k in src) if(typeof src[k]==='number') dst[k]=(dst[k]||0)+src[k]; };
     for(const n in bx.bat){ const s=fu.bat[n]||(fu.bat[n]={G:0}); add(s,bx.bat[n]); if(bx.bat[n].PA>0) s.G++; }
     for(const n in bx.pit){ add(fu.pit[n]||(fu.pit[n]={}), bx.pit[n]); }
@@ -1855,7 +1928,7 @@ function farmView(){
 }
 
 window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, showSetup, setupPick, setupBg, setupName, setupStart, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
-  tradeBudget, doTrade, payroll, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
+  tradeBudget, tradeCheck, doTrade, payroll, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,
   springNext, springPlayNext, springRecord, springSimAll, openSeason, SPRING_GAMES, gameReport, renderFeed, setFeedFilter, logGame, profileTab,

@@ -999,11 +999,11 @@ function startPostseason(){
 }
 function psOpenSeries(hi, lo){
   const ps=state.postseason, rd=PS_ROUNDS[ps.stage];
-  ps.cur={name:rd.name, hi, lo, bestOf:rd.bestOf, need:Math.ceil(rd.bestOf/2), hiStart:rd.hiStart||0, maxGames:rd.maxGames||Infinity,
+  ps.cur={name:rd.name, hi, lo, bestOf:rd.bestOf, need:Math.ceil(rd.bestOf/2), hiStart:rd.hiStart||0, maxGames:rd.maxGames||0,
     hiHomeAll:!!rd.hiHomeAll, wHi:rd.hiStart||0, wLo:0, games:[]};
   if(hi===USER||lo===USER) FM.psSeriesMessage(ps.cur);
 }
-function psSeriesOver(c){ return c.wHi>=c.need || c.wLo>=c.need || c.need-c.wLo>c.maxGames-c.games.length; }
+function psSeriesOver(c){ return c.wHi>=c.need || c.wLo>=c.need || (c.maxGames>0 && c.need-c.wLo>c.maxGames-c.games.length); }
 // next game of the current series: {home, away, label}
 function psNext(){
   const ps=state.postseason; if(!ps||!ps.cur) return null;
@@ -1474,6 +1474,8 @@ function renderTrade(){
   if(!tradeTeam) tradeTeam=teams[0];
   const myAll=[...K.ROSTERS[USER].batters,...K.ROSTERS[USER].pitchers].sort((a,b)=>K.ovr(b)-K.ovr(a));
   const themAll=[...K.ROSTERS[tradeTeam].batters,...K.ROSTERS[tradeTeam].pitchers].sort((a,b)=>K.ovr(b)-K.ovr(a));
+  [...tradeOut].forEach(n=>{ if(!myAll.some(p=>p.n===n)) tradeOut.delete(n); });
+  [...tradeIn].forEach(n=>{ if(!themAll.some(p=>p.n===n)) tradeIn.delete(n); });
   const itemOut=p=>`<label class="checkitem"><input type="checkbox" ${tradeOut.has(p.n)?'checked':''} onchange="App.toggleOut('${p.n}')">
     <span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span> ${p.n} <span class="muted">${p.pos||p.role}·${p.age}세</span></label>`;
   const itemIn=p=>`<label class="checkitem"><input type="checkbox" ${tradeIn.has(p.n)?'checked':''} onchange="App.toggleIn('${p.n}')">
@@ -1482,7 +1484,8 @@ function renderTrade(){
   const inVal=[...tradeIn].reduce((a,n)=>a+playerValue(findPlayer(tradeTeam,n)),0);
   const budget = FM.tradeBudget([...tradeOut],tradeTeam,[...tradeIn]);
   const valueOk = inVal>0 && outVal>=inVal*0.98;
-  const accept = valueOk && budget.ok;
+  const roster = tradeOut.size||tradeIn.size? FM.tradeCheck(tradeTeam,[...tradeOut],[...tradeIn]) : "";
+  const accept = valueOk && budget.ok && !roster;
   return `<div class="card"><h3>트레이드 <span class="tag">상대팀 선택 후 선수 교환</span></h3>
     <div class="row" style="margin-bottom:10px">상대팀: <select onchange="App.tradeTeam(this.value)">${teams.map(t=>`<option value="${t}" ${t===tradeTeam?'selected':''}>${K.ROSTERS[t].name}</option>`).join("")}</select></div>
     <div class="row" style="align-items:flex-start">
@@ -1494,6 +1497,7 @@ function renderTrade(){
     <div class="deal-result ${accept?'deal-ok':'deal-no'}">${
       tradeIn.size===0&&tradeOut.size===0? '교환할 선수를 선택하세요.' :
       accept? '✅ 상대가 받아들일 만한 제안입니다. 트레이드를 실행하세요!' :
+      valueOk&&roster? '❌ '+roster :
       valueOk? '❌ '+budget.msg :
       '❌ 상대팀이 거절할 제안입니다. 더 좋은 카드를 제시하세요 (받을 가치 ≤ 내줄 가치).'}</div>
     <button class="btn primary" ${accept?'':'disabled'} onclick="App.execTrade()">🤝 트레이드 실행</button>
@@ -1503,7 +1507,12 @@ function renderTrade(){
 }
 function findPlayer(team,n){ const r=K.ROSTERS[team]; return r.batters.find(x=>x.n===n)||r.pitchers.find(x=>x.n===n)||(r.farm||[]).find(x=>x.n===n); }
 function execTrade(){
-  FM.doTrade(tradeTeam,[...tradeOut],[...tradeIn]); // moves players and rebuilds both lineups
+  const outs=[...tradeOut].map(n=>findPlayer(USER,n)), ins=[...tradeIn].map(n=>findPlayer(tradeTeam,n));
+  const outVal=outs.reduce((a,p)=>a+(p?playerValue(p):0),0), inVal=ins.reduce((a,p)=>a+(p?playerValue(p):0),0);
+  if(!outs.length || !(inVal>0 && outVal>=inVal*0.98)){ FM.notify('상대팀이 거절할 제안입니다.'); render(); return; }
+  const budget=FM.tradeBudget([...tradeOut],tradeTeam,[...tradeIn]); if(!budget.ok){ FM.notify(budget.msg); render(); return; }
+  const why=FM.doTrade(tradeTeam,[...tradeOut],[...tradeIn]); // moves players and rebuilds both lineups
+  if(why){ FM.notify(why); render(); return; }
   tradeOut.clear(); tradeIn.clear();
   FM.notify("트레이드 완료! 라인업이 자동 재구성되었습니다.");
   render();
