@@ -630,8 +630,11 @@ function restAdjust(teamId, cfg, opts){
     var sp=getP(teamId,cfg.spName);
     if(!sp || isInjured(sp) || cond(sp)<50){
       var pool=(cfg.rotation||[]).concat(r.pitchers.filter(function(p){return p.role!=="CL";}).map(function(p){return p.n;}));
-      var alt=pool.map(function(n){return getP(teamId,n);}).filter(function(p){return p && !isInjured(p) && cond(p)>=70;})
-        .sort(function(a,b){ return (b.role==="SP")-(a.role==="SP") || cond(b)-cond(a) || ovr(b)-ovr(a); })[0];
+      var order=function(a,b){ return (b.role==="SP")-(a.role==="SP") || cond(b)-cond(a) || ovr(b)-ovr(a); };
+      var healthyArms=pool.map(function(n){return getP(teamId,n);}).filter(function(p){return p && !isInjured(p);});
+      // prefer a fresh arm; a tired starter keeps the ball, but an injured one always gives it up
+      var alt=healthyArms.filter(function(p){return cond(p)>=70;}).sort(order)[0] ||
+        ((!sp || isInjured(sp))? healthyArms.sort(order)[0] : null);
       if(alt) out.spName=alt.n;
     }
   }

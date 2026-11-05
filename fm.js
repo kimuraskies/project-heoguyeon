@@ -9,7 +9,7 @@
 
 // ---------- small helpers ----------
 const clampN=(x,a,b)=>x<a?a:(x>b?b:x);
-const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const q=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 function hash(s){ let h=7; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h; }
 function allPlayers(t){ return K.ROSTERS[t].batters.concat(K.ROSTERS[t].pitchers); }
@@ -65,7 +65,7 @@ function marketValue(p){ // 억원, what a club would pay in a trade-ish sense
   const o=K.ovr(p), ageAdj = p.age<=25?1.6 : p.age<=28?1.3 : p.age<=31?1 : p.age<=34?0.6 : 0.3;
   return Math.max(0.5, Math.round(Math.pow(Math.max(0,o-55),2)/12*ageAdj));
 }
-function payroll(t){ return Math.round(allPlayers(t).reduce((a,p)=>a+(p.sal||0),0)*10)/10; }
+function payroll(t){ return Math.round(allPlayers(t).concat(K.ROSTERS[t].farm||[]).reduce((a,p)=>a+(p.sal||0),0)*10)/10; }
 
 // ---------- names for rookies / call-ups ----------
 const SUR=['김','이','박','최','정','강','조','윤','장','임','한','오','서','신','권','황','안','송','류','홍','전','고','문','양','손'];
@@ -108,7 +108,14 @@ function ensurePlayer(p){
   if(p.bench==null) p.bench=0;
   if(p.pot==null){ const h=hash(p.n+'p'), o=K.ovr(p);
     const room=p.age<=21? 8+h%18 : p.age<=24? 5+h%14 : p.age<=27? 2+h%9 : p.age<=30? h%4 : 0;
-    p.pot=Math.min(96,o+room); }
+    p.pot=Math.max(o,Math.min(96,o+room)); }
+}
+// aging: snapshot a player, then undo any gain that carried him past his potential
+const ATTRS={B:['con','pow','eye','spd','fld','arm'],P:['stu','ctl','mov','sta']};
+function snap(p){ const o={_ovr:K.ovr(p)}; ATTRS[p.type].forEach(k=>o[k]=p[k]); return o; }
+function capPot(p,before){
+  if(!p.pot || K.ovr(p)<=Math.max(p.pot,before._ovr)) return;
+  ATTRS[p.type].forEach(k=>{ if(p[k]>before[k]) p[k]=before[k]; });
 }
 function ensurePlayers(){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(K.ROSTERS[t].farm||[]).forEach(ensurePlayer)); }
 function ensure(){
@@ -121,6 +128,7 @@ function ensure(){
     seasonStart(true);
   }
   if(!state.fm.farmV){ K.TEAM_IDS.forEach(seedFarm); state.fm.farmV=1; }
+  if(!state.fm.farmPayV){ const fin=state.fm.fin; if(fin) fin.budget=Math.round(fin.budget+farmOf(USER).reduce((a,p)=>a+(p.sal||0),0)*1.06); state.fm.farmPayV=1; }
 }
 
 // ---------- inbox ----------
@@ -685,7 +693,7 @@ function aiSignFAs(){
 // ---------- foreign players (quota 4 incl. Asian quota, two replacements a season) ----------
 const FX_NAMES=['로페즈','마르테','브리토','오도넬','헤이워드','카펜터','레예스','몬테로','갈비스','스탠튼','라미레스','클라크','파울러','밀러','앤더슨','톰슨','로저스','하퍼','크루즈','벨트레','마차도','가르시아','소토','베탄코트','플로레스','에반스','콜','브룩스','그레이','토레스'];
 const FX_MAX=4, FX_SWAPS=2;
-function foreignOf(t){ return allPlayers(t).filter(p=>p.f); }
+function foreignOf(t){ return allPlayers(t).concat(farmOf(t)).filter(p=>p.f); }
 // `used` is shared across one batch of candidates so two of them never get the same name
 function makeForeign(type, used){
   used=used||allNames(); let n=FX_NAMES.find(x=>!used.has(x)&&Math.random()<0.3)||FX_NAMES.find(x=>!used.has(x));
@@ -943,7 +951,9 @@ function applyCamp(){
     if(!keys.length) return;
     const base = p.age<=24? 0.9 : p.age<=28? 0.55 : p.age<=32? 0.3 : 0.1; // chance of +1 per trained attribute
     let tot=0;
-    keys.forEach(k=>{ const g=Math.random()<base*(c.keys?1:0.5)? 1 : 0; if(g){ p[k]=Math.min(99,p[k]+g); tot+=g; } });
+    // camp works within potential too: a gain that would carry him past it doesn't stick
+    keys.forEach(k=>{ const g=Math.random()<base*(c.keys?1:0.5)? 1 : 0; if(!g||p[k]>=99) return;
+      const was=K.ovr(p); p[k]++; if(K.ovr(p)>Math.max(p.pot||0,was)) p[k]--; else tot++; });
     if(f.camp.focus==='fit') p.cond=100;
     if(tot>=2) gains.push(`${p.n} (+${tot})`);
   });
@@ -1673,7 +1683,7 @@ function clearSpot(t,type){
     .concat((type==='B'?r.pitchers:r.batters).filter(p=>K.isInjured(p))).sort((a,b)=>b.inj-a.inj)[0];
   if(!hurt) return null;
   const arr=hurt.type==='B'?r.batters:r.pitchers; arr.splice(arr.indexOf(hurt),1); farmOf(t).push(hurt);
-  if(t===USER){ hurt.downUg=userGamesPlayed(); hurt.downYear=state.year; }
+  if(t===USER){ hurt.downUg=userGamesAll(); hurt.downYear=state.year; }
   if(state.cfgs[t]) repairCfg(t);
   return hurt;
 }
@@ -1738,7 +1748,8 @@ function futLine(p){
 function opsOf(s){ const pa=s.AB+(s.BB||0)+(s.HBP||0)+(s.SF||0), tb=s.H+(s._2B||0)+2*(s._3B||0)+3*(s.HR||0);
   return (pa? (s.H+(s.BB||0)+(s.HBP||0))/pa : 0) + (s.AB? tb/s.AB : 0); }
 // KBO rule: a player taken off the 1군 entry can't be re-registered for 10 days
-function downLeft(p){ if(p.downYear!==state.year||p.downUg==null) return 0; return Math.max(0, DOWN_GAMES-(userGamesPlayed()-p.downUg)); }
+function userGamesAll(){ const ps=state.postseason; return userGamesPlayed()+(ps&&ps.gc? ps.gc[USER]||0 : 0); }
+function downLeft(p){ if(p.downYear!==state.year||p.downUg==null) return 0; return Math.max(0, DOWN_GAMES-(userGamesAll()-p.downUg)); }
 function promoteBlock(p){
   if(K.isInjured(p)) return `부상 중인 선수는 1군에 등록할 수 없습니다 (회복 ${p.inj}경기).`;
   if(entryCount(USER)>=ENTRY_MAX) return `1군 엔트리가 가득 찼습니다 (${ENTRY_MAX}명). 먼저 다른 선수를 2군으로 내리세요.`;
@@ -1748,7 +1759,7 @@ function promoteBlock(p){
 function doPromote(t,p){
   const f=farmOf(t); f.splice(f.indexOf(p),1);
   const r=K.ROSTERS[t]; (p.type==='B'?r.batters:r.pitchers).push(p);
-  p.bench=0; addMor(p,8);
+  p.bench=0; if(p.upMorY!==state.year){ addMor(p,8); p.upMorY=state.year; }
   if(p.type==='P' && p.role!=='SP'){ const c=state.cfgs[t]; if(c.bullpen.indexOf(p.n)<0) c.bullpen.push(p.n); }
 }
 function promote(n){
@@ -1766,7 +1777,7 @@ function demote(n){
   if(!isB && p.role==='SP' && arr.filter(x=>x.role==='SP').length<=5){ notify('선발투수가 5명 아래로 줄어듭니다. 2군 선발을 먼저 올리세요.'); return; }
   arr.splice(arr.indexOf(p),1); farmOf(USER).push(p);
   const inSeason=state.phase==='regular'||state.phase==='postseason';
-  if(inSeason){ p.downUg=userGamesPlayed(); p.downYear=state.year; }
+  if(inSeason){ p.downUg=userGamesAll(); p.downYear=state.year; }
   p.listed=false; p.bench=0; addMor(p, p.age>=30? -10 : -5);
   const f=fm(); f.restNext=f.restNext.filter(x=>x!==n); f.promises=f.promises.filter(pr=>pr.n!==n);
   repairCfg(USER);
@@ -1840,7 +1851,7 @@ function starHTML(p){ const s=starsOf(p), full=Math.floor(s);
 function growChance(t,p){
   const o=K.ovr(p), gap=(p.pot||o)-o, I=TR_INT[trOf(p).i];
   const ageF=p.age<=21?0.28 : p.age<=24?0.22 : p.age<=27?0.14 : p.age<=30?0.07 : 0.03;
-  const potF=gap<=0? 0.12 : Math.min(1.2, 0.35+gap/12);
+  const potF=gap<=0? 0 : Math.min(1.2, 0.35+gap/12);
   const play=isFarm(t,p)? 1.15 : (p.bench||0)>=5? 0.7 : 1;
   return clampN(ageF*potF*I.g*play, 0, 0.9);
 }
@@ -1852,8 +1863,11 @@ function trainingTick(){
     const tr=trOf(p), I=TR_INT[tr.i], keys=TR_FOCUS[p.type][tr.f].k;
     // a focused plan puts every gain into its attributes and lands a little more often
     if(Math.random()<growChance(USER,p)*(tr.f==='bal'?1:1.15)){
-      const k=keys.filter(k=>p[k]<99)[Math.floor(Math.random()*keys.length)];
-      if(k){ p[k]++; (p.grow=p.grow||[]).push([state.year,k]); if(p.grow.length>40) p.grow.shift(); f.trLog.push({n:p.n, k, farm:isFarm(USER,p)}); }
+      const room=keys.filter(k=>p[k]<99), k=room[Math.floor(Math.random()*room.length)], was=K.ovr(p);
+      if(k){ p[k]++; }
+      // potential is a ceiling: a point that would carry him past it doesn't stick
+      if(k && K.ovr(p)>Math.max(p.pot||0,was)){ p[k]--; }
+      else if(k){ (p.grow=p.grow||[]).push([state.year,k]); if(p.grow.length>40) p.grow.shift(); f.trLog.push({n:p.n, k, farm:isFarm(USER,p)}); }
     }
     p.cond=clampN(K.cond(p)+I.c,0,100);
     if(I.inj && Math.random()<I.inj){ p.inj=R(2,6); f.trLog.push({n:p.n, hurt:p.inj}); }
@@ -1928,7 +1942,7 @@ function farmView(){
 }
 
 window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, showSetup, setupPick, setupBg, setupName, setupStart, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
-  tradeBudget, tradeCheck, doTrade, payroll, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
+  tradeBudget, tradeCheck, doTrade, payroll, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,
   springNext, springPlayNext, springRecord, springSimAll, openSeason, SPRING_GAMES, gameReport, renderFeed, setFeedFilter, logGame, profileTab,

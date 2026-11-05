@@ -1070,15 +1070,17 @@ function ageRosters(){
     const farm=K.ROSTERS[t].farm||[];
     K.ROSTERS[t].batters.concat(farm.filter(p=>p.type==='B')).forEach(p=>{
       p.age++;
-      const d = room(p,ageDelta(p.age));
+      const d = room(p,ageDelta(p.age)), was=FM.snap(p);
       ['con','pow','eye'].forEach(k=> p[k]=clamp(p[k]+d+rint(-1,1),40,99));
       ['spd','fld','arm'].forEach(k=> p[k]=clamp(p[k]+ (p.age>=31? d-1 : d) + rint(-1,1),40,99));
+      FM.capPot(p,was);
     });
     K.ROSTERS[t].pitchers.concat(farm.filter(p=>p.type==='P')).forEach(p=>{
       p.age++;
-      const d=room(p,ageDelta(p.age));
+      const d=room(p,ageDelta(p.age)), was=FM.snap(p);
       ['stu','ctl','mov'].forEach(k=> p[k]=clamp(p[k]+d+rint(-1,1),40,99));
       p.sta=clamp(p.sta + (p.age>=32? d-1:d) + rint(-1,1),35,99);
+      FM.capPot(p,was);
     });
   }
 }
@@ -1191,7 +1193,8 @@ function heroInfo(rank){
       cta:`<button class="btn primary hero-cta" onclick="FM.openSeason()">${I('trophy')}${state.year} 정규시즌 개막</button>`, more:''};
   }
   if(ph==="regular"){
-    if(!next) return {eyebrow:`${state.year} SEASON / FINAL`, title:"정규시즌 종료", sub:"포스트시즌 일정을 기다립니다.", m:null, cta:'', more:''};
+    if(!next) return {eyebrow:`${state.year} SEASON / FINAL`, title:"정규시즌 종료", sub:"우리 팀 일정은 끝났습니다. 남은 다른 구단 경기를 마치면 포스트시즌이 시작됩니다.", m:null,
+      cta:`<button class="btn primary hero-cta" onclick="App.simRest()">${I('skip')}남은 경기 진행</button>`, more:''};
     const opp=next.home===USER?next.away:next.home;
     return {eyebrow:`NEXT GAME / GAME ${pad(played+1)}`, title:`${next.home===USER?'홈':'원정'} · ${K.ROSTERS[opp].name}전`,
       sub:`${played+1}번째 경기 · 남은 ${SEASON_GAMES-played}경기${played?` · 현재 ${rank}위`:''}`, m:{home:next.home,away:next.away,label:'정규시즌'},
