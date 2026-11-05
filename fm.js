@@ -70,7 +70,7 @@ function payroll(t){ return Math.round(allPlayers(t).reduce((a,p)=>a+(p.sal||0),
 // ---------- names for rookies / call-ups ----------
 const SUR=['김','이','박','최','정','강','조','윤','장','임','한','오','서','신','권','황','안','송','류','홍','전','고','문','양','손'];
 const SYL=['민','준','서','현','우','진','호','성','재','영','지','훈','동','태','승','하','도','윤','건','혁','수','찬','규','원','석','빈','율','온','결','형'];
-function allNames(){ const s=new Set(); K.TEAM_IDS.forEach(t=>allPlayers(t).forEach(p=>s.add(p.n))); return s; }
+function allNames(){ const s=new Set(); K.TEAM_IDS.forEach(t=>allPlayers(t).concat(K.ROSTERS[t].farm||[]).forEach(p=>s.add(p.n))); return s; }
 function newName(){
   const used=allNames();
   for(let i=0;i<500;i++){
@@ -106,8 +106,11 @@ function ensurePlayer(p){
   // remaining years: veterans on short deals; others spread 1..4 (1 year ~15%) so few expire at once
   if(p.yrs==null){ const h=hash(p.n+'y')%20; p.yrs = p.age>=35? 1+hash(p.n)%2 : h<3?1 : h<9?2 : h<15?3 : 4; }
   if(p.bench==null) p.bench=0;
+  if(p.pot==null){ const h=hash(p.n+'p'), o=K.ovr(p);
+    const room=p.age<=21? 8+h%18 : p.age<=24? 5+h%14 : p.age<=27? 2+h%9 : p.age<=30? h%4 : 0;
+    p.pot=Math.min(96,o+room); }
 }
-function ensurePlayers(){ K.TEAM_IDS.forEach(t=>allPlayers(t).forEach(ensurePlayer)); }
+function ensurePlayers(){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(K.ROSTERS[t].farm||[]).forEach(ensurePlayer)); }
 function ensure(){
   if(!state) return;
   ensurePlayers();
@@ -117,6 +120,7 @@ function ensure(){
       lastWarn:-99, lastOffer:-99, lastTalk:{}, rt:{}, board:null, fin:null, fired:false, lastChance:false };
     seasonStart(true);
   }
+  if(!state.fm.farmV){ K.TEAM_IDS.forEach(seedFarm); state.fm.farmV=1; }
 }
 
 // ---------- inbox ----------
@@ -385,10 +389,13 @@ function rtColor(r){ return r>=7.5?'#36c275':r>=6.8?'#9fd26b':r>=6.2?'#d6e2c4':r
 
 // ---------- lineup preparation (rest, injuries, call-ups) ----------
 function callUp(t,type,pos){
-  const p=makeRookie(type,pos);
-  if(type==='B') K.ROSTERS[t].batters.push(p); else K.ROSTERS[t].pitchers.push(p);
-  if(t===USER) send('2군 감독','🧢',`${p.n} 1군 콜업`,
-    `부상자가 많아 2군에서 ${p.n}(${p.age}세, ${posFull(p.pos||p.role)})을(를) 올렸습니다.`, []);
+  const f=farmOf(t);
+  let p=f.filter(x=>x.type===type&&!K.isInjured(x)&&!(t===USER&&downLeft(x)))
+    .sort((a,b)=>(pos? (b.role===pos)-(a.role===pos) : 0) || K.ovr(b)-K.ovr(a))[0];
+  if(p) doPromote(t,p);
+  else { p=makeRookie(type,pos); ensurePlayer(p); if(type==='B') K.ROSTERS[t].batters.push(p); else K.ROSTERS[t].pitchers.push(p); }
+  if(t===USER){ const fl=futLine(p); send('2군 감독','🧢',`${p.n} 1군 콜업`,
+    `부상자가 많아 2군에서 ${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})을(를) 올렸습니다.${fl? '\n'+fl : ''}`, []); }
   return p;
 }
 function prepareCfg(team, cfg){
@@ -442,6 +449,12 @@ function afterGame(res){
     coachReport(ug);
     maybeMedia(ug);
     checkForeignForm(ug);
+    if(state.phase==='regular'){
+      farmGame();
+      if(ug%TR_EVERY===0) trainingTick();
+      if(ug%TR_REPORT===0) trainingReport();
+      if(ug%24===0) farmReport();
+    }
     if(ug-f.board.lastReview>=12 && state.phase==='regular'){ f.board.lastReview=ug; boardReview(); }
   }
 }
@@ -1217,15 +1230,12 @@ function offseasonMoves(){
       if(p.age>=39 && K.ovr(p)<72){ if(t===USER) retired.push(p.n); return true; } return false; };
     r.batters=r.batters.filter(p=>!out(p)); r.pitchers=r.pitchers.filter(p=>!out(p));
     allPlayers(t).forEach(p=>{ p.cond=100; p.inj=0; p.bench=0; p.expiring=false; p.mor=clampN(p.mor*0.6+62*0.4,5,99); });
-    // draft: one batter and one pitcher each, then fill to a playable roster
-    const rookies=[makeRookie('B'), makeRookie('P')];
-    r.batters.push(rookies[0]); r.pitchers.push(rookies[1]);
-    while(r.batters.length<12){ const p=makeRookie('B'); r.batters.push(p); rookies.push(p); }
-    while(r.pitchers.filter(p=>p.role==='SP').length<5){ const p=makeRookie('P','SP'); r.pitchers.push(p); rookies.push(p); }
-    while(r.pitchers.length<10){ const p=makeRookie('P','RP'); r.pitchers.push(p); rookies.push(p); }
-    if(t===USER){ f.newRookies=rookies.map(p=>`${p.n} (${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})`); return; }
-    // AI clubs cut their least valuable players so rosters don't grow every year
-    const trim=(arr,max)=>{ while(arr.length>max){ let w=0; arr.forEach((p,i)=>{ if(playerValue(p)<playerValue(arr[w])) w=i; }); arr.splice(w,1); } };
+    // draft: four rookies a club join the farm; the farm fills any hole in the 1군
+    const fx=offseasonFarm(t);
+    if(t===USER){ f.newRookies=fx.draft.map(p=>`${p.n} (${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)}, 잠재력 ${starText(p)})`);
+      f.farmNews={up:fx.up.map(p=>p.n), retired:fx.retired, cut:fx.cut}; return; }
+    // AI clubs send their least valuable players down so 1군 rosters don't grow every year
+    const trim=(arr,max)=>{ while(arr.length>max){ let w=0; arr.forEach((p,i)=>{ if(playerValue(p)<playerValue(arr[w])) w=i; }); farmOf(t).push(arr.splice(w,1)[0]); } };
     trim(r.batters,14);
     if(r.pitchers.length>12){ const sp=r.pitchers.filter(p=>p.role==='SP'), rp=r.pitchers.filter(p=>p.role!=='SP'); trim(sp,Math.max(5,12-rp.length)); trim(rp,12-sp.length); r.pitchers=sp.concat(rp); }
   });
@@ -1242,8 +1252,10 @@ function onNewSeason(){
   const f=fm(); seasonStart(false);
   send('단장','🔥',`${state.year} 스토브리그`, `새 시즌 준비 기간입니다. FA 시장·외국인 선수·트레이드를 정리하고, 전지훈련 방향을 정해 스프링캠프로 떠나세요.`, []);
   const n=f.offseasonNews||{left:[],retired:[]};
+  const fn=f.farmNews||{up:[],retired:[],cut:[]};
   send('스카우트 팀장','🎓',`${state.year} 신인 입단`,
-    `새 시즌 신인이 합류했습니다.\n\n${(f.newRookies||[]).map(x=>'• '+x).join('\n')}` +
+    `신인 ${(f.newRookies||[]).length}명이 2군에 합류했습니다.\n\n${(f.newRookies||[]).map(x=>'• '+x).join('\n')}` +
+    (fn.up.length? `\n\n1군 인원을 채우려 2군에서 올린 선수: ${fn.up.join(', ')}`:'') + (fn.retired.length? `\n2군 은퇴: ${fn.retired.join(', ')}`:'') + (fn.cut.length? `\n2군 정리(방출): ${fn.cut.join(', ')}`:'') +
     (n.left.length? `\n\nFA로 떠난 선수: ${n.left.join(', ')}`:'') + (n.retired.length? `\n은퇴한 선수: ${n.retired.join(', ')}`:'') +
     (n.signed&&n.signed.length? `\n다른 구단의 FA 계약: ${n.signed.join(', ')}`:''), []);
 }
@@ -1554,19 +1566,26 @@ function showProfile(team,name){
     : ((s&&s.G>0)? `<div class="kpi"><div class="k"><div class="v">${fmtEra(s.ER,s.OUT)}</div><div class="l">평균자책</div></div><div class="k"><div class="v">${s.W}-${s.L}</div><div class="l">승-패</div></div><div class="k"><div class="v">${s.SV}</div><div class="l">세이브</div></div><div class="k"><div class="v">${ipStr(s.OUT)}</div><div class="l">이닝</div></div><div class="k"><div class="v">${s.SO}</div><div class="l">탈삼진</div></div></div>` : '<div class="muted">이번 시즌 등판 기록 없음</div>');
   const form = rt&&rt.last.length? rt.last.map(r=>`<span class="pill" style="background:${rtColor(r)}33;color:${rtColor(r)};font-size:13px">${r.toFixed(1)}</span>`).join(' ') : '<span class="muted">기록 없음</span>';
   const c=Math.round(K.cond(p));
-  const resting=mine&&fm().restNext.indexOf(name)>=0;
-  const actions = mine? `<div class="row" style="margin-top:14px;gap:6px">
+  const resting=mine&&fm().restNext.indexOf(name)>=0, farm=isFarm(team,p), tr=trOf(p), block=farm? promoteBlock(p) : '';
+  const fl=futLine(p);
+  const actions = mine&&farm? `<div class="row" style="margin-top:14px;gap:6px">
+      <button class="btn primary" ${block?`disabled title="${esc(block)}"`:''} onclick="FM.promote('${q(name)}')">1군 등록</button>
+      <button class="btn" onclick="FM.talk('${q(name)}','praise')">👏 칭찬하기</button>
+      <button class="btn" onclick="App.closeModal();App.tab('train')">훈련 설정</button></div>
+      ${block?`<div class="hint">${esc(block)}</div>`:''}`
+    : mine? `<div class="row" style="margin-top:14px;gap:6px">
       <button class="btn" onclick="FM.talk('${q(name)}','praise')">👏 칭찬하기</button>
       <button class="btn" onclick="FM.talk('${q(name)}','scold')">😤 질책하기</button>
       <button class="btn" onclick="FM.toggleRest('${q(name)}')">${resting?'↩ 휴식 취소':'🛌 다음 경기 휴식'}</button>
       <button class="btn" onclick="FM.toggleList('${q(name)}')">${p.listed?'📋 트레이드 리스트 해제':'📋 트레이드 리스트 등록'}</button>
+      <button class="btn" onclick="FM.demote('${q(name)}')">2군으로</button>
       <button class="btn" onclick="FM.releasePlayer('${q(name)}')">📤 방출</button></div>` : '';
   modal(`<span class="closeX" onclick="App.closeModal()">×</span>
     <div class="row" style="align-items:center;gap:16px;flex-wrap:wrap">
       <div style="width:64px;height:64px;border-radius:50%;background:conic-gradient(${ratColor(o)} ${o}%, var(--panel2) 0);display:flex;align-items:center;justify-content:center">
         <div style="width:52px;height:52px;border-radius:50%;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:${ratColor(o)}">${o}</div></div>
       <div style="flex:1;min-width:200px"><h2 style="margin:0">${esc(name)}${p.rookie?' <span class="pill pos">신인</span>':''}</h2>
-        <div class="muted">${teamDot(team)} ${K.ROSTERS[team].name} · ${p.age}세 · ${posFull(p.pos||p.role)}</div>
+        <div class="muted">${teamDot(team)} ${K.ROSTERS[team].name}${farm?' <span class="chip">2군</span>':''} · ${p.age}세 · ${posFull(p.pos||p.role)}</div>
         <div class="muted" style="font-size:12px;margin-top:2px">성격: <b style="color:var(--txt)">${pers(p).k}</b> — ${pers(p).d}</div></div>
     </div>
     <div class="kpi" style="margin:14px 0">
@@ -1574,7 +1593,9 @@ function showProfile(team,name){
       <div class="k"><div class="v" style="font-size:18px">${moraleFace(K.mor(p))} ${moraleLabel(K.mor(p))}</div><div class="l">사기</div></div>
       <div class="k"><div class="v" style="font-size:18px">${p.sal}억 · ${p.expiring?'만료':p.yrs+'년'}</div><div class="l">연봉 · 계약</div></div>
       <div class="k"><div class="v" style="font-size:18px">${marketValue(p)}억</div><div class="l">시장 가치</div></div>
-      <div class="k"><div class="v" style="font-size:18px">${avgRt}</div><div class="l">평균 평점</div></div></div>
+      <div class="k"><div class="v" style="font-size:18px">${avgRt}</div><div class="l">평균 평점</div></div>
+      <div class="k"><div class="v" style="font-size:18px">${starHTML(p)}</div><div class="l">잠재력</div></div></div>
+    ${mine? `<div class="hint" style="margin:-4px 0 12px">훈련: <b>${TR_FOCUS[p.type][tr.f].l}</b> · 강도 ${TR_INT[tr.i].l} · 성장 가능성 ${growLabel(growChance(team,p))[0]} · ${state.year} 성장 +${(p.grow||[]).filter(g=>g[0]===state.year).length}${fl? ' · '+fl : ''}</div>` : ''}
     <div class="tabsm" style="margin-bottom:12px">${[['overview','개요'],['season',state.year+' 시즌'],['career','통산 기록'],['log','최근 경기']].map(([k,l])=>`<button class="${profTab===k?'active':''}" onclick="FM.profileTab('${k}')">${l}</button>`).join('')}</div>
     ${profTab==='season'? seasonPanel(team,p) : profTab==='career'? careerPanel(team,p) : profTab==='log'? logPanel(team,p) : `
     <div class="grid" style="grid-template-columns:1fr auto;gap:14px;align-items:start" id="profgrid">
@@ -1587,10 +1608,256 @@ function showProfile(team,name){
     ${actions}`);
 }
 
+// ---------- 2군 (퓨처스리그) ----------
+// Each club keeps a farm squad in K.ROSTERS[t].farm, which the game engine never sees.
+// The user's farm plays one Futures game for every 1군 game in the regular season, and
+// every club calls players up from its farm when injuries thin out the 1군.
+const ENTRY_MAX=28, MIN_1B=12, MIN_1P=11, DOWN_GAMES=10, FARM_CAP=30;
+function farmOf(t){ const r=K.ROSTERS[t]; if(!r.farm) r.farm=[]; return r.farm; }
+function isFarm(t,p){ return farmOf(t).indexOf(p)>=0; }
+function entryCount(t){ const r=K.ROSTERS[t]; return r.batters.length+r.pitchers.length; }
+function farmFromRow(row){
+  const [n,type,pos,age,sal,a,b,c,d,e,g]=row;
+  return type==='B'? {n,type,pos,age,sal,con:a,pow:b,eye:c,spd:d,fld:e,arm:g} : {n,type,role:pos,age,sal,stu:a,ctl:b,mov:c,sta:d};
+}
+// top a farm squad up to a playable Futures roster with development players
+function fillFarm(t){
+  const f=farmOf(t), nb=()=>f.filter(p=>p.type==='B'), np=()=>f.filter(p=>p.type==='P');
+  while(nb().filter(p=>p.pos==='C').length<2) f.push(makeRookie('B','C'));
+  while(nb().length<12) f.push(makeRookie('B'));
+  while(np().filter(p=>p.role==='SP').length<5) f.push(makeRookie('P','SP'));
+  while(np().length<12) f.push(makeRookie('P','RP'));
+  f.forEach(ensurePlayer);
+}
+function seedFarm(t){
+  const used=allNames(), f=farmOf(t);
+  ((window.KBO_FARM||{})[t]||[]).forEach(row=>{ if(used.has(row[0])) return; f.push(farmFromRow(row)); used.add(row[0]); });
+  fillFarm(t);
+}
+function futures(){ const f=fm(); if(!f.fut||f.fut.year!==state.year) f.fut={year:state.year,W:0,L:0,T:0,g:0,bat:{},pit:{},log:[]}; return f.fut; }
+// one Futures game for the user's farm against another club's farm. The two squads are
+// mounted as temporary rosters so the normal engine (lineups, fatigue, injuries) runs them.
+function farmGame(){
+  const fu=futures(), others=K.TEAM_IDS.filter(t=>t!==USER), opp=others[fu.g%others.length];
+  const H='F_'+USER, A='F_'+opp, RS=K.ROSTERS;
+  const mount=t=>({name:RS[t].name+' 2군', color:RS[t].color, batters:farmOf(t).filter(p=>p.type==='B'), pitchers:farmOf(t).filter(p=>p.type==='P')});
+  RS[H]=mount(USER); RS[A]=mount(opp);
+  try{
+    if([H,A].some(id=>RS[id].batters.filter(p=>!K.isInjured(p)).length<9 || RS[id].pitchers.filter(p=>!K.isInjured(p)).length<5)) return null;
+    const cfg=id=>{ const d=K.defaultLineup(id);
+      return K.restAdjust(id,{teamId:id, lineup:d.lineup, positions:d.positions, rotation:d.rotation, bullpen:d.bullpen, closer:d.closer, spName:d.rotation[fu.g%Math.max(1,d.rotation.length)]},{restBelow:65}); };
+    const home=fu.g%2===0, res=K.simGame(home?cfg(H):cfg(A), home?cfg(A):cfg(H), {maxInnings:9});
+    K.applyFatigue(H,res.box);
+    const bx=res.box[H], add=(dst,src)=>{ for(const k in src) if(typeof src[k]==='number') dst[k]=(dst[k]||0)+src[k]; };
+    for(const n in bx.bat){ const s=fu.bat[n]||(fu.bat[n]={G:0}); add(s,bx.bat[n]); if(bx.bat[n].PA>0) s.G++; }
+    for(const n in bx.pit){ add(fu.pit[n]||(fu.pit[n]={}), bx.pit[n]); }
+    const us=home?res.homeRuns:res.awayRuns, th=home?res.awayRuns:res.homeRuns;
+    if(us>th) fu.W++; else if(us<th) fu.L++; else fu.T++;
+    fu.g++; fu.log.unshift({opp, us, th, home}); fu.log.length=Math.min(fu.log.length,10);
+    return res;
+  } finally { delete RS[H]; delete RS[A]; }
+}
+function futLine(p){
+  const fu=fm()&&fm().fut&&fm().fut.year===state.year? fm().fut : null; if(!fu) return '';
+  if(p.type==='B'){ const s=fu.bat[p.n]; if(!s||!s.AB) return ''; return `퓨처스 ${s.G}경기 타율 ${fmtAvg(s.H/s.AB)} ${s.HR}홈런 OPS ${opsOf(s).toFixed(3)}`; }
+  const s=fu.pit[p.n]; if(!s||!s.OUT) return ''; return `퓨처스 ${s.G||0}경기 ${ipStr(s.OUT)}이닝 ERA ${fmtEra(s.ER,s.OUT)} ${s.SO}탈삼진`;
+}
+function opsOf(s){ const pa=s.AB+(s.BB||0)+(s.HBP||0)+(s.SF||0), tb=s.H+(s._2B||0)+2*(s._3B||0)+3*(s.HR||0);
+  return (pa? (s.H+(s.BB||0)+(s.HBP||0))/pa : 0) + (s.AB? tb/s.AB : 0); }
+// KBO rule: a player taken off the 1군 entry can't be re-registered for 10 days
+function downLeft(p){ if(p.downYear!==state.year||p.downUg==null) return 0; return Math.max(0, DOWN_GAMES-(userGamesPlayed()-p.downUg)); }
+function promoteBlock(p){
+  if(K.isInjured(p)) return `부상 중인 선수는 1군에 등록할 수 없습니다 (회복 ${p.inj}경기).`;
+  if(entryCount(USER)>=ENTRY_MAX) return `1군 엔트리가 가득 찼습니다 (${ENTRY_MAX}명). 먼저 다른 선수를 2군으로 내리세요.`;
+  const left=downLeft(p); if(left) return `말소 후 ${DOWN_GAMES}경기가 지나야 다시 등록할 수 있습니다 (${left}경기 남음).`;
+  return '';
+}
+function doPromote(t,p){
+  const f=farmOf(t); f.splice(f.indexOf(p),1);
+  const r=K.ROSTERS[t]; (p.type==='B'?r.batters:r.pitchers).push(p);
+  p.bench=0; addMor(p,8);
+  if(p.type==='P' && p.role!=='SP'){ const c=state.cfgs[t]; if(c.bullpen.indexOf(p.n)<0) c.bullpen.push(p.n); }
+}
+function promote(n){
+  const p=farmOf(USER).find(x=>x.n===n); if(!p) return;
+  const why=promoteBlock(p); if(why){ notify(why); return; }
+  doPromote(USER,p);
+  notify(`${n} 1군 등록 (엔트리 ${entryCount(USER)}/${ENTRY_MAX})`);
+  closeModal(); render();
+}
+function demote(n){
+  const r=K.ROSTERS[USER], p=findPlayer(USER,n); if(!p||isFarm(USER,p)) return;
+  const isB=p.type==='B', arr=isB?r.batters:r.pitchers;
+  if(isB && arr.length<=MIN_1B){ notify(`1군 타자는 최소 ${MIN_1B}명이 필요합니다. 2군 선수를 먼저 올리세요.`); return; }
+  if(!isB && arr.length<=MIN_1P){ notify(`1군 투수는 최소 ${MIN_1P}명이 필요합니다. 2군 선수를 먼저 올리세요.`); return; }
+  if(!isB && p.role==='SP' && arr.filter(x=>x.role==='SP').length<=5){ notify('선발투수가 5명 아래로 줄어듭니다. 2군 선발을 먼저 올리세요.'); return; }
+  arr.splice(arr.indexOf(p),1); farmOf(USER).push(p);
+  const inSeason=state.phase==='regular'||state.phase==='postseason';
+  if(inSeason){ p.downUg=userGamesPlayed(); p.downYear=state.year; }
+  p.listed=false; p.bench=0; addMor(p, p.age>=30? -10 : -5);
+  const f=fm(); f.restNext=f.restNext.filter(x=>x!==n); f.promises=f.promises.filter(pr=>pr.n!==n);
+  repairCfg(USER);
+  notify(`${n} 2군행${inSeason? ` · ${DOWN_GAMES}경기 뒤 재등록 가능`:''}`);
+  closeModal(); render();
+}
+// after a player leaves the 1군: fill his lineup slot, rotation turn and bullpen role
+function repairCfg(t){
+  const c=state.cfgs[t], R0=K.ROSTERS[t], B=new Set(R0.batters.map(p=>p.n)), P=new Set(R0.pitchers.map(p=>p.n));
+  for(let i=0;i<c.lineup.length;i++){
+    if(B.has(c.lineup[i])) continue;
+    const spot=(c.positions||[])[i], fit=b=>K.batValue(b)-(spot&&spot!=='DH'? K.posFit(b,spot)*1.6 : 0);
+    const sub=R0.batters.filter(b=>c.lineup.indexOf(b.n)<0&&!K.isInjured(b)).sort((a,b)=>fit(b)-fit(a))[0];
+    if(sub) c.lineup[i]=sub.n;
+  }
+  for(let i=0;i<c.rotation.length;i++){
+    if(P.has(c.rotation[i])) continue;
+    const sub=R0.pitchers.filter(p=>c.rotation.indexOf(p.n)<0&&p.n!==c.closer).sort((a,b)=>(b.role==='SP')-(a.role==='SP')||K.ovr(b)-K.ovr(a))[0];
+    if(sub){ c.rotation[i]=sub.n; c.bullpen=c.bullpen.filter(n=>n!==sub.n); }
+  }
+  c.bullpen=c.bullpen.filter(n=>P.has(n));
+  if(!P.has(c.closer)) c.closer=c.bullpen[0];
+}
+// monthly note from the Futures manager, with the hottest bat and arm ready to call up
+function farmReport(){
+  const fu=futures(), f=farmOf(USER);
+  const bats=f.filter(p=>p.type==='B'&&fu.bat[p.n]&&fu.bat[p.n].PA>=30).sort((a,b)=>opsOf(fu.bat[b.n])-opsOf(fu.bat[a.n]));
+  const arms=f.filter(p=>p.type==='P'&&fu.pit[p.n]&&fu.pit[p.n].OUT>=30).sort((a,b)=>fu.pit[a.n].ER/fu.pit[a.n].OUT-fu.pit[b.n].ER/fu.pit[b.n].OUT);
+  const picks=[bats[0],arms[0]].filter(Boolean); if(!picks.length) return;
+  send('2군 감독','🧢',`퓨처스 월간 보고 (${fu.W}승 ${fu.L}패 ${fu.T}무)`,
+    `2군에서 눈에 띄는 선수를 보고드립니다.\n\n${picks.map(p=>`• ${p.n} (${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)}, 잠재력 ${starText(p)})\n  ${futLine(p)}`).join('\n')}\n\n1군 엔트리 ${entryCount(USER)}/${ENTRY_MAX}명.`,
+    picks.map(p=>({label:`${p.n} 1군 등록`, fn:'promote', arg:{n:p.n}})).concat([{label:'2군에서 더 지켜본다', fn:'ok'}]));
+}
+ACTIONS.promote=(m,a)=>{ const p=farmOf(USER).find(x=>x.n===a.n); if(!p) return '이미 1군에 있거나 팀을 떠난 선수입니다.';
+  const why=promoteBlock(p); if(why) return '❌ '+why; doPromote(USER,p); return `${a.n}을(를) 1군에 등록했습니다 (엔트리 ${entryCount(USER)}/${ENTRY_MAX}).`; };
+
+// offseason: draftees join the farm, the 1군 is filled to minimum from the farm, old farmhands retire
+function offseasonFarm(t){
+  const f=farmOf(t), r=K.ROSTERS[t];
+  const retired=[]; for(let i=f.length-1;i>=0;i--){ const p=f[i]; if(p.age>=37 || (p.age>=33&&K.ovr(p)<66)){ retired.push(p.n); f.splice(i,1); } }
+  f.forEach(p=>{ p.cond=100; p.inj=0; p.bench=0; });
+  const draft=[makeRookie('B'),makeRookie('B'),makeRookie('P','SP'),makeRookie('P')];
+  draft.forEach(p=>{ ensurePlayer(p); f.push(p); });
+  const best=(type,role)=>f.filter(p=>p.type===type&&(!role||p.role===role)).sort((a,b)=>K.ovr(b)-K.ovr(a))[0];
+  const up=[], lift=(type,role)=>{ const p=best(type,role)||makeRookie(type,role); if(f.indexOf(p)<0) f.push(p); doPromote(t,p); up.push(p); };
+  while(r.batters.length<MIN_1B) lift('B');
+  while(r.pitchers.filter(p=>p.role==='SP').length<5) lift('P','SP');
+  while(r.pitchers.length<MIN_1P) lift('P');
+  const cut=[]; while(f.length>FARM_CAP){ let w=0; f.forEach((p,i)=>{ if(playerValue(p)<playerValue(f[w])) w=i; }); cut.push(f.splice(w,1)[0].n); }
+  fillFarm(t);
+  return {draft:draft.filter(p=>f.indexOf(p)>=0), up, retired, cut};
+}
+
+// ---------- 육성 · 훈련 ----------
+// Every 6 regular-season games each of the user's players (1군 and 2군) may gain a point in
+// his training focus. The chance comes from age, room left below his potential, playing time
+// and training load; heavy training wears players down and now and then hurts one.
+const TR_EVERY=6, TR_REPORT=12;
+const TR_FOCUS={
+  B:{bal:{l:'균형',k:['con','pow','eye','spd','fld','arm']}, con:{l:'컨택',k:['con']}, pow:{l:'파워',k:['pow']}, eye:{l:'선구안',k:['eye']}, run:{l:'주루',k:['spd']}, def:{l:'수비·송구',k:['fld','arm']}},
+  P:{bal:{l:'균형',k:['stu','ctl','mov','sta']}, stu:{l:'구위',k:['stu']}, ctl:{l:'제구',k:['ctl']}, mov:{l:'무브먼트',k:['mov']}, sta:{l:'체력',k:['sta']}}
+};
+const TR_INT={light:{l:'가볍게',g:0.7,c:4,inj:0}, normal:{l:'보통',g:1,c:0,inj:0}, hard:{l:'강하게',g:1.4,c:-6,inj:0.02}};
+const ATTR_KO={con:'컨택',pow:'파워',eye:'선구안',spd:'주력',fld:'수비',arm:'송구',stu:'구위',ctl:'제구',mov:'무브먼트',sta:'체력'};
+function trOf(p){ const t=p.tr||{}; return {f:TR_FOCUS[p.type][t.f]? t.f : 'bal', i:TR_INT[t.i]? t.i : 'normal'}; }
+// scouts grade potential in half stars: OVR 59 = 1, 68 = 2, 77 = 3, 86 = 4, 95 = 5
+function starsOf(p){ return clampN(Math.round(((p.pot||K.ovr(p))-50)/9*2)/2, 0.5, 5); }
+function starText(p){ const s=starsOf(p); return '★'.repeat(Math.floor(s))+(s%1?'½':''); }
+function starHTML(p){ const s=starsOf(p), full=Math.floor(s);
+  return `<span class="stars" title="잠재력 ${s}/5 (스카우트 평가)">${'★'.repeat(full)}${s%1?'<span class="half">★</span>':''}<span class="off">${'★'.repeat(5-Math.ceil(s))}</span></span>`; }
+function growChance(t,p){
+  const o=K.ovr(p), gap=(p.pot||o)-o, I=TR_INT[trOf(p).i];
+  const ageF=p.age<=21?0.28 : p.age<=24?0.22 : p.age<=27?0.14 : p.age<=30?0.07 : 0.03;
+  const potF=gap<=0? 0.12 : Math.min(1.2, 0.35+gap/12);
+  const play=isFarm(t,p)? 1.15 : (p.bench||0)>=5? 0.7 : 1;
+  return clampN(ageF*potF*I.g*play, 0, 0.9);
+}
+function growLabel(c){ return c>=0.27?['높음','good'] : c>=0.13?['보통','team'] : c>=0.05?['낮음','warn'] : ['정체','bad']; }
+function trainingTick(){
+  const f=fm(); f.trLog=f.trLog||[];
+  allPlayers(USER).concat(farmOf(USER)).forEach(p=>{
+    if(K.isInjured(p)) return;
+    const tr=trOf(p), I=TR_INT[tr.i], keys=TR_FOCUS[p.type][tr.f].k;
+    // a focused plan puts every gain into its attributes and lands a little more often
+    if(Math.random()<growChance(USER,p)*(tr.f==='bal'?1:1.15)){
+      const k=keys.filter(k=>p[k]<99)[Math.floor(Math.random()*keys.length)];
+      if(k){ p[k]++; (p.grow=p.grow||[]).push([state.year,k]); if(p.grow.length>40) p.grow.shift(); f.trLog.push({n:p.n, k, farm:isFarm(USER,p)}); }
+    }
+    p.cond=clampN(K.cond(p)+I.c,0,100);
+    if(I.inj && Math.random()<I.inj){ p.inj=R(2,6); f.trLog.push({n:p.n, hurt:p.inj}); }
+  });
+}
+function trainingReport(){
+  const f=fm(), log=f.trLog||[]; f.trLog=[];
+  if(!log.length) return;
+  const by={}; log.filter(x=>x.k).forEach(x=>{ (by[x.n]=by[x.n]||{farm:x.farm,ks:[]}).ks.push(ATTR_KO[x.k]); });
+  const hurt=log.filter(x=>x.hurt);
+  const lines=Object.entries(by).map(([n,v])=>`• ${n}${v.farm?' (2군)':''}: ${v.ks.map(k=>k+' +1').join(', ')}`);
+  send('육성 코치','📈',`훈련 리포트: ${Object.keys(by).length}명 성장${hurt.length?` · 훈련 중 부상 ${hurt.length}명`:''}`,
+    `최근 ${TR_REPORT}경기 동안의 훈련 성과입니다.\n\n${lines.join('\n')||'눈에 띄는 성장 없음'}`+
+    (hurt.length? `\n\n강도 높은 훈련 중 부상: ${hurt.map(x=>`${x.n} (${x.hurt}경기)`).join(', ')}` : '')+
+    `\n\n훈련 탭에서 선수별 초점과 강도를 바꿀 수 있습니다.`, []);
+}
+function setTrain(n,key,v){ const p=findPlayer(USER,n); if(!p) return; p.tr=Object.assign(trOf(p),{[key]:v}); render(); }
+function setTrainAll(key,v){
+  allPlayers(USER).concat(farmOf(USER)).forEach(p=>{ p.tr=Object.assign(trOf(p),{[key]:key==='f'? autoFocus(p) : v}); });
+  notify(key==='f'? '선수마다 가장 약한 영역으로 훈련 초점을 맞췄습니다.' : `전원 훈련 강도: ${TR_INT[v].l}`); render();
+}
+function autoFocus(p){
+  const low=ks=>ks.slice().sort((a,b)=>p[a]-p[b])[0];
+  if(p.type==='B'){ if(p.fld<55&&p.pos!=='DH') return 'def'; return {con:'con',pow:'pow',eye:'eye'}[low(['con','pow','eye'])]; }
+  if(p.role==='SP'&&p.sta<62) return 'sta';
+  return low(['stu','ctl','mov']);
+}
+let trFilter='all';
+function setTrFilter(v){ trFilter=v; render(); }
+function renderTraining(){
+  ensure();
+  const all=allPlayers(USER).map(p=>[p,false]).concat(farmOf(USER).map(p=>[p,true]))
+    .filter(([p,farm])=>trFilter==='all'? true : trFilter==='1'? !farm : trFilter==='farm'? farm : p.type===trFilter)
+    .map(([p,farm])=>({p,farm,c:growChance(USER,p)})).sort((a,b)=>b.c-a.c||b.p.pot-a.p.pot);
+  const yr=p=>(p.grow||[]).filter(g=>g[0]===state.year).length;
+  const opt=(o,cur)=>Object.entries(o).map(([k,v])=>`<option value="${k}" ${k===cur?'selected':''}>${v.l}</option>`).join('');
+  const rows=all.map(({p,farm,c})=>{ const tr=trOf(p), [gl,gc]=growLabel(c), g=yr(p);
+    return `<tr><td>${pname(USER,p.n)}${p.rookie?' <span class="pill pos">신인</span>':''}</td><td><span class="chip ${farm?'':'team'}">${farm?'2군':'1군'}</span></td>
+      <td>${p.pos||p.role}</td><td>${p.age}</td><td><b>${K.ovr(p)}</b></td><td>${starHTML(p)}</td>
+      <td><span class="chip ${gc}" title="${Math.round(c*100)}% / ${TR_EVERY}경기">${gl}</span></td>
+      <td><select aria-label="${esc(p.n)} 훈련 초점" onchange="FM.setTrain('${q(p.n)}','f',this.value)">${opt(TR_FOCUS[p.type],tr.f)}</select></td>
+      <td><select aria-label="${esc(p.n)} 훈련 강도" onchange="FM.setTrain('${q(p.n)}','i',this.value)">${opt(TR_INT,tr.i)}</select></td>
+      <td>${g?`<b class="win">+${g}</b>`:'<span class="muted">-</span>'}</td></tr>`; }).join('');
+  const recent=allPlayers(USER).concat(farmOf(USER)).flatMap(p=>(p.grow||[]).filter(g=>g[0]===state.year).map(g=>[p,g[1]]));
+  const top=Object.values(recent.reduce((a,[p,k])=>{ (a[p.n]=a[p.n]||{p,n:0}).n++; return a; },{})).sort((a,b)=>b.n-a.n).slice(0,5);
+  const filt=[['all','전체'],['1','1군'],['farm','2군'],['B','타자'],['P','투수']];
+  return `<div class="panel">
+    <div class="section-head"><div><p class="eyebrow">Player development</p><h2>육성 · 훈련</h2></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn btn-sm" onclick="FM.setTrainAll('f')">약점 보완 자동 설정</button>
+        <button class="btn btn-sm" onclick="FM.setTrainAll('i','light')">전원 가볍게</button><button class="btn btn-sm" onclick="FM.setTrainAll('i','normal')">전원 보통</button><button class="btn btn-sm" onclick="FM.setTrainAll('i','hard')">전원 강하게</button></div></div>
+    <p class="hint" style="margin:10px 0 0">정규시즌 ${TR_EVERY}경기마다 훈련 효과가 반영되고, ${TR_REPORT}경기마다 육성 코치가 리포트를 보냅니다. 성장 가능성은 <b>나이</b>, <b>잠재력까지 남은 여유</b>, <b>출전 기회</b>(2군에서 매일 뛰면 ↑, 1군 벤치에 오래 있으면 ↓), <b>훈련 강도</b>로 정해집니다. 강하게 하면 빨리 크지만 컨디션이 떨어지고 가끔 다칩니다.</p>
+    ${top.length? `<div class="brief-line" style="flex-wrap:wrap">${icon('morale-up')}<span>${state.year} 성장 TOP: ${top.map(x=>`<b>${esc(x.p.n)}</b> +${x.n}`).join(' · ')}</span></div>` : ''}
+    <div class="tabsm" style="margin-top:14px">${filt.map(([k,l])=>`<button class="${trFilter===k?'active':''}" onclick="FM.setTrFilter('${k}')">${l}</button>`).join('')}</div>
+    <div style="overflow-x:auto"><table class="stat-table"><thead><tr><th>선수</th><th>소속</th><th>POS</th><th>나이</th><th>OVR</th><th>잠재력</th><th>성장 가능성</th><th>훈련 초점</th><th>강도</th><th>${state.year} 성장</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </div>`;
+}
+// squad tab, 2군 view
+function farmView(){
+  ensure();
+  const fu=futures(), f=farmOf(USER);
+  const bs=f.filter(p=>p.type==='B').sort((a,b)=>K.ovr(b)-K.ovr(a)), ps=f.filter(p=>p.type==='P').sort((a,b)=>K.ovr(b)-K.ovr(a));
+  const btn=p=>{ const why=promoteBlock(p); return `<button class="btn btn-sm" ${why?`disabled title="${esc(why)}"`:''} onclick="FM.promote('${q(p.n)}')">1군 등록</button>`; };
+  const bRow=p=>{ const s=fu.bat[p.n]; return `<tr><td class="name">${pname(USER,p.n)}${p.rookie?' <span class="pill pos">신인</span>':''}</td><td><span class="pill pos">${p.pos}</span></td><td>${p.age}</td><td><b>${K.ovr(p)}</b></td><td>${starHTML(p)}</td>${statusCells(p)}
+    ${s&&s.AB? `<td>${s.G}</td><td>${fmtAvg(s.H/s.AB)}</td><td>${s.HR}</td><td>${s.RBI}</td><td>${opsOf(s).toFixed(3)}</td>` : '<td colspan="5" class="muted">기록 없음</td>'}<td>${btn(p)}</td></tr>`; };
+  const pRow=p=>{ const s=fu.pit[p.n]; return `<tr><td class="name">${pname(USER,p.n)}${p.rookie?' <span class="pill pos">신인</span>':''}</td><td><span class="pill pos">${p.role}</span></td><td>${p.age}</td><td><b>${K.ovr(p)}</b></td><td>${starHTML(p)}</td>${statusCells(p)}
+    ${s&&s.OUT? `<td>${s.G||0}</td><td>${ipStr(s.OUT)}</td><td>${fmtEra(s.ER,s.OUT)}</td><td>${s.SO}</td><td>${s.BB}</td>` : '<td colspan="5" class="muted">기록 없음</td>'}<td>${btn(p)}</td></tr>`; };
+  const last=fu.log.slice(0,5).map(g=>`<span class="chip ${g.us>g.th?'good':g.us<g.th?'bad':''}" title="${K.ROSTERS[g.opp].name} 2군">${g.us>g.th?'승':g.us<g.th?'패':'무'} ${g.us}:${g.th} ${g.opp}</span>`).join(' ');
+  return `<div class="brief-line" style="flex-wrap:wrap;margin-top:0">${icon('calendar')}<span>퓨처스리그 <b>${fu.W}승 ${fu.L}패 ${fu.T}무</b> · 1군 엔트리 <b>${entryCount(USER)}/${ENTRY_MAX}</b> · 2군 ${f.length}명</span><span style="display:flex;gap:4px;flex-wrap:wrap">${last}</span></div>
+    <p class="hint">2군은 1군 정규시즌 경기마다 퓨처스 경기를 한 번 치릅니다. 2군 선수는 매일 출전해 훈련 성장 가능성이 높습니다. 1군에서 내린 선수는 ${DOWN_GAMES}경기가 지나야 다시 올릴 수 있습니다.</p>
+    <div style="overflow-x:auto"><table class="stat-table"><caption>2군 타자</caption><thead><tr><th>선수</th><th>POS</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>타율</th><th>HR</th><th>타점</th><th>OPS</th><th></th></tr></thead><tbody>${bs.map(bRow).join('')}</tbody></table></div>
+    <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
+}
+
 window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, showSetup, setupPick, setupBg, setupName, setupStart, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeBudget, doTrade, payroll, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,
   springNext, springPlayNext, springRecord, springSimAll, openSeason, SPRING_GAMES, gameReport, renderFeed, setFeedFilter, logGame, profileTab,
-  onRegularSeasonEnd, icon, badge, dashTasks, dashBrief, psSeriesMessage, psSeriesResult, afterPsGame, takeJob, signFA, fxPick, fxSign, attr20 };
+  onRegularSeasonEnd, icon, badge, farmOf, isFarm, entryCount, promote, demote, farmView, renderTraining, setTrain, setTrainAll, setTrFilter, farmGame, trainingTick, starHTML, futures, ENTRY_MAX, dashTasks, dashBrief, psSeriesMessage, psSeriesResult, afterPsGame, takeJob, signFA, fxPick, fxSign, attr20 };
 })();

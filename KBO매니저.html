@@ -229,6 +229,11 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
   .task-list li{grid-template-columns:24px minmax(0,1fr)}
   .task-list .btn{grid-column:2;justify-self:start}
 }
+.stat-table th,.stat-table td:first-child{white-space:nowrap}
+.stars{color:var(--warn);letter-spacing:1px;white-space:nowrap}
+.stars .off{color:var(--line-strong)}
+.stars .half{display:inline-block;width:.5em;overflow:hidden;vertical-align:bottom}
+.stat-table select{background:var(--panel2);color:var(--txt);border:1px solid var(--line-strong);border-radius:6px;padding:4px 6px;font:inherit;font-size:12px}
 .stack{display:grid;gap:16px;align-content:start;min-width:0}
 </style>
 </head>
@@ -277,7 +282,6 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
       <button class="btn" onclick="App.save()" aria-label="저장"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg><span class="lbl">저장</span></button>
       <button class="btn" onclick="App.load()" aria-label="불러오기"><svg class="icon" aria-hidden="true"><use href="#i-load"/></svg><span class="lbl">불러오기</span></button>
       <button class="btn" onclick="App.confirmNew()" aria-label="새 게임"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg><span class="lbl">새 게임</span></button>
-      <button class="btn" onclick="App.selfTest()" aria-label="엔진검증" title="풀시즌을 시뮬레이션해 통계 현실성을 확인"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="lbl">엔진검증</span></button>
     </div>
   </header>
   <div class="shell">
@@ -293,6 +297,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
 <script src="design/badges.js"></script>
 <script src="core.js"></script>
 <script src="career.js"></script>
+<script src="farm.js"></script>
 <script src="fm.js"></script>
 <script>
 "use strict";
@@ -1060,16 +1065,18 @@ function endRegularSeason(){
 
 // ---------- next season (aging) ----------
 function ageRosters(){
+  const room=(p,d)=> d>0 && p.pot && K.ovr(p)>=p.pot ? 0 : d;
   for(const t in K.ROSTERS){
-    K.ROSTERS[t].batters.forEach(p=>{
+    const farm=K.ROSTERS[t].farm||[];
+    K.ROSTERS[t].batters.concat(farm.filter(p=>p.type==='B')).forEach(p=>{
       p.age++;
-      const d = ageDelta(p.age);
+      const d = room(p,ageDelta(p.age));
       ['con','pow','eye'].forEach(k=> p[k]=clamp(p[k]+d+rint(-1,1),40,99));
       ['spd','fld','arm'].forEach(k=> p[k]=clamp(p[k]+ (p.age>=31? d-1 : d) + rint(-1,1),40,99));
     });
-    K.ROSTERS[t].pitchers.forEach(p=>{
+    K.ROSTERS[t].pitchers.concat(farm.filter(p=>p.type==='P')).forEach(p=>{
       p.age++;
-      const d=ageDelta(p.age);
+      const d=room(p,ageDelta(p.age));
       ['stu','ctl','mov'].forEach(k=> p[k]=clamp(p[k]+d+rint(-1,1),40,99));
       p.sta=clamp(p.sta + (p.age>=32? d-1:d) + rint(-1,1),35,99);
     });
@@ -1111,7 +1118,7 @@ function nextSeason(){
 }
 
 // ================= RENDERING =================
-const TABS=[["dash","dashboard","대시보드"],["inbox","inbox","받은편지함"],["feed","feed","피드"],["squad","squad","스쿼드"],["lineup","lineup","라인업"],["sched","schedule","일정·경기"],["stand","standings","순위"],["leaders","records","기록실"],["trade","trade","트레이드"],["club","club","구단"]];
+const TABS=[["dash","dashboard","대시보드"],["inbox","inbox","받은편지함"],["feed","feed","피드"],["squad","squad","스쿼드"],["lineup","lineup","라인업"],["train","camp","훈련"],["sched","schedule","일정·경기"],["stand","standings","순위"],["leaders","records","기록실"],["trade","trade","트레이드"],["club","club","구단"]];
 
 function render(){
   FM.ensure();
@@ -1134,6 +1141,7 @@ function render(){
   else if(currentTab==="inbox") v.innerHTML=FM.renderInbox();
   else if(currentTab==="feed") v.innerHTML=FM.renderFeed();
   else if(currentTab==="club") v.innerHTML=FM.renderClub();
+  else if(currentTab==="train") v.innerHTML=FM.renderTraining();
 }
 function phaseLabel(){
   if(state.phase==="regular"){ const played=state.schedule.slice(0,state.gameIdx).filter(g=>g.home===USER||g.away===USER).length; return `정규시즌 ${played}/${SEASON_GAMES}경기`; }
@@ -1305,20 +1313,24 @@ function renderSquad(){
   const r=K.ROSTERS[USER];
   const tabs=`<div class="tabsm">
     <button class="${squadView==='bat'?'active':''}" onclick="App.squadView('bat')">타자</button>
-    <button class="${squadView==='pit'?'active':''}" onclick="App.squadView('pit')">투수</button></div>`;
+    <button class="${squadView==='pit'?'active':''}" onclick="App.squadView('pit')">투수</button>
+    <button class="${squadView==='farm'?'active':''}" onclick="App.squadView('farm')">2군 (퓨처스)</button></div>`;
+  const down=p=>`<td><button class="btn btn-sm" onclick="FM.demote('${p.n.replace(/'/g,"\\'")}')">2군</button></td></tr>`;
+  const withDown=(html,p)=>html.replace(/<\/tr>$/,'')+down(p);
   let body;
-  if(squadView==="bat"){
-    const rows=r.batters.slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).map(p=>batRow(USER,p,true)).join("");
+  if(squadView==="farm") body=FM.farmView();
+  else if(squadView==="bat"){
+    const rows=r.batters.slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).map(p=>withDown(batRow(USER,p,true),p)).join("");
     body=`<table><thead><tr><th class="name">선수</th><th>POS</th><th>나이</th><th>OVR</th><th>컨디션</th><th>사기</th>
       <th>컨택</th><th>파워</th><th>선구</th><th>주력</th><th>수비</th><th>송구</th>
-      <th>G</th><th>AB</th><th>H</th><th>HR</th><th>타점</th><th>득점</th><th>BB</th><th>SO</th><th>도루</th><th>타율</th><th>출루</th></tr></thead><tbody>${rows}</tbody></table>`;
+      <th>G</th><th>AB</th><th>H</th><th>HR</th><th>타점</th><th>득점</th><th>BB</th><th>SO</th><th>도루</th><th>타율</th><th>출루</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   } else {
-    const rows=r.pitchers.slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).map(p=>pitRow(USER,p,true)).join("");
+    const rows=r.pitchers.slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).map(p=>withDown(pitRow(USER,p,true),p)).join("");
     body=`<table><thead><tr><th class="name">선수</th><th>보직</th><th>나이</th><th>OVR</th><th>컨디션</th><th>사기</th>
       <th>구위</th><th>제구</th><th>무브</th><th>체력</th>
-      <th>G</th><th>GS</th><th>W</th><th>L</th><th>SV</th><th>HD</th><th>IP</th><th>SO</th><th>BB</th><th>ERA</th></tr></thead><tbody>${rows}</tbody></table>`;
+      <th>G</th><th>GS</th><th>W</th><th>L</th><th>SV</th><th>HD</th><th>IP</th><th>SO</th><th>BB</th><th>ERA</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   }
-  return `<div class="card"><h3>${r.name} 스쿼드 <span class="tag">능력치 1~20 (FM 스케일) · 선수 이름 클릭 시 상세 프로필</span></h3>${tabs}${body}</div>`;
+  return `<div class="card"><h3>${r.name} 스쿼드 <span class="tag">1군 엔트리 ${FM.entryCount(USER)}/${FM.ENTRY_MAX} · 능력치 1~20 (FM 스케일) · 선수 이름 클릭 시 상세 프로필</span></h3>${tabs}${body}</div>`;
 }
 
 const POS_OPTS=['C','1B','2B','3B','SS','LF','CF','RF','DH'];
@@ -1489,7 +1501,7 @@ function renderTrade(){
     <div class="hint" style="margin-top:8px">선수 가치 = 능력치(OVR) + 나이 보정(어릴수록 +). 트레이드 후 라인업은 자동 재구성되니 라인업 탭에서 확인하세요.</div>
   </div>`;
 }
-function findPlayer(team,n){ return K.ROSTERS[team].batters.find(x=>x.n===n)||K.ROSTERS[team].pitchers.find(x=>x.n===n); }
+function findPlayer(team,n){ const r=K.ROSTERS[team]; return r.batters.find(x=>x.n===n)||r.pitchers.find(x=>x.n===n)||(r.farm||[]).find(x=>x.n===n); }
 function execTrade(){
   FM.doTrade(tradeTeam,[...tradeOut],[...tradeIn]); // moves players and rebuilds both lineups
   tradeOut.clear(); tradeIn.clear();
@@ -1501,7 +1513,7 @@ function execTrade(){
 function modal(html){ const bg=el(`<div class="modal-bg" onclick="if(event.target===this)App.closeModal()"><div class="modal">${html}</div></div>`); document.body.appendChild(bg); }
 function closeModal(){ document.querySelectorAll('.modal-bg:not(#relay)').forEach(m=>m.remove()); }
 
-function findTeamOf(name){ for(const t of K.TEAM_IDS){ if(K.ROSTERS[t].batters.some(b=>b.n===name)||K.ROSTERS[t].pitchers.some(p=>p.n===name)) return t; } return null; }
+function findTeamOf(name){ for(const t of K.TEAM_IDS){ if(findPlayer(t,name)) return t; } return null; }
 function posFull(pos){ return {"C":"포수","1B":"1루수","2B":"2루수","3B":"3루수","SS":"유격수","LF":"좌익수","CF":"중견수","RF":"우익수","DH":"지명타자","SP":"선발투수","RP":"불펜투수","CL":"마무리투수"}[pos]||pos; }
 function showGameModal(res){
   const isHomeUser = res.home===USER;
@@ -1580,7 +1592,7 @@ const SAVE_KEY='kbo_manager_save', AUTOSAVE_KEY='kbo_manager_autosave', SAVE_VER
 function saveData(){ return JSON.stringify({ v:SAVE_VERSION, savedAt:Date.now(), state, teamGameCount, rosters:K.ROSTERS }); }
 function applySave(data){
   // restore rosters in place
-  for(const t in data.rosters){ K.ROSTERS[t].batters=data.rosters[t].batters; K.ROSTERS[t].pitchers=data.rosters[t].pitchers; K.ROSTERS[t].color=data.rosters[t].color; }
+  for(const t in data.rosters){ K.ROSTERS[t].batters=data.rosters[t].batters; K.ROSTERS[t].pitchers=data.rosters[t].pitchers; K.ROSTERS[t].color=data.rosters[t].color; K.ROSTERS[t].farm=data.rosters[t].farm||[]; }
   state=data.state; teamGameCount=data.teamGameCount; state.pendingGame=null;
   USER=(state.user&&state.user.team)||"KIA"; // saves from before team selection were KIA careers
   FM.applyTheme(USER);
