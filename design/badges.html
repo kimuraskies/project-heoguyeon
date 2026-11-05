@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>구단 배지 · 디자인</title><link rel="stylesheet" href="tokens.css">
+<body><main class="preview"><p class="eyebrow">DESIGN / CLUB IDENTITY</p><h1>색과 이름으로 구분하는 10개 구단</h1><p class="muted">동일한 오리지널 배지 형태와 중립 서체. 실제 로고·마스코트·워드마크를 사용하지 않습니다.</p><div class="asset-grid" id="badges"></div></main>
+<script src="badges.js"></script><script>
+document.getElementById('badges').innerHTML = Object.entries(BADGE_TEAMS).map(([id,color]) => `<article class="panel asset">${teamBadge(id,color,80)}<strong>${id}</strong><code>${color}</code></article>`).join('');
+</script></body></html>
