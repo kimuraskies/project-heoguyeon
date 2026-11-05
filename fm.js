@@ -194,7 +194,10 @@ const MGR_BG={
 };
 // readable accent per club (brand colors that are too dark on the dark UI are lifted)
 const TEAM_ACCENT={KIA:'#ea0029',LG:'#c30452','한화':'#fc4e00',SSG:'#ce0e2d','삼성':'#1d6fe0',NC:'#3f6fd1',KT:'#e4002b','롯데':'#d00f31','두산':'#4a5fd6','키움':'#b0123f'};
-function applyTheme(t){ document.documentElement.style.setProperty('--accent', TEAM_ACCENT[t]||'#ea0029'); }
+function applyTheme(t){ document.documentElement.style.setProperty('--accent', TEAM_ACCENT[t]||'#ea0029'); document.documentElement.dataset.team=t; }
+// design-system helpers: inline SVG sprite icon and the original round club badge
+function icon(id, cls){ return `<svg class="icon${cls?' '+cls:''}" aria-hidden="true"><use href="#i-${id}"/></svg>`; }
+function badge(t, size){ return typeof teamBadge==='function'? teamBadge(t, K.ROSTERS[t]&&K.ROSTERS[t].color, size||48) : ''; }
 // one-line scouting summary: the best hitter and top two starters
 function teamPitch(t){
   const r=K.ROSTERS[t];
@@ -1335,7 +1338,7 @@ function statusInline(p){
 }
 function attrNum(v){ const a=attr20(v); return `<b style="color:${attrColor(a)}">${a}</b>`; }
 function tabBadge(id){
-  if(id==='inbox'){ const u=unread(); return u? ` <span class="pill" style="background:var(--accent2);color:#222">${u}</span>` : ''; }
+  if(id==='inbox'){ const u=unread(); return u? ` <span class="count" aria-label="안 읽음 ${u}개">${u}</span>` : ''; }
   return '';
 }
 
@@ -1372,7 +1375,53 @@ function renderInbox(){
     <style>@media(max-width:820px){#inboxgrid{grid-template-columns:1fr!important}}</style>`;
 }
 
-// ---------- UI: dashboard cards ----------
+// ---------- UI: dashboard (design pass 1: hero → decisions → reference panels) ----------
+// Decisions the manager owes right now, most urgent first. Each: {ic, t, d, a, go}
+function dashTasks(){
+  ensure();
+  const f=fm(), out=[], c=state.cfgs[USER];
+  const camp=f.camp&&f.camp.year===state.year&&f.camp.focus;
+  if(state.phase==='stove' && !camp) out.push({ic:'camp', t:'스프링캠프 방향 선택', d:'수석코치 · '+Object.values(CAMP).map(x=>x.label).join(' / '), a:'훈련 선택', go:"FM.campPicker()"});
+  // real decisions only: skip plain acknowledgements, and let press/interview requests lapse after 3 games
+  const now=userGamesPlayed(), PRESS=['media','interview'];
+  const open=f.inbox.filter(m=>!m.done&&m.actions.length&&!m.actions.every(a=>a.fn==='ok')
+    &&!(m.actions.every(a=>PRESS.includes(a.fn))&&(m.year!==state.year||now-m.ug>3)));
+  const rankOf=m=>m.actions.some(a=>PRESS.includes(a.fn))? 1 : 0;
+  open.sort((a,b)=>rankOf(a)-rankOf(b)).forEach(m=>{
+    const renew=m.actions.some(a=>a.fn==='renew'), trade=m.actions.some(a=>/Trade$/.test(a.fn));
+    out.push({ic:renew?'contract':trade?'trade':'inbox', t:m.subject, d:`받은편지함 · ${m.from} · ${m.ug}경기차`, a:renew?'조건 검토':trade?'제안 검토':'검토', go:`App.tab('inbox');FM.openMsg(${m.id})`});
+  });
+  const inj=allPlayers(USER).filter(K.isInjured), used=c.lineup.concat(c.rotation);
+  const injIn=inj.filter(p=>used.includes(p.n));
+  if(injIn.length) out.push({ic:'injury', t:`부상 선수 ${injIn.length}명이 라인업·로테이션에 있음`, d:'의무팀 · '+injIn.map(p=>`${p.n} (회복 ${p.inj})`).join(', '), a:'라인업 확인', go:"App.tab('lineup')"});
+  const tired=allPlayers(USER).filter(p=>!K.isInjured(p)&&K.cond(p)<60&&c.lineup.includes(p.n));
+  if(tired.length && !f.autoRest) out.push({ic:'lineup', t:`지친 주전 ${tired.length}명`, d:'수석코치 · '+tired.map(p=>p.n).join(', ')+' · 휴식 권장', a:'라인업 확인', go:"App.tab('lineup')"});
+  if(state.phase==='stove'){
+    if(!c.tac) out.push({ic:'settings', t:'팀 기본 전술 정하기', d:'라인업 탭 · 공격·수비·배터리 기본값', a:'전술 설정', go:"App.tab('lineup')"});
+    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 외국인 ${foreignOf(USER).length}/${FX_MAX}명 · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
+  }
+  if(!out.length && inj.length) out.push({ic:'injury', t:`부상자 ${inj.length}명 회복 중`, d:'의무팀 · '+inj.map(p=>`${p.n} (${p.inj})`).join(', '), a:'선수단 보기', go:"App.tab('squad')"});
+  return out;
+}
+function dashBrief(){
+  ensure();
+  const f=fm(), b=f.board, s=boardStatus(), pay=payroll(USER);
+  const inj=allPlayers(USER).filter(K.isInjured), tired=allPlayers(USER).filter(p=>!K.isInjured(p)&&K.cond(p)<60), sad=allPlayers(USER).filter(p=>K.mor(p)<35);
+  const tone=b.conf>=60?['good','안정']:b.conf>=35?['warn','주의']:['bad','위험'];
+  const kind=x=>x.kind==='spring'?'시범경기':x.kind==='ps'?'포스트시즌':`${x.ug}경기`;
+  const feed=(f.feed||[]).slice(0,2);
+  return `<section class="panel"><div class="section-head"><h3>구단 브리핑</h3><span class="chip ${tone[0]}">이사회 ${tone[1]}</span></div>
+    <div class="metric-grid">
+      <div><small>이사회 신뢰</small><b>${b.conf}</b><small>${confLabel(b.conf)} · 목표 ${esc(b.expect.label)}</small></div>
+      <div><small>연봉 / 예산</small><b>${pay}<span class="unit"> / ${f.fin.budget}억</span></b><small>잔고 ${f.fin.balance.toFixed(1)}억 · 현재 ${s.rank}위</small></div>
+    </div>
+    <div class="brief-line">${icon('squad')}<span>부상 <b>${inj.length}</b> · 피로 <b>${tired.length}</b> · 불만 <b>${sad.length}</b> <span class="muted">· 사기 ${moraleLabel(avgMorale(USER))}</span></span>
+      <button class="btn btn-sm" ${meetingReady()?'':'disabled'} onclick="FM.teamMeeting()" title="${meetingReady()?'10경기에 한 번':`${10-(userGamesPlayed()-f.lastMeeting)}경기 후 가능`}">팀 미팅</button></div>
+    ${feed.map(x=>`<article class="feed-item" onclick="App.tab('feed')"><time>${x.year} · ${kind(x)}</time><p>${esc(x.title)}</p></article>`).join('')
+      || '<p class="muted" style="margin-top:14px;font-size:13px">경기를 치르면 경기 리포트가 여기에 쌓입니다.</p>'}
+    ${feed.length?`<button class="btn btn-quiet btn-sm" style="margin-top:8px" onclick="App.tab('feed')">${icon('feed')}피드 전체 보기</button>`:''}
+  </section>`;
+}
 function dashCards(){ return dashCards0() + feedCard(); }
 function dashCards0(){
   ensure();
@@ -1543,5 +1592,5 @@ window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, showSetup, setupPic
   showProfile, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,
   springNext, springPlayNext, springRecord, springSimAll, openSeason, SPRING_GAMES, gameReport, renderFeed, setFeedFilter, logGame, profileTab,
-  onRegularSeasonEnd, psSeriesMessage, psSeriesResult, afterPsGame, takeJob, signFA, fxPick, fxSign, attr20 };
+  onRegularSeasonEnd, icon, badge, dashTasks, dashBrief, psSeriesMessage, psSeriesResult, afterPsGame, takeJob, signFA, fxPick, fxSign, attr20 };
 })();

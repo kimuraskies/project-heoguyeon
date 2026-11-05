@@ -6,28 +6,31 @@
 <title>KBO 매니저 2026 — 한국프로야구 매니지먼트</title>
 <style>
 :root{
-  --bg:#0e1116; --panel:#171c24; --panel2:#1f2630; --line:#2a323d;
-  --txt:#e6e9ee; --dim:#93a0b0; --accent:#ea0029; --accent2:#ffd200;
-  --good:#36c275; --warn:#f0a020; --bad:#e0556a; --blue:#3b82f6;
+  /* design pass 1 (design/tokens.css): broadcast navy surfaces, club theme via data-team */
+  --bg:#090f19; --panel:#111c2b; --panel2:#19283b; --hero:#132237; --line:#2c3c52; --line-strong:#42546d;
+  --txt:#f2f6fc; --dim:#b0bfd2; --accent:#ea0029; --accent2:#ffd200;
+  --good:#7de1af; --warn:#ffcf7a; --bad:#ff9caa; --blue:#99cdff;
+  --team:#ea0029; --team-ink:#ff9aab; --on-team:#fff;
   color-scheme:dark; /* single dark look: native controls and scrollbars match */
 }
+:root[data-team="KIA"]{--team:#ea0029;--team-ink:#ff9aab;--on-team:#fff}
+:root[data-team="LG"]{--team:#c30452;--team-ink:#ff9fc4;--on-team:#fff}
+:root[data-team="한화"]{--team:#fc4e00;--team-ink:#ffb08a;--on-team:#090f19}
+:root[data-team="SSG"]{--team:#ce0e2d;--team-ink:#ff9aaa;--on-team:#fff}
+:root[data-team="삼성"]{--team:#074ca1;--team-ink:#98c8ff;--on-team:#fff}
+:root[data-team="NC"]{--team:#315288;--team-ink:#abcaff;--on-team:#fff}
+:root[data-team="KT"]{--team:#000000;--team-ink:#e0e8f5;--on-team:#fff}
+:root[data-team="롯데"]{--team:#041e42;--team-ink:#9ec9ff;--on-team:#fff}
+:root[data-team="두산"]{--team:#1a1748;--team-ink:#c4bdff;--on-team:#fff}
+:root[data-team="키움"]{--team:#570514;--team-ink:#ffafbd;--on-team:#fff}
 *{box-sizing:border-box;}
 [hidden]{display:none!important;}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:14px;}
 #app{max-width:1200px;margin:0 auto;padding-block:0 60px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));}
-header.top{display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:2px solid var(--accent);position:sticky;top:env(safe-area-inset-top, 0px);background:var(--bg);z-index:30;flex-wrap:wrap;}
-.logo{font-weight:800;font-size:20px;letter-spacing:-.5px;}
-.logo span{color:var(--accent);}
-.teaminfo{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);}
-.teamdot{width:14px;height:14px;border-radius:50%;display:inline-block;}
-.headctrl{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
-nav.tabs{display:flex;gap:4px;flex-wrap:wrap;margin:12px 0;}
-nav.tabs button{background:var(--panel);color:var(--dim);border:1px solid var(--line);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;}
-nav.tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
-nav.tabs button:hover:not(.active){background:var(--panel2);color:var(--txt);}
+.teamdot{width:14px;height:14px;border-radius:50%;display:inline-block;vertical-align:-2px;box-shadow:0 0 0 1px #ffffff40;}
 .btn{background:var(--panel2);color:var(--txt);border:1px solid var(--line);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;}
-.btn:hover{border-color:var(--accent);}
-.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btn:hover{border-color:var(--team-ink);}
+.btn.primary{background:var(--team);color:var(--on-team);border-color:var(--team-ink);}
 .btn.primary:hover{filter:brightness(1.1);}
 .btn.gold{background:var(--accent2);color:#222;border-color:var(--accent2);}
 .btn:disabled{opacity:.4;cursor:not-allowed;}
@@ -69,7 +72,7 @@ select,input{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .kpi .k .v{font-size:22px;font-weight:800;}
 .kpi .k .l{font-size:11px;color:var(--dim);}
 .hint{font-size:12px;color:var(--dim);line-height:1.6;}
-.rankrow.me{background:color-mix(in srgb, var(--accent) 14%, transparent);}
+.rankrow.me{background:#ffffff0a;color:var(--team-ink);}
 .tabsm{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;}
 .tabsm button{font-size:12px;padding:5px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--dim);cursor:pointer;}
 .tabsm button.active{background:var(--accent);color:#fff;}
@@ -111,28 +114,183 @@ footer{text-align:center;color:var(--dim);font-size:11px;margin-top:30px;line-he
 .pl-velo,.pl-cnt{color:var(--dim);font-variant-numeric:tabular-nums}
 .mu-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11.5px;color:var(--dim);margin:10px 0}
 .mu-stats>div{background:var(--panel2);border-radius:8px;padding:7px 9px;line-height:1.55;min-width:0}
+/* ---- design pass 1: shell, header, nav ---- */
+header.top{display:flex;align-items:center;gap:14px;padding:12px 4px;border-top:5px solid var(--team);border-bottom:1px solid var(--line-strong);position:sticky;top:env(safe-area-inset-top, 0px);background:#0d1522;z-index:30;flex-wrap:wrap;margin:0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))) 0;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);background:#0d1522;z-index:31}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand svg{width:44px;height:44px;flex:none}
+.brand small{display:block;color:var(--dim);font-size:11px;letter-spacing:.12em}
+.brand b{font-size:17px;letter-spacing:-.03em;white-space:nowrap}
+.teaminfo{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);flex-wrap:wrap}
+.headctrl{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
+.headctrl .btn{display:inline-flex;align-items:center;gap:6px}
+.headctrl .icon{width:18px;height:18px}
+.shell{display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
+nav.tabs{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;margin:12px 0 8px;scrollbar-width:none;}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{flex:none;display:inline-flex;align-items:center;gap:7px;min-height:42px;background:transparent;color:var(--dim);border:0;border-bottom:3px solid transparent;padding:8px 10px;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap}
+nav.tabs .icon{width:18px;height:18px}
+nav.tabs button.active{background:var(--panel2);color:var(--txt);border-bottom-color:var(--team-ink);}
+nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
+.count{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--warn);color:#1a1300;font-size:11px;font-weight:800;line-height:18px;text-align:center}
+@media(min-width:1024px){
+  .shell{grid-template-columns:168px minmax(0,1fr);gap:28px;align-items:start}
+  nav.tabs{flex-direction:column;overflow:visible;position:sticky;top:96px;margin:20px 0}
+  nav.tabs button{border-bottom:0;border-left:3px solid transparent;border-radius:6px;justify-content:flex-start;padding:10px 12px;font-size:14px}
+  nav.tabs button.active{border-left-color:var(--team-ink)}
+  #view{padding-top:20px}
+}
+@media(max-width:600px){
+  .headctrl .lbl{display:none}
+  .headctrl .btn{padding:8px 10px}
+  .brand svg{width:38px;height:38px}
+  .teaminfo{order:3;width:100%;font-size:12px}
+  header.top{position:static;gap:10px}
+}
+/* ---- design pass 1: components ---- */
+.icon{width:22px;height:22px;flex:none;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:1.75}
+.btn .icon{width:18px;height:18px;margin-right:2px;vertical-align:-4px}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-quiet{background:transparent}
+.eyebrow{margin:0;font-size:11px;font-weight:750;letter-spacing:.14em;color:var(--team-ink);text-transform:uppercase}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);background:var(--panel2);border-radius:99px;padding:2px 10px;font-size:12px;font-weight:650;white-space:nowrap;color:var(--txt)}
+.chip.warn{color:var(--warn)} .chip.good{color:var(--good)} .chip.bad{color:var(--bad)} .chip.team{color:var(--team-ink)}
+.panel{background:var(--panel);border:1px solid var(--line-strong);border-radius:12px;padding:20px;min-width:0}
+.panel h2,.panel h3{margin:0}
+.panel h2{font-size:19px;letter-spacing:-.03em}
+.panel h3{font-size:15px}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hero{position:relative;overflow:hidden;background:linear-gradient(115deg,var(--hero),#0b1420);border:1px solid var(--line-strong);border-top:4px solid var(--team);border-radius:20px;padding:28px 32px}
+.hero::before{content:'';position:absolute;width:430px;height:430px;right:-120px;top:30px;border:1px solid #40536a;border-radius:50%;box-shadow:0 0 0 48px #ffffff03,0 0 0 96px #ffffff03;pointer-events:none}
+.hero>*{position:relative}
+.hero-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hero-title{font-size:clamp(28px,4vw,46px);font-weight:800;line-height:1.16;letter-spacing:-.05em;margin:14px 0 6px;text-wrap:balance}
+.hero-sub{color:var(--dim);margin:0;font-size:14px}
+.matchup{display:flex;align-items:center;gap:20px;margin:22px 0}
+.club-mark{display:flex;align-items:center;gap:12px;min-width:0}
+.club-mark strong{font-size:22px;white-space:nowrap}
+.club-mark small{display:block;color:var(--dim);font-size:12px;font-weight:500}
+.club-mark svg{width:60px;height:60px;flex:none}
+.tbd-badge{width:60px;height:60px;border-radius:20px;border:1.5px dashed var(--line-strong);display:grid;place-items:center;color:var(--dim);font-size:22px;font-weight:800;flex:none}
+.versus{color:var(--dim);font-weight:700;font-size:14px}
+.match-meta{margin-left:auto;text-align:right}
+.match-meta span{color:var(--dim);font-size:12px}
+.match-meta p{margin:2px 0 0;font-weight:700;white-space:nowrap}
+.hero-bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding-top:18px;border-top:1px solid var(--line-strong);flex-wrap:wrap}
+.hero-bottom p{margin:0;font-size:13px;color:var(--dim)}
+.hero-bottom strong{display:block;color:var(--txt);margin:4px 0;font-size:16px}
+.hero-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.hero-cta{min-height:46px;padding:10px 20px;font-size:14px}
+.hero-more{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+.hero .progress{margin-top:16px;height:4px}
+.hero .progress>i{background:var(--team-ink)}
+.tasks{margin:20px 0}
+.task-list{list-style:none;padding:0;margin:12px 0 0}
+.task-list li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px 0;border-top:1px solid var(--line)}
+.task-list h3{font-size:14.5px;margin:0}
+.task-list p{color:var(--dim);font-size:12.5px;margin:3px 0 0;overflow-wrap:anywhere}
+.task-list .icon{color:var(--warn)}
+.reference{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;margin-top:16px}
+.stat-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;margin-top:6px}
+.stat-table caption{text-align:left;color:var(--dim);font-size:11.5px;padding:8px 0 6px}
+.stat-table th,.stat-table td{padding:9px 6px;border-bottom:1px solid var(--line);text-align:right;text-transform:none;letter-spacing:0}
+.stat-table th{font-weight:500;color:var(--dim);font-size:11.5px}
+.stat-table th:first-child,.stat-table td:first-child{text-align:left}
+.stat-table .selected td{background:#ffffff08;color:var(--team-ink)}
+.stat-table summary{display:flex;align-items:center;gap:7px;font-weight:700;list-style:none;cursor:pointer;min-height:28px}
+.stat-table summary::-webkit-details-marker{display:none}
+.stat-table summary::after{content:'+';color:var(--dim);margin-left:4px;font-weight:400}
+.stat-table details[open] summary::after{content:'−'}
+.stat-table .rk{color:var(--dim);font-weight:500;width:16px;display:inline-block}
+.row-detail{font-size:12px;color:var(--dim);font-weight:400;padding:4px 0 2px 23px;margin:0;line-height:1.6}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.metric-grid b{font-size:28px;font-variant-numeric:tabular-nums;display:block;line-height:1.2}
+.metric-grid .unit{font-size:14px;font-weight:600;color:var(--dim)}
+.metric-grid small{display:block;color:var(--dim);font-size:12px}
+.brief-line{display:flex;align-items:center;gap:10px;margin-top:16px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:13px}
+.brief-line .btn{margin-left:auto}
+.brief-line .icon{color:var(--dim)}
+.feed-item{padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.feed-item time{color:var(--dim);font-size:11.5px}
+.feed-item p{font-size:13.5px;margin:4px 0 0}
+.feed-item:hover p{color:var(--team-ink)}
+.game-row{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:8px 0;font-size:13px}
+@media(max-width:900px){.reference{grid-template-columns:1fr}}
+@media(max-width:600px){
+  .hero{padding:22px 18px;border-radius:16px}
+  .hero-top .eyebrow{font-size:10px;letter-spacing:.08em}
+  .matchup{gap:12px}
+  .club-mark{flex-direction:column;gap:4px;text-align:center}
+  .club-mark strong{font-size:17px}
+  .club-mark svg,.tbd-badge{width:48px;height:48px}
+  .hero-bottom{flex-direction:column;align-items:stretch;gap:14px}
+  .hero-actions .btn{width:100%;justify-content:center}
+  .panel{padding:18px 14px}
+  .task-list li{grid-template-columns:24px minmax(0,1fr)}
+  .task-list .btn{grid-column:2;justify-self:start}
+}
+.stack{display:grid;gap:16px;align-content:start;min-width:0}
 </style>
 </head>
 <body>
+<!-- design/icons.svg, inlined once so <use href="#i-…"> works from file:// too -->
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v8H3z M14 3h7v5h-7z M3 15h7v6H3z M14 12h7v9h-7z"/></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v16H3z M3 13h5l2 3h4l2-3h5"/></symbol>
+<symbol id="i-feed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z M8 8h8 M8 12h8 M8 16h5"/></symbol>
+<symbol id="i-squad" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-3a4 4 0 0 0-8 0v3 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M3 20v-3a4 4 0 0 1 3-4 M21 20v-3a4 4 0 0 0-3-4"/></symbol>
+<symbol id="i-lineup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h12 M9 12h12 M9 20h12 M3 4h1 M3 12h1 M3 20h1"/></symbol>
+<symbol id="i-schedule" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18v16H3z M7 3v4 M17 3v4 M3 10h18 M7 14h2 M15 14h2 M7 18h2"/></symbol>
+<symbol id="i-standings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V11h5v10 M9 21V4h6v17 M15 21V8h5v13"/></symbol>
+<symbol id="i-records" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4 M4 20h17 M8 16l4-6 4 3 5-9"/></symbol>
+<symbol id="i-trade" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h17l-4-4 M21 17H4l4 4"/></symbol>
+<symbol id="i-club" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V9l8-6 8 6v12 M2 21h20 M8 12v5 M12 12v5 M16 12v5"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3l14 9L7 21z"/></symbol>
+<symbol id="i-fast-forward" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5l9 7-9 7z M12 5l9 7-9 7z"/></symbol>
+<symbol id="i-skip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5l11 7-11 7z M20 5v14"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16 M17 4v16"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h13l4 4v14H3V3z M7 3v6h9V3 M7 21v-8h10v8"/></symbol>
+<symbol id="i-load" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V6h7l2 3h9l-3 11z M12 3v11 M8 10l4 4 4-4"/></symbol>
+<symbol id="i-new" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16 M4 12h16"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16 M4 12h16 M4 18h16 M8 3v6 M16 9v6 M10 15v6"/></symbol>
+<symbol id="i-substitute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h15l-4-4 M20 16H5l4 4 M4 5v3 M20 19v-3"/></symbol>
+<symbol id="i-pinch-hit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20l3-3 M7 16L17 3q3-2 4 2L10 18z"/></symbol>
+<symbol id="i-bunt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18L19 6 M15 5l5 5 M3 19l3 2 M4 4h4 M6 2v4"/></symbol>
+<symbol id="i-steal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 7-10 M14 5h5v5 M7 21h10"/></symbol>
+<symbol id="i-intentional-walk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4v16 M8 7h8 M12 3v8 M8 16l4 4 4-4 M12 13v7 M20 4v16"/></symbol>
+<symbol id="i-injury" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8v5h5v8h-5v5H8v-5H3V8h5z"/></symbol>
+<symbol id="i-morale-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15l8-8 8 8 M12 7v14"/></symbol>
+<symbol id="i-morale-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l8 8 8-8 M12 3v14"/></symbol>
+<symbol id="i-contract" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h10l4 4v14H5z M14 3v5h5 M8 12h8 M8 16h5"/></symbol>
+<symbol id="i-money" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18v12H3z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6 M6 12h.1 M18 12h.1"/></symbol>
+<symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10v7a5 5 0 0 1-10 0z M7 5H3v3a4 4 0 0 0 4 4 M17 5h4v3a4 4 0 0 1-4 4 M12 15v6 M8 21h8"/></symbol>
+<symbol id="i-camp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20L12 3l10 17z M8 20l4-7 4 7"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18v16H3z M7 3v4 M17 3v4 M3 10h18 M8 15l3 3 5-5"/></symbol>
+<symbol id="i-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 21h20z M12 9v5 M12 18h.01"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></symbol>
+</svg>
 <div id="app">
   <header class="top">
-    <div class="logo">KBO <span>매니저</span> 2026</div>
+    <div class="brand"><span id="brandBadge"></span><div><small id="brandSub">KBO MANAGER 2026</small><b id="brandName">KBO 매니저</b></div></div>
     <div class="teaminfo" id="teaminfo"></div>
     <div class="headctrl">
-      <button class="btn" onclick="App.save()">💾 저장</button>
-      <button class="btn" onclick="App.load()">📂 불러오기</button>
-      <button class="btn" onclick="App.confirmNew()">🔄 새 게임</button>
-      <button class="btn" onclick="App.selfTest()" title="풀시즌을 시뮬레이션해 통계 현실성을 확인">🔬 엔진검증</button>
+      <button class="btn" onclick="App.save()" aria-label="저장"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg><span class="lbl">저장</span></button>
+      <button class="btn" onclick="App.load()" aria-label="불러오기"><svg class="icon" aria-hidden="true"><use href="#i-load"/></svg><span class="lbl">불러오기</span></button>
+      <button class="btn" onclick="App.confirmNew()" aria-label="새 게임"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg><span class="lbl">새 게임</span></button>
+      <button class="btn" onclick="App.selfTest()" aria-label="엔진검증" title="풀시즌을 시뮬레이션해 통계 현실성을 확인"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="lbl">엔진검증</span></button>
     </div>
   </header>
-  <nav class="tabs" id="tabs"></nav>
+  <div class="shell">
+  <nav class="tabs" id="tabs" aria-label="주 메뉴"></nav>
   <div id="view"></div>
+  </div>
   <footer>
     KBO 매니저 — KBO 공식 기록실 2026 정규시즌 기록 기반 (능력치는 기록을 엔진에 맞게 환산한 근사값). 재미를 위한 비공식 시뮬레이션입니다.<br>
     데이터: koreabaseball.com 기록실 · 엔진은 타석 단위 확률 시뮬레이션
   </footer>
 </div>
 
+<script src="design/badges.js"></script>
 <script src="core.js"></script>
 <script src="career.js"></script>
 <script src="fm.js"></script>
@@ -953,15 +1111,18 @@ function nextSeason(){
 }
 
 // ================= RENDERING =================
-const TABS=[["dash","🏠 대시보드"],["inbox","📥 받은편지함"],["feed","📰 피드"],["squad","👥 스쿼드"],["lineup","📋 라인업"],["sched","📅 일정/경기"],["stand","🏆 순위"],["leaders","📊 기록실"],["trade","🔁 트레이드"],["club","🏛 구단"]];
+const TABS=[["dash","dashboard","대시보드"],["inbox","inbox","받은편지함"],["feed","feed","피드"],["squad","squad","스쿼드"],["lineup","lineup","라인업"],["sched","schedule","일정·경기"],["stand","standings","순위"],["leaders","records","기록실"],["trade","trade","트레이드"],["club","club","구단"]];
 
 function render(){
   FM.ensure();
   autosave();
   // header
-  $("teaminfo").innerHTML = `${FM.esc(state.user.name)} 감독 · ${teamDot(USER)} <b>${K.ROSTERS[USER].name}</b> · ${state.year} 시즌 · ${phaseLabel()}`;
+  $("brandBadge").innerHTML = FM.badge(USER,44);
+  $("brandName").textContent = `${K.ROSTERS[USER].name} 감독실`;
+  $("brandSub").textContent = `${state.year} / CLUB MANAGEMENT`;
+  $("teaminfo").innerHTML = `${FM.esc(state.user.name)} 감독 · <span class="chip team">${phaseLabel()}</span>`;
   // tabs
-  $("tabs").innerHTML = TABS.map(([id,lbl])=>`<button class="${currentTab===id?'active':''}" onclick="App.tab('${id}')">${lbl}${FM.tabBadge(id)}</button>`).join("");
+  $("tabs").innerHTML = TABS.map(([id,ic,lbl])=>`<button class="${currentTab===id?'active':''}" ${currentTab===id?'aria-current="page"':''} onclick="App.tab('${id}')">${FM.icon(ic)}${lbl}${FM.tabBadge(id)}</button>`).join("");
   const v=$("view");
   if(currentTab==="dash") v.innerHTML=renderDash();
   else if(currentTab==="squad") v.innerHTML=renderSquad();
@@ -979,7 +1140,7 @@ function phaseLabel(){
   if(state.phase==="stove") return "스토브리그";
   if(state.phase==="spring") return `시범경기 ${state.spring?state.spring.played:0}/${FM.SPRING_GAMES}`;
   if(state.phase==="postseason") return "포스트시즌"+(state.postseason&&state.postseason.cur?" · "+state.postseason.cur.name:"");
-  return "오프시즌 🏆"+(state.champion?` ${K.ROSTERS[state.champion].name} 우승`:"");
+  return "오프시즌"+(state.champion?` ${K.ROSTERS[state.champion].name} 우승`:"");
 }
 
 function psControls(){
@@ -994,77 +1155,126 @@ function psControls(){
       <button class="btn" onclick="App.showPS()">🏆 대진표</button>
     </div>`;
 }
+let showAllTasks=false;
+// hero content for the current phase: {eyebrow, title, sub, m:{home,away,label}|null, tbd, cta, more, progress}
+function heroInfo(rank){
+  const I=FM.icon, ph=state.phase;
+  const userGames=state.schedule.filter(g=>g.home===USER||g.away===USER);
+  const played=userGames.filter(g=>g.played).length, next=userGames.find(g=>!g.played);
+  const pad=n=>String(n).padStart(3,'0');
+  if(ph==="stove"){
+    const ready=!!(FM.ensure(), state.fm&&state.fm.camp&&state.fm.camp.year===state.year&&state.fm.camp.focus);
+    return {eyebrow:`${state.year} SEASON / PREPARATION`, title:"새 시즌의 첫 수를 두다.",
+      sub:`스토브리그 → 스프링캠프 → 시범경기 ${FM.SPRING_GAMES}경기 → 개막`, m:null, tbd:"시범경기",
+      starters:`<p>다음 경기 · 시범경기</p><strong>선발 미정 <span class="muted">vs</span> 선발 미정</strong><p>캠프를 마치면 시범경기 대진이 정해집니다.</p>`,
+      cta: ready? `<button class="btn primary hero-cta" onclick="FM.startSpring()">${I('play')}스프링캠프 출발</button>`
+                 : `<button class="btn primary hero-cta" onclick="FM.campPicker()">${I('camp')}캠프 방향 결정</button>`,
+      more: ready? `<button class="btn" onclick="FM.campPicker()">${I('camp')}훈련 방향 변경</button>` : ''};
+  }
+  if(ph==="spring"){
+    const n=FM.springNext(), sp=state.spring;
+    if(n) return {eyebrow:`EXHIBITION / GAME ${pad(n.i+1)}`, title:`시범경기 ${n.i+1}차전`,
+      sub:`${sp.W}승 ${sp.L}패 ${sp.T}무 · 순위·시즌 기록 미반영 · 라인업과 작전을 시험하세요`, m:{home:n.home,away:n.away,label:'시범경기'},
+      cta:`<button class="btn primary hero-cta" onclick="App.nextGame()">${I('play')}경기 준비</button>`,
+      more:`<button class="btn" onclick="FM.springSimAll()">${I('fast-forward')}남은 시범경기 시뮬레이션</button>`};
+    const g0=userGames[0];
+    return {eyebrow:`${state.year} SEASON / OPENING DAY`, title:"개막이 다가왔다.",
+      sub:`시범경기를 ${sp?sp.W:0}승 ${sp?sp.L:0}패 ${sp?sp.T:0}무로 마쳤습니다.`, m:g0?{home:g0.home,away:g0.away,label:'정규시즌 개막전'}:null, noSP:true,
+      cta:`<button class="btn primary hero-cta" onclick="FM.openSeason()">${I('trophy')}${state.year} 정규시즌 개막</button>`, more:''};
+  }
+  if(ph==="regular"){
+    if(!next) return {eyebrow:`${state.year} SEASON / FINAL`, title:"정규시즌 종료", sub:"포스트시즌 일정을 기다립니다.", m:null, cta:'', more:''};
+    const opp=next.home===USER?next.away:next.home;
+    return {eyebrow:`NEXT GAME / GAME ${pad(played+1)}`, title:`${next.home===USER?'홈':'원정'} · ${K.ROSTERS[opp].name}전`,
+      sub:`${played+1}번째 경기 · 남은 ${SEASON_GAMES-played}경기${played?` · 현재 ${rank}위`:''}`, m:{home:next.home,away:next.away,label:'정규시즌'},
+      progress:Math.round(played/SEASON_GAMES*100),
+      cta:`<button class="btn primary hero-cta" onclick="App.nextGame()">${I('play')}경기 준비</button>`,
+      more:`<button class="btn" onclick="App.userGames(5)">${I('fast-forward')}5경기 빠르게</button>
+        <button class="btn" onclick="App.userGames(20)">${I('fast-forward')}20경기</button>
+        <button class="btn" onclick="App.simRest()">${I('skip')}시즌 끝까지</button>`};
+  }
+  if(ph==="postseason"){
+    const c=state.postseason.cur, n=psNext();
+    if(!c) return {eyebrow:"POSTSEASON", title:"포스트시즌", sub:"", m:null, cta:'', more:`<button class="btn" onclick="App.showPS()">${I('trophy')}대진표</button>`};
+    const mine=c.hi===USER||c.lo===USER;
+    const inPS=state.postseason.seeds.includes(USER) && !state.postseason.rounds.some(r=>r.r.loser===USER);
+    return {eyebrow:`POSTSEASON / ${c.name}`, title:mine?`${c.name}, 우리의 가을.`:c.name,
+      sub:`${c.hi} ${c.wHi-c.hiStart}승${c.hiStart?' (+1승 어드밴티지)':''} vs ${c.lo} ${c.wLo}승 · ${c.bestOf===3?'2선승':c.need+'선승'}`,
+      m:n?{home:n.home,away:n.away,label:n.label}:null,
+      cta:`<button class="btn primary hero-cta" onclick="App.psNext()">${I('play')}${mine?'경기 준비':'다음 경기 시뮬레이션'}</button>`,
+      more:`${inPS&&!mine?`<button class="btn" onclick="App.psAuto(false)">${I('fast-forward')}우리 경기까지</button>`:''}
+        <button class="btn" onclick="App.psAuto(true)">${I('skip')}포스트시즌 끝까지</button>
+        <button class="btn" onclick="App.showPS()">${I('trophy')}대진표</button>`};
+  }
+  return {eyebrow:`${state.year} SEASON / FINAL`, title: state.champion? `${K.ROSTERS[state.champion].name} 우승` : `${state.year} 시즌 종료`,
+    sub:`우리 팀은 정규시즌 ${rank}위로 시즌을 마쳤습니다.`, m:null,
+    cta:`<button class="btn primary hero-cta" onclick="App.nextSeason()">${I('calendar')}스토브리그 시작</button>`,
+    more:`<button class="btn" onclick="App.showPS()">${I('trophy')}시즌 결과</button>`};
+}
 function renderDash(){
-  const st=standings();
-  const me=st.find(x=>x.t===USER); const rank=st.findIndex(x=>x.t===USER)+1;
+  const I=FM.icon, st=standings();
+  const me=st.find(x=>x.t===USER), rank=st.findIndex(x=>x.t===USER)+1;
+  const h=heroInfo(rank);
+  const mark=t=>`<div class="club-mark">${FM.badge(t,60)}<div><strong>${t}</strong><small>${t===USER?'우리 팀':K.ROSTERS[t].name}</small></div></div>`;
+  const spLine=(t)=>{ const n=projectedSP(t), spr=state.phase==='spring'&&state.spring;
+    if(spr){ const s=spr.stats.pit[n]; return {n, s: s&&s.OUT? `시범 ${ipStr(s.OUT)}이닝 · ERA ${fmtEra(s.ER,s.OUT)}` : '시범경기 첫 등판'}; }
+    const s=state.season[t].pit[n]; return {n, s: s&&s.G>0? `${s.W}승 ${s.L}패 · ERA ${fmtEra(s.ER,s.OUT)}` : '시즌 첫 등판'}; };
+  let matchup, starters=h.starters||'';
+  if(h.m){
+    const a=h.m.away, hm=h.m.home;
+    matchup=`${mark(a)}<span class="versus">VS</span>${mark(hm)}<div class="match-meta"><span>${FM.esc(h.m.label)}</span><p>${hm===USER?'홈경기':'원정경기'}</p></div>`;
+    if(!h.noSP){ const sa=spLine(a), sh=spLine(hm);
+      starters=`<p>예고 선발</p><strong>${FM.esc(sa.n)} <span class="muted">vs</span> ${FM.esc(sh.n)}</strong><p>${a} ${sa.s} / ${hm} ${sh.s}</p>`; }
+    else starters=`<p>개막전 선발 (로테이션 1번)</p><strong>${FM.esc(state.cfgs[USER].rotation[0]||'미정')}</strong><p>라인업 탭에서 개막 로테이션을 확인하세요.</p>`;
+  } else if(h.tbd){
+    matchup=`${mark(USER)}<span class="versus">VS</span><div class="club-mark"><span class="tbd-badge" aria-hidden="true">?</span><div><strong>미정</strong><small>상대 미정</small></div></div><div class="match-meta"><span>${h.tbd}</span><p>일정 미정</p></div>`;
+  } else matchup='';
+  const hero=`<section class="hero" aria-labelledby="heroTitle">
+    <div class="hero-top"><p class="eyebrow">${h.eyebrow}</p><span class="chip team">${phaseLabel()}</span></div>
+    <h1 class="hero-title" id="heroTitle">${FM.esc(h.title)}</h1><p class="hero-sub">${h.sub}</p>
+    ${matchup?`<div class="matchup">${matchup}</div>`:'<div style="height:18px"></div>'}
+    <div class="hero-bottom"><div>${starters}</div><div class="hero-actions">${h.cta}</div></div>
+    ${h.more?`<div class="hero-more">${h.more}</div>`:''}
+    ${h.progress!=null?`<div class="progress" title="정규시즌 진행률 ${h.progress}%"><i style="width:${h.progress}%"></i></div>`:''}
+  </section>`;
+
+  const tasks=FM.dashTasks(), shown=showAllTasks? tasks : tasks.slice(0,3);
+  const taskHtml=`<section class="panel tasks" aria-labelledby="taskHead">
+    <div class="section-head"><h2 id="taskHead">지금 결정할 일</h2><span class="chip ${tasks.length?'warn':'good'}">${tasks.length? tasks.length+'건 대기' : '모두 처리'}</span></div>
+    ${tasks.length? `<ul class="task-list">${shown.map(x=>`<li>${I(x.ic)}<div><h3>${FM.esc(x.t)}</h3><p>${FM.esc(x.d)}</p></div><button class="btn" onclick="${x.go}">${x.a}</button></li>`).join('')}</ul>
+      ${tasks.length>3?`<button class="btn btn-quiet btn-sm" style="margin-top:6px" onclick="App.allTasks()">${showAllTasks?'접기':`전체 보기 (${tasks.length}건)`}</button>`:''}`
+      : `<p class="muted" style="margin:12px 0 0">지금 감독이 결정할 일은 없습니다. 경기를 진행하세요.</p>`}
+  </section>`;
+
+  const games=st[0].W+st[0].L+st[0].T>0;
+  const gb=x=>((st[0].W-x.W)+(x.L-st[0].L))/2;
+  const standRows=st.map((x,i)=>`<tr class="${x.t===USER?'selected':''}"><td><details><summary><span class="rk">${i+1}</span>${teamDot(x.t)} ${x.t}${x.t===USER?' · 내 팀':''}</summary>
+      <p class="row-detail">득점 ${x.RF} · 실점 ${x.RA} (${x.diff>=0?'+':''}${x.diff})${x.T?` · ${x.T}무`:''}<br>최근 5경기 ${recentForm(x.t)}</p></details></td>
+    <td>${x.W}–${x.L}</td><td>${x.gp?fmtAvg(x.pct):'—'}</td><td>${!games||i===0?'—':gb(x).toFixed(1)}</td></tr>`).join("");
+  const standHtml=`<section class="panel"><div class="section-head"><h3>리그 순위</h3><span class="chip">${state.phase==='regular'||state.phase==='postseason'||state.phase==='offseason'? me.gp+'경기 기준' : '시즌 시작 전'}</span></div>
+    <table class="stat-table"><caption>구단명을 누르면 득실과 최근 흐름을 펼칩니다.${rank<=5&&games?' · 현재 가을야구 진출권':''}</caption>
+      <thead><tr><th scope="col">구단</th><th scope="col">승–패</th><th scope="col">승률</th><th scope="col">차</th></tr></thead><tbody>${standRows}</tbody></table></section>`;
+
   const userGames=state.schedule.filter(g=>g.home===USER||g.away===USER);
   const recent=userGames.filter(g=>g.played).slice(-5).reverse();
-  const next=userGames.find(g=>!g.played);
-  let recentHtml = recent.length? recent.map(g=>{
-    const opp=g.home===USER?g.away:g.home; const us=g.home===USER?g.hr:g.ar; const them=g.home===USER?g.ar:g.hr;
-    const w=us>them, t=us===them;
-    return `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:5px 0">
-      <span>${g.home===USER?'vs':'@'} ${teamDot(opp)} ${opp}</span>
-      <span class="${t?'muted':(w?'win':'lose')}"><b>${t?'무':(w?'승':'패')}</b> ${us}:${them}</span></div>`;
-  }).join("") : `<div class="muted">아직 경기 없음</div>`;
-
-  const ctrl = state.phase==="stove"||state.phase==="spring" ? FM.preseasonControls() : state.phase==="regular" ? `
-    <div class="row">
-      <button class="btn primary" onclick="App.nextGame()">▶ 다음 경기 (프리뷰→중계)</button>
-      <button class="btn" onclick="App.userGames(5)">⏩ 5경기 빠르게</button>
-      <button class="btn" onclick="App.userGames(20)">⏩⏩ 20경기</button>
-      <button class="btn" onclick="App.simRest()">⏭ 시즌 끝까지</button>
-    </div>`
-    : state.phase==="postseason" ? psControls()
-    : `<div class="row"><button class="btn gold" onclick="App.showPS()">🏆 시즌 결과</button><button class="btn primary" onclick="App.nextSeason()">➡ 스토브리그 시작</button></div>`;
-
-  const psn = state.phase==="postseason"? psNext() : state.phase==="spring"? FM.springNext() : null;
-  const nextHtml = psn ? `<div class="muted" style="text-align:center;font-size:12px">${psn.label}</div><div class="scoreboard">
-      <div class="t">${teamDot(psn.home)}<div><b>${psn.home}</b></div><div class="muted" style="font-size:11px">${psn.home===USER?'우리':K.ROSTERS[psn.home].name}</div></div>
-      <div class="muted">VS</div>
-      <div class="t">${teamDot(psn.away)}<div><b>${psn.away}</b></div><div class="muted" style="font-size:11px">${psn.away===USER?'우리':K.ROSTERS[psn.away].name}</div></div>
-    </div>` : next ? `<div class="scoreboard">
-      <div class="t">${teamDot(next.home)}<div><b>${next.home}</b></div><div class="muted" style="font-size:11px">${next.home===USER?'우리':K.ROSTERS[next.home].name}</div></div>
-      <div class="muted">VS</div>
-      <div class="t">${teamDot(next.away)}<div><b>${next.away}</b></div><div class="muted" style="font-size:11px">${next.away===USER?'우리':K.ROSTERS[next.away].name}</div></div>
-    </div>` : `<div class="muted" style="text-align:center;padding:14px">정규시즌 종료</div>`;
-
-  const miniStand = st.map((x,i)=>`<tr class="rankrow ${x.t===USER?'me':''}">
-     <td>${i+1}</td><td class="name">${teamDot(x.t)} ${x.t}</td><td>${x.W}</td><td>${x.L}</td><td>${x.T}</td><td>${fmtAvg(x.pct)}</td></tr>`).join("");
-
-  // team leaders
+  const recentHtml = recent.length? recent.map(g=>{
+    const opp=g.home===USER?g.away:g.home, us=g.home===USER?g.hr:g.ar, them=g.home===USER?g.ar:g.hr, w=us>them, t=us===them;
+    return `<div class="game-row"><span>${g.home===USER?'vs':'@'} ${teamDot(opp)} ${K.ROSTERS[opp].name}</span><span class="${t?'muted':(w?'win':'lose')}"><b>${t?'무':(w?'승':'패')}</b> ${us}:${them}</span></div>`;
+  }).join("") : `<p class="muted" style="margin:10px 0 0;font-size:13px">정규시즌 경기를 치르면 표시됩니다.</p>`;
   const myBat=Object.entries(state.season[USER].bat).map(([n,s])=>({n,s})).filter(x=>x.s.AB>0);
   const topAvg=myBat.slice().sort((a,b)=> (b.s.H/b.s.AB)-(a.s.H/a.s.AB))[0];
   const topHR=myBat.slice().sort((a,b)=>b.s.HR-a.s.HR)[0];
   const topRBI=myBat.slice().sort((a,b)=>b.s.RBI-a.s.RBI)[0];
+  const leaders=`<section class="panel"><div class="section-head"><h3>최근 경기 · 팀 리더</h3>${me.gp?`<span class="chip">${me.W}승 ${me.L}패 ${me.T}무</span>`:''}</div>
+    ${recentHtml}
+    ${topAvg? `<div class="metric-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div><small>타율 1위</small><b>${fmtAvg(topAvg.s.H/topAvg.s.AB)}</b><small>${topAvg.n}</small></div>
+      <div><small>홈런 1위</small><b>${topHR.s.HR}</b><small>${topHR.n}</small></div>
+      <div><small>타점 1위</small><b>${topRBI.s.RBI}</b><small>${topRBI.n}</small></div></div>` : ''}
+    <p class="hint" style="margin:14px 0 0">${FM.teamPitch(USER)}</p></section>`;
 
-  return `
-  ${FM.preseasonCard()}
-  <div class="grid cols3">
-    <div class="card"><h3>다음 경기 <span class="tag">${state.year} 시즌</span></h3>${nextHtml}<div style="margin-top:12px">${ctrl}</div>
-      <div class="progress"><i style="width:${Math.round(state.gameIdx/state.schedule.length*100)}%"></i></div>
-    </div>
-    <div class="card"><h3>팀 순위</h3>
-      <div class="big" style="color:${rank<=5?'var(--good)':'var(--dim)'}">${rank}위 <span style="font-size:14px" class="muted">/ 10팀</span></div>
-      <div class="muted">${me.W}승 ${me.L}패 ${me.T}무 · 승률 ${fmtAvg(me.pct)}</div>
-      <div class="muted" style="margin-top:4px">득점 ${me.RF} / 실점 ${me.RA} (${me.diff>=0?'+':''}${me.diff})</div>
-      <div class="hint" style="margin-top:8px">${rank<=5?'현재 가을야구 진출권 ✅':'5위 안에 들어야 포스트시즌 진출'}</div>
-    </div>
-    <div class="card"><h3>최근 경기</h3>${recentHtml}</div>
-  </div>
-  <div class="grid cols2" style="margin-top:14px">
-    <div class="card"><h3>리그 순위표</h3>
-      <table><thead><tr><th>순위</th><th class="name">팀</th><th>승</th><th>패</th><th>무</th><th>승률</th></tr></thead><tbody>${miniStand}</tbody></table>
-    </div>
-    <div class="card"><h3>우리 팀 리더</h3>
-      ${topAvg? `<div class="kpi">
-        <div class="k"><div class="v">${fmtAvg(topAvg.s.H/topAvg.s.AB)}</div><div class="l">타율 1위 · ${topAvg.n}</div></div>
-        <div class="k"><div class="v">${topHR.s.HR}</div><div class="l">홈런 1위 · ${topHR.n}</div></div>
-        <div class="k"><div class="v">${topRBI.s.RBI}</div><div class="l">타점 1위 · ${topRBI.n}</div></div>
-      </div>`:'<div class="muted">시즌 진행 후 표시됩니다.</div>'}
-      <div class="hint" style="margin-top:10px">💡 라인업·로테이션을 직접 짜고, 트레이드로 약점을 보강하세요. ${FM.teamPitch(USER)}</div>
-    </div>
-  </div>` + FM.dashCards();
+  return hero + taskHtml + (state.phase==="spring"? FM.preseasonCard() : '')
+    + `<div class="reference"><div class="stack">${standHtml}${leaders}</div>${FM.dashBrief()}</div>`;
 }
 
 function batRow(team,p,showStat){
@@ -1436,6 +1646,7 @@ const App={
   squadView:(v)=>{squadView=v;render();},
   leaderCat:(c)=>{leaderCat=c;render();},
   nextGame:()=>startNextUserGame(),
+  allTasks:()=>{ showAllTasks=!showAllTasks; render(); },
   startMatch:()=>Match.start(),
   cancelPreview:()=>{ closeModal(); },
   takeJob:(t)=>FM.takeJob(t),
