@@ -244,3 +244,13 @@ footer{color:var(--md-on-surface-variant)}
 
 /* play result and win probability moved to the right column */
 .pv-side-info{margin-bottom:12px}
+
+/* header settings menu (hamburger): save, load, delegation, new game */
+.hmenu{position:relative}
+.hmenu>summary{list-style:none;cursor:pointer}
+.hmenu>summary::-webkit-details-marker{display:none}
+.hmenu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:180px;display:flex;flex-direction:column;padding:6px 0;border-radius:12px;background:var(--md-surface-container-high,var(--panel));box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.hmenu-list button{display:flex;align-items:center;gap:12px;padding:10px 16px;background:none;border:0;color:var(--txt);font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.hmenu-list button:hover,.hmenu-list button:focus-visible{background:color-mix(in srgb,var(--txt) 8%,transparent);outline:none}
+.hmenu-list .icon{width:18px;height:18px;color:var(--dim)}
+.hmenu-list hr{border:0;border-top:1px solid var(--line);margin:6px 0}

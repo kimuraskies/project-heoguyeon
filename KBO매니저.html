@@ -292,9 +292,16 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
     <div class="brand"><span id="brandBadge"></span><div><small id="brandSub">KBO MANAGER 2026</small><b id="brandName">KBO 매니저</b></div></div>
     <div class="teaminfo" id="teaminfo"></div>
     <div class="headctrl">
-      <button class="btn" onclick="App.save()" aria-label="저장"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg><span class="lbl">저장</span></button>
-      <button class="btn" onclick="App.load()" aria-label="불러오기"><svg class="icon" aria-hidden="true"><use href="#i-load"/></svg><span class="lbl">불러오기</span></button>
-      <button class="btn" onclick="App.confirmNew()" aria-label="새 게임"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg><span class="lbl">새 게임</span></button>
+      <details class="hmenu">
+        <summary class="btn" aria-label="설정 메뉴" title="설정"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg><span class="lbl">설정</span></summary>
+        <div class="hmenu-list" role="menu">
+        <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.save()"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>저장</button>
+        <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.load()"><svg class="icon" aria-hidden="true"><use href="#i-load"/></svg>불러오기</button>
+        <button type="button" role="menuitem" onclick="this.closest('details').open=false;FM.delegPicker()"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>업무 분담</button>
+        <hr>
+        <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.confirmNew()"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg>새 게임</button>
+        </div>
+      </details>
     </div>
   </header>
   <div class="shell">
@@ -1679,5 +1686,9 @@ function beginCareer(user){
 boot();
 </script>
 
+<script>
+document.addEventListener('click',e=>{ document.querySelectorAll('details.hmenu[open]').forEach(d=>{ if(!d.contains(e.target)) d.open=false; }); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('details.hmenu[open]').forEach(d=>d.open=false); });
+</script>
 </body>
 </html>
