@@ -70,7 +70,8 @@ function payroll(t){ return Math.round(allPlayers(t).concat(K.ROSTERS[t].farm||[
 // ---------- names for rookies / call-ups ----------
 const SUR=['김','이','박','최','정','강','조','윤','장','임','한','오','서','신','권','황','안','송','류','홍','전','고','문','양','손'];
 const SYL=['민','준','서','현','우','진','호','성','재','영','지','훈','동','태','승','하','도','윤','건','혁','수','찬','규','원','석','빈','율','온','결','형'];
-function allNames(){ const s=new Set(); K.TEAM_IDS.forEach(t=>allPlayers(t).concat(K.ROSTERS[t].farm||[]).forEach(p=>s.add(p.n))); return s; }
+function allNames(){ const s=new Set(); K.TEAM_IDS.forEach(t=>allPlayers(t).concat(K.ROSTERS[t].farm||[]).forEach(p=>s.add(p.n)));
+  const d=state&&state.fm&&state.fm.draft; if(d) d.pool.concat(...Object.values(d.picks)).forEach(p=>s.add(p.n)); return s; }
 function newName(){
   const used=allNames();
   for(let i=0;i<500;i++){
@@ -464,6 +465,7 @@ function afterGame(res){
     if(state.phase==='regular'){
       // a Futures hiccup must never undo the 1군 game that was just recorded
       try{ farmGame(); }catch(e){ console.error('Futures game skipped', e); }
+      leagueCalendar();
       if(ug%TR_EVERY===0) trainingTick();
       if(ug%TR_REPORT===0) trainingReport();
       if(ug%24===0) farmReport();
@@ -525,7 +527,10 @@ function checkStreak(){
   if(l===5||l===10) send('스포츠 뉴스','📰',`${USER}, ${l}연패 수렁`,`${club}가 ${l}연패에 빠졌습니다. 팬들의 시선이 ${state.user.name} 감독에게 쏠리고 있습니다. 팀 미팅을 고려해 보세요.`,[]);
 }
 function maybeTradeOffer(ug){
-  const f=fm(); if(state.phase!=='regular' || ug-f.lastOffer<10 || Math.random()>0.08) return;
+  const f=fm(), w=tradeWindow(); if(state.phase!=='regular' || !w.open) return;
+  // offers pick up in the last two weeks before the deadline
+  const rush=w.daysLeft!=null&&w.daysLeft<=14;
+  if(ug-f.lastOffer<(rush?3:10) || Math.random()>(rush?0.3:0.08)) return;
   const mine=allPlayers(USER).filter(p=>!K.isInjured(p));
   const listed=mine.filter(p=>p.listed);
   const pool=listed.length? listed : mine.slice().sort((a,b)=>playerValue(b)-playerValue(a)).slice(0,14);
@@ -556,6 +561,7 @@ function tradeBudget(outNames, team, inNames){
 // can both clubs still field a legal 1군 after the swap? Checked when the deal is offered and
 // again when it runs, since a player may have been sent down or released in between.
 function tradeCheck(team, fromUser, fromThem){
+  const w=tradeWindow(); if(!w.open) return w.msg;
   if(!fromUser.length || !fromThem.length) return '양쪽 모두 선수를 한 명 이상 골라야 합니다.';
   const on=(t,n)=>allPlayers(t).find(x=>x.n===n);
   const gone=fromUser.filter(n=>!on(USER,n)).concat(fromThem.filter(n=>!on(team,n)));
@@ -771,6 +777,7 @@ function onRegularSeasonEnd(){
     `정규시즌 최종 순위: ${seeds.map((t,i)=>`${i+1}. ${K.ROSTERS[t].name}`).join(' · ')}\n\n` +
     (seeds.includes(USER)? `${K.ROSTERS[USER].name}는 ${rank}위로 가을야구에 나갑니다. 경기마다 라인업·선발을 정하고 실시간 중계로 지휘하세요.`
       : `${K.ROSTERS[USER].name}는 ${rank}위로 시즌을 마쳤습니다. 포스트시즌은 대시보드에서 시뮬레이션으로 진행됩니다.`), []);
+  openDraft();
   showPS();
 }
 function psSeriesMessage(c){
@@ -1363,6 +1370,7 @@ function lastChance(){ const f=fm(); f.fired=false; f.lastChance=true; f.board.c
 function offseasonMoves(){
   ensure();
   const f=fm();
+  const dr=draftState(); if(dr&&!draftDone(dr)){ const before=dr.picks[USER].length; draftAuto(); f.draftAutoN=DRAFT_ROUNDS-before; } else f.draftAutoN=0;
   // unanswered contract talks: the player walks
   f.inbox.forEach(m=>{ if(!m.done && m.actions.some(a=>a.fn==='renew')){ m.done=true; m.read=true; m.result='기한 내 결정하지 않아 FA로 떠났습니다.'; const p=findPlayer(USER,m.actions[0].arg.n); if(p) p.leaving=true; } });
   const left=[], retired=[];
@@ -1382,6 +1390,7 @@ function offseasonMoves(){
     if(r.pitchers.length>12){ const sp=r.pitchers.filter(p=>p.role==='SP'), rp=r.pitchers.filter(p=>p.role!=='SP'); trim(sp,Math.max(5,12-rp.length)); trim(rp,12-sp.length); r.pitchers=sp.concat(rp); }
   });
   f.offseasonNews={left, retired, signed:[]}; // AI clubs sign free agents when spring camp opens
+  f.draft=null;
 }
 // "next season" button: warn about contract talks that will end with the player leaving
 function confirmNextSeason(go){
@@ -1396,7 +1405,7 @@ function onNewSeason(){
   const n=f.offseasonNews||{left:[],retired:[]};
   const fn=f.farmNews||{up:[],retired:[],cut:[]};
   send('스카우트 팀장','🎓',`${state.year} 신인 입단`,
-    `신인 ${(f.newRookies||[]).length}명이 2군에 합류했습니다.\n\n${(f.newRookies||[]).map(x=>'• '+x).join('\n')}` +
+    `드래프트 지명 신인 ${(f.newRookies||[]).length}명이 2군에 합류했습니다.${f.draftAutoN? ` (스카우트 팀이 ${f.draftAutoN}명을 대신 지명)`:''}\n\n${(f.newRookies||[]).map(x=>'• '+x).join('\n')}` +
     (fn.up.length? `\n\n1군 인원을 채우려 2군에서 올린 선수: ${fn.up.join(', ')}`:'') + (fn.retired.length? `\n2군 은퇴: ${fn.retired.join(', ')}`:'') + (fn.cut.length? `\n2군 정리(방출): ${fn.cut.join(', ')}`:'') +
     (n.left.length? `\n\nFA로 떠난 선수: ${n.left.join(', ')}`:'') + (n.retired.length? `\n은퇴한 선수: ${n.retired.join(', ')}`:'') +
     (n.signed&&n.signed.length? `\n다른 구단의 FA 계약: ${n.signed.join(', ')}`:''), []);
@@ -1543,6 +1552,8 @@ function dashTasks(){
   ensure();
   const f=fm(), out=[], c=state.cfgs[USER];
   const camp=f.camp&&f.camp.year===state.year&&f.camp.focus;
+  const dr=draftState(); if(dr&&!draftDone(dr)&&draftOnClock(dr)===USER) out.push({ic:'trophy', t:`신인 드래프트 ${Math.floor(dr.pick/dr.order.length)+1}라운드 — 우리 차례`, d:`스카우트 팀 · 지명 ${dr.picks[USER].length}/${DRAFT_ROUNDS}`, a:'지명하기', go:'FM.showDraft()'});
+  const tw=tradeWindow(); if(state.phase==='regular'&&tw.open&&tw.daysLeft!=null&&tw.daysLeft<=14) out.push({ic:'trade', t:`트레이드 마감 D-${tw.daysLeft}`, d:`단장 · ${DEADLINE[0]}월 ${DEADLINE[1]}일까지 · 마감이 가까워 제안이 늘어납니다`, a:'트레이드', go:"App.tab('trade')"});
   if(state.phase==='stove' && !camp) out.push({ic:'camp', t:'스프링캠프 방향 선택', d:'수석코치 · '+Object.values(CAMP).map(x=>x.label).join(' / '), a:'훈련 선택', go:"FM.campPicker()"});
   // real decisions only: skip plain acknowledgements, and let press/interview requests lapse after 3 games
   const now=userGamesPlayed(), PRESS=['media','interview'];
@@ -1758,6 +1769,127 @@ function showProfile(team,name){
     ${actions}`);
 }
 
+// ---------- 리그 달력: 트레이드 마감 · 올스타 휴식기 · 신인 드래프트 ----------
+// The schedule has no dates, so game days are laid on a calendar: opening day 3/28, six game
+// days a week, and a four-day All-Star break from 7/10. That puts the 7/31 trade deadline
+// around game 104 and the season's end in mid-September.
+const SEASON_START=[3,28], ALLSTAR=[7,10], ALLSTAR_DAYS=4, DEADLINE=[7,31], DRAFT_ROUNDS=4, DRAFT_POOL=60;
+function baseDate(day){ return new Date(state.year, SEASON_START[0]-1, SEASON_START[1]+Math.floor(day*7/6)); }
+function allStarDate(){ return new Date(state.year, ALLSTAR[0]-1, ALLSTAR[1]); }
+function calDate(day){ const d=baseDate(day); if(d>=allStarDate()) d.setDate(d.getDate()+ALLSTAR_DAYS); return d; }
+function dateLabel(d){ return `${d.getMonth()+1}월 ${d.getDate()}일`; }
+function nextUserGame(){ return state.schedule.find(g=>!g.played&&(g.home===USER||g.away===USER)); }
+function today(){ const g=nextUserGame(), last=state.schedule[state.schedule.length-1]; return calDate(g? g.day : last? last.day : 0); }
+function tradeWindow(){
+  if(state.phase==='postseason') return {open:false, msg:'포스트시즌 중에는 트레이드할 수 없습니다.'};
+  if(state.phase!=='regular') return {open:true, daysLeft:null};
+  const left=Math.round((new Date(state.year, DEADLINE[0]-1, DEADLINE[1])-today())/864e5);
+  return left>=0? {open:true, daysLeft:left} : {open:false, daysLeft:left, msg:`트레이드 마감일(${DEADLINE[0]}월 ${DEADLINE[1]}일)이 지났습니다. 시즌이 끝나면 다시 열립니다.`};
+}
+function tradeTag(){ const w=tradeWindow();
+  return !w.open? '트레이드 마감' : w.daysLeft==null? '스토브리그 · 자유롭게 협상' : w.daysLeft<=14? `마감 D-${w.daysLeft} (${DEADLINE[0]}/${DEADLINE[1]})` : `마감 ${DEADLINE[0]}월 ${DEADLINE[1]}일`; }
+// after each of the user's regular-season games: deadline notices and the All-Star break
+function leagueCalendar(){
+  if(state.phase!=='regular') return;
+  const f=fm(); if(!f.cal||f.cal.year!==state.year) f.cal={year:state.year};
+  const c=f.cal, w=tradeWindow();
+  if(w.open && w.daysLeft!=null && w.daysLeft<=14 && !c.warn){ c.warn=1;
+    send('단장','⏳',`트레이드 마감 D-${w.daysLeft}`, `${DEADLINE[0]}월 ${DEADLINE[1]}일이 트레이드 마감입니다. 마감이 다가오면 다른 구단의 제안이 늘어납니다.\n보강이 필요한 자리가 있다면 지금 움직이셔야 합니다. 마감 뒤에는 시즌이 끝날 때까지 트레이드할 수 없습니다.`, []); }
+  if(!w.open && !c.closed){ c.closed=1;
+    f.inbox.forEach(m=>{ if(!m.done&&m.actions.some(a=>a.fn==='acceptTrade')){ m.done=true; m.result='트레이드 마감으로 제안이 무효가 되었습니다.'; } });
+    send('단장','🔒','트레이드 마감', `트레이드 시장이 닫혔습니다. 남은 시즌은 지금 선수단과 2군으로 치릅니다.`, []); }
+  const g=nextUserGame();
+  if(!c.allstar && g && baseDate(g.day)>=allStarDate()){ c.allstar=1; allStarBreak(); }
+}
+// the best bat at each position and the five best arms, league-wide, then four days of rest
+function allStarBreak(){
+  const ops=x=>(x.H+x.BB+x.HBP)/Math.max(1,x.AB+x.BB+x.HBP)+(x.H+x._2B+2*x._3B+3*x.HR)/Math.max(1,x.AB);
+  const bats=[], arms=[];
+  K.TEAM_IDS.forEach(t=>{ const s=state.season[t];
+    for(const n in s.bat){ const p=findPlayer(t,n); if(p&&p.type==='B'&&s.bat[n].PA>=120) bats.push({t,p,v:ops(s.bat[n])}); }
+    for(const n in s.pit){ const p=findPlayer(t,n), x=s.pit[n]; if(p&&p.type==='P'&&x.OUT>=150) arms.push({t,p,v:x.ER*27/x.OUT}); } });
+  const pick=[];
+  ['C','1B','2B','3B','SS','LF','CF','RF'].forEach(pos=>{ const b=bats.filter(x=>x.p.pos===pos&&pick.indexOf(x)<0).sort((a,b)=>b.v-a.v)[0]; if(b){ b.slot=pos; pick.push(b); } });
+  const dh=bats.filter(x=>pick.indexOf(x)<0).sort((a,b)=>b.v-a.v)[0]; if(dh){ dh.slot='지명'; pick.push(dh); }
+  const ace=arms.sort((a,b)=>a.v-b.v).slice(0,5);
+  const all=pick.concat(ace), ours=all.filter(x=>x.t===USER);
+  ours.forEach(x=>addMor(x.p,6));
+  K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(p=>{ p.cond=Math.min(100,K.cond(p)+30); if(p.inj>0) p.inj=Math.max(0,p.inj-ALLSTAR_DAYS); }));
+  send('KBO','⭐',`${state.year} 올스타 휴식기`,
+    `팬 투표와 감독 추천으로 올스타가 확정됐습니다.\n\n` +
+    pick.map(x=>`• ${x.slot} ${x.p.n} (${x.t}, OPS ${x.v.toFixed(3)})`).join('\n') + '\n' +
+    ace.map(x=>`• 투수 ${x.p.n} (${x.t}, ERA ${x.v.toFixed(2)})`).join('\n') +
+    `\n\n${ours.length? `우리 팀에서 ${ours.map(x=>x.p.n).join(', ')}이(가) 뽑혀 사기가 올랐습니다.` : '우리 팀에서는 올스타가 나오지 않았습니다.'}\n` +
+    `${ALLSTAR_DAYS}일 휴식으로 모든 선수의 컨디션이 회복되고, 부상 선수는 회복이 ${ALLSTAR_DAYS}경기만큼 당겨집니다.`, []);
+}
+
+// rookie draft: opens when the regular season ends, picks in reverse standings for four rounds.
+// Prospects show a scout's estimate of their potential (within ±4), not the real figure.
+function draftState(){ const d=fm()&&fm().draft; return d&&d.year===state.year? d : null; }
+function draftOnClock(d){ return d.order[d.pick%d.order.length]; }
+function draftDone(d){ return d.pick>=d.order.length*DRAFT_ROUNDS; }
+function estPot(p){ return clampN(p.pot+(hash(p.n+'scout')%9)-4, 50, 96); }
+function makeProspect(used){
+  const type=Math.random()<0.5?'P':'B', p=makeRookie(type, type==='P'&&Math.random()<0.45?'SP':undefined);
+  while(used.has(p.n)) p.n=newName();
+  used.add(p.n); p.pers=hash(p.n)%PERS.length;
+  const college=Math.random()<0.35, tier=Math.random();
+  const bump=tier>0.93? R(6,10) : tier>0.75? R(3,6) : tier>0.4? R(0,3) : R(-3,0);
+  p.age=college? R(22,23) : R(18,19); p.college=college;
+  (type==='B'?['con','pow','eye','spd','fld','arm']:['stu','ctl','mov']).forEach(k=>p[k]=clampN(p[k]+bump+(college?2:0),35,88));
+  ensurePlayer(p); p.pot=Math.min(96,p.pot+Math.max(0,bump)); p.yrs=3; p.sal=bump>=6? 0.5 : 0.3;
+  return p;
+}
+function openDraft(){
+  if(draftState()) return;
+  const order=standings().map(x=>x.t).reverse(), used=allNames(), pool=[];
+  for(let i=0;i<DRAFT_POOL;i++) pool.push(makeProspect(used));
+  const picks={}; order.forEach(t=>picks[t]=[]);
+  fm().draft={year:state.year, order, pick:0, pool, picks, log:[]};
+  send('KBO','🎓',`${state.year+1} KBO 신인 드래프트`,
+    `정규시즌 순위의 역순으로 ${DRAFT_ROUNDS}라운드를 지명합니다. 우리 구단은 ${order.indexOf(USER)+1}번째로 지명합니다.\n` +
+    `스카우트 평가(잠재력 별점)는 추정치라 실제와 조금 다를 수 있습니다. 지명한 선수는 다음 시즌 2군에 합류합니다.\n` +
+    `다음 시즌을 시작할 때까지 지명을 마치지 않으면 스카우트 팀이 대신 지명합니다.`, [{label:'드래프트 회의장으로', fn:'openDraft'}]);
+  draftRun();
+}
+function draftScore(p,t,d){ const mine=d.picks[t], nb=mine.filter(x=>x.type==='B').length, np=mine.length-nb;
+  return estPot(p)*0.65+K.ovr(p)*0.35+(p.type==='B'? (nb>np?-3:2) : (np>nb?-3:2))+(t===USER?0:(hash(p.n+t)%7)*0.5); }
+function draftTake(d,t,p){ d.pool.splice(d.pool.indexOf(p),1); d.picks[t].push(p);
+  d.log.push({r:Math.floor(d.pick/d.order.length)+1, no:d.pick+1, t, n:p.n, type:p.type, pos:p.pos||p.role}); d.pick++; }
+function draftBest(d,t){ return d.pool.slice().sort((a,b)=>draftScore(b,t,d)-draftScore(a,t,d))[0]; }
+// AI clubs pick until it's the user's turn or the draft is over
+function draftRun(){ const d=draftState(); if(!d) return; while(!draftDone(d) && draftOnClock(d)!==USER){ const t=draftOnClock(d); draftTake(d,t,draftBest(d,t)); } }
+function draftPick(n){ const d=draftState(); if(!d||draftDone(d)||draftOnClock(d)!==USER) return;
+  const p=d.pool.find(x=>x.n===n); if(!p) return; draftTake(d,USER,p); draftRun(); showDraft(); render(); }
+function draftAuto(){ const d=draftState(); if(!d) return;
+  while(!draftDone(d)){ if(draftOnClock(d)===USER) draftTake(d,USER,draftBest(d,USER)); else draftRun(); } }
+let draftFilter='all', draftSort='pot';
+function draftView(f,s){ if(f) draftFilter=f; if(s) draftSort=s; showDraft(); }
+function showDraft(){
+  const d=draftState(); if(!d){ notify('진행 중인 드래프트가 없습니다.'); return; }
+  const done=draftDone(d), onClock=!done&&draftOnClock(d)===USER, rnd=Math.min(DRAFT_ROUNDS,Math.floor(d.pick/d.order.length)+1);
+  const key=p=>draftSort==='ovr'? K.ovr(p) : estPot(p)*10+K.ovr(p)/10;
+  const list=d.pool.filter(p=>draftFilter==='all'||p.type===draftFilter).sort((a,b)=>key(b)-key(a)).slice(0,30);
+  const attrs=p=>p.type==='B'? `컨${attr20(p.con)} 파${attr20(p.pow)} 선${attr20(p.eye)} 주${attr20(p.spd)} 수${attr20(p.fld)}` : `구${attr20(p.stu)} 제${attr20(p.ctl)} 무${attr20(p.mov)} 체${attr20(p.sta)}`;
+  const rows=list.map(p=>`<tr><td class="name"><b>${esc(p.n)}</b> <span class="muted">${p.age}세 · ${p.college?'대졸':'고졸'}</span></td>
+    <td>${posFull(p.pos||p.role)}</td><td><b>${K.ovr(p)}</b></td><td>${starHTML({pot:estPot(p)})}</td><td style="font-size:12px;white-space:nowrap">${attrs(p)}</td>
+    <td>${onClock? `<button class="btn btn-sm primary" onclick="FM.draftPick('${q(p.n)}')">지명</button>` : ''}</td></tr>`).join('');
+  const recent=d.log.slice(-8).reverse().map(x=>`<div style="font-size:12px">${x.r}R ${x.no}번 · ${teamDot(x.t)} ${x.t} — ${esc(x.n)} <span class="muted">(${posFull(x.pos)})</span></div>`).join('')||'<div class="muted">아직 지명이 없습니다.</div>';
+  const mine=d.picks[USER].map((p,i)=>`<div style="font-size:12px">${i+1}R · <b>${esc(p.n)}</b> <span class="muted">${posFull(p.pos||p.role)} · OVR ${K.ovr(p)}</span> ${starHTML({pot:estPot(p)})}</div>`).join('')||'<div class="muted">아직 없음</div>';
+  const fb=(v,l)=>`<button class="btn btn-sm ${draftFilter===v?'primary':''}" onclick="FM.draftView('${v}')">${l}</button>`;
+  const sb=(v,l)=>`<button class="btn btn-sm ${draftSort===v?'primary':''}" onclick="FM.draftView(null,'${v}')">${l}</button>`;
+  modal(`<span class="closeX" onclick="App.closeModal()">×</span><h2>🎓 ${state.year+1} KBO 신인 드래프트</h2>
+    <div class="muted">${done? '지명이 모두 끝났습니다.' : onClock? `<b style="color:var(--accent)">${rnd}라운드 · 우리 차례입니다</b>` : `${rnd}라운드 진행 중`} · 우리 지명 ${d.picks[USER].length}/${DRAFT_ROUNDS}</div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr);gap:12px;margin-top:10px">
+      ${done? '' : `<div class="row" style="gap:6px;flex-wrap:wrap">${fb('all','전체')}${fb('B','타자')}${fb('P','투수')}<span class="muted" style="margin:0 4px">|</span>${sb('pot','잠재력순')}${sb('ovr','현재 능력순')}
+        <button class="btn btn-sm" style="margin-left:auto" onclick="FM.draftAuto();render();FM.showDraft()">남은 지명 스카우트에게 맡기기</button></div>
+      <div style="overflow-x:auto;max-height:360px"><table class="stat-table"><thead><tr><th class="name">선수</th><th>포지션</th><th>OVR</th><th>잠재력(추정)</th><th>능력치</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`}
+      <div class="grid cols2" style="gap:12px"><div><div class="muted" style="font-weight:700;margin-bottom:4px">우리 지명</div>${mine}</div>
+        <div><div class="muted" style="font-weight:700;margin-bottom:4px">최근 지명</div>${recent}</div></div>
+    </div>`);
+}
+ACTIONS.openDraft=()=>{ setTimeout(showDraft,0); return '드래프트 회의장으로 이동했습니다.'; };
+
 // ---------- 2군 (퓨처스리그) ----------
 // Each club keeps a farm squad in K.ROSTERS[t].farm, which the game engine never sees.
 // The user's farm plays one Futures game for every 1군 game in the regular season, and
@@ -1927,7 +2059,10 @@ function offseasonFarm(t){
   const retired=[]; for(let i=f.length-1;i>=0;i--){ const p=f[i]; if(p.age>=37 || (p.age>=33&&K.ovr(p)<66)){ retired.push(p.n); f.splice(i,1); } }
   f.forEach(p=>{ p.cond=100; p.inj=0; p.bench=0; });
   // one at a time, so each draftee's name is checked against the ones drafted before him
-  const draft=[['B'],['B'],['P','SP'],['P']].map(([type,pos])=>{ const p=makeRookie(type,pos); ensurePlayer(p); f.push(p); return p; });
+  // the club's draft picks, or (saves from before the draft existed) four generated rookies
+  const dr=draftState(), picked=dr&&dr.picks[t];
+  const draft= picked&&picked.length? picked.map(p=>{ ensurePlayer(p); f.push(p); return p; })
+    : [['B'],['B'],['P','SP'],['P']].map(([type,pos])=>{ const p=makeRookie(type,pos); ensurePlayer(p); f.push(p); return p; });
   const best=(type,role)=>f.filter(p=>p.type===type&&(!role||p.role===role)).sort((a,b)=>K.ovr(b)-K.ovr(a))[0];
   const up=[], lift=(type,role)=>{ const p=best(type,role)||makeRookie(type,role); if(f.indexOf(p)<0) f.push(p); doPromote(t,p); up.push(p); };
   while(r.batters.length<MIN_1B) lift('B');
@@ -2049,7 +2184,7 @@ function farmView(){
 }
 
 window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, showSetup, setupPick, setupBg, setupName, setupStart, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
-  tradeBudget, tradeCheck, doTrade, payroll, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
+  tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,
   springNext, springPlayNext, springRecord, springSimAll, openSeason, SPRING_GAMES, gameReport, renderFeed, setFeedFilter, logGame, profileTab,

@@ -1197,7 +1197,7 @@ function heroInfo(rank){
       cta:`<button class="btn primary hero-cta" onclick="App.simRest()">${I('skip')}남은 경기 진행</button>`, more:''};
     const opp=next.home===USER?next.away:next.home;
     return {eyebrow:`NEXT GAME / GAME ${pad(played+1)}`, title:`${next.home===USER?'홈':'원정'} · ${K.ROSTERS[opp].name}전`,
-      sub:`${played+1}번째 경기 · 남은 ${SEASON_GAMES-played}경기${played?` · 현재 ${rank}위`:''}`, m:{home:next.home,away:next.away,label:'정규시즌'},
+      sub:`${FM.dateLabel(FM.calDate(next.day))} · ${played+1}번째 경기 · 남은 ${SEASON_GAMES-played}경기${played?` · 현재 ${rank}위`:''}`, m:{home:next.home,away:next.away,label:'정규시즌'},
       progress:Math.round(played/SEASON_GAMES*100),
       cta:`<button class="btn primary hero-cta" onclick="App.nextGame()">${I('play')}경기 준비</button>`,
       more:`<button class="btn" onclick="App.userGames(5)">${I('fast-forward')}5경기 빠르게</button>
@@ -1489,7 +1489,7 @@ function renderTrade(){
   const valueOk = inVal>0 && outVal>=inVal*0.98;
   const roster = tradeOut.size||tradeIn.size? FM.tradeCheck(tradeTeam,[...tradeOut],[...tradeIn]) : "";
   const accept = valueOk && budget.ok && !roster;
-  return `<div class="card"><h3>트레이드 <span class="tag">상대팀 선택 후 선수 교환</span></h3>
+  return `<div class="card"><h3>트레이드 <span class="tag">${FM.tradeTag()}</span></h3>${FM.tradeWindow().open? "" : `<div class="deal-result deal-no" style="margin-bottom:10px">${FM.tradeWindow().msg}</div>`}
     <div class="row" style="margin-bottom:10px">상대팀: <select onchange="App.tradeTeam(this.value)">${teams.map(t=>`<option value="${t}" ${t===tradeTeam?'selected':''}>${K.ROSTERS[t].name}</option>`).join("")}</select></div>
     <div class="row" style="align-items:flex-start">
       <div class="trade-side"><b>내보낼 선수 (${USER})</b><div style="max-height:340px;overflow:auto;margin-top:6px">${myAll.map(itemOut).join("")}</div>
