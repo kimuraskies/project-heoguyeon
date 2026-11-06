@@ -207,7 +207,8 @@ const MGR_BG={
 };
 // readable accent per club (brand colors that are too dark on the dark UI are lifted)
 const TEAM_ACCENT={KIA:'#ea0029',LG:'#c30452','한화':'#fc4e00',SSG:'#ce0e2d','삼성':'#1d6fe0',NC:'#3f6fd1',KT:'#e4002b','롯데':'#d00f31','두산':'#4a5fd6','키움':'#b0123f'};
-function applyTheme(t){ document.documentElement.style.setProperty('--accent', TEAM_ACCENT[t]||'#ea0029'); document.documentElement.dataset.team=t; }
+// the club seeds the Material 3 palette through data-team (design/material.css); --accent follows its primary role
+function applyTheme(t){ const st=document.documentElement.style; if(st&&st.removeProperty) st.removeProperty('--accent'); document.documentElement.dataset.team=t; }
 // design-system helpers: inline SVG sprite icon and the original round club badge
 function icon(id, cls){ return `<svg class="icon${cls?' '+cls:''}" aria-hidden="true"><use href="#i-${id}"/></svg>`; }
 function badge(t, size){ return typeof teamBadge==='function'? teamBadge(t, K.ROSTERS[t]&&K.ROSTERS[t].color, size||48) : ''; }

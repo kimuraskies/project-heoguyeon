@@ -1,0 +1,147 @@
+/* ==== Material 3 (Material You) — dark scheme with dynamic color from the club ====
+   Layered on top of the existing component CSS. The club's colors (--team, --team-ink, set per
+   data-team) seed the palette the way Material You seeds it from a wallpaper: --team-ink is a
+   light tone of the club color and becomes the primary role; containers and surfaces are
+   tinted with it. Shapes, type scale, state layers and components follow m3.material.io.
+   Self-contained on purpose (system fonts, no CDN) so the game can later ship as a packaged client. */
+:root{
+  --md-primary: var(--team-ink);
+  --md-on-primary: color-mix(in oklab, var(--team) 55%, #0b0b0f);
+  --md-primary-container: color-mix(in oklab, var(--team) 58%, #16161b);
+  --md-on-primary-container: color-mix(in oklab, var(--team-ink) 55%, #ffffff);
+  --md-secondary-container: color-mix(in oklab, var(--team-ink) 20%, #232329);
+  --md-on-secondary-container: color-mix(in oklab, var(--team-ink) 35%, #ffffff);
+  --md-tertiary: #f2c94c;
+  --md-on-tertiary: #3b2f00;
+  --md-error: #ffb4ab;
+  --md-error-container: #93000a;
+  --md-surface-dim: color-mix(in oklab, var(--team) 3%, #101014);
+  --md-surface: color-mix(in oklab, var(--team) 4%, #131317);
+  --md-surface-container-lowest: color-mix(in oklab, var(--team) 3%, #0e0e12);
+  --md-surface-container-low: color-mix(in oklab, var(--team) 5%, #1b1b20);
+  --md-surface-container: color-mix(in oklab, var(--team) 6%, #1f1f25);
+  --md-surface-container-high: color-mix(in oklab, var(--team) 7%, #2a2a30);
+  --md-surface-container-highest: color-mix(in oklab, var(--team) 8%, #35353b);
+  --md-on-surface: #e5e1e9;
+  --md-on-surface-variant: #c9c5d0;
+  --md-outline: #938f99;
+  --md-outline-variant: #48464f;
+  --md-scrim: rgba(0,0,0,.55);
+  --md-state-hover: 8%; --md-state-press: 12%;
+  --md-font: Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* the game's own tokens now point at Material roles, so every existing inline style follows */
+  --bg: var(--md-surface); --panel: var(--md-surface-container); --panel2: var(--md-surface-container-high);
+  --hero: var(--md-surface-container-high); --line: var(--md-outline-variant); --line-strong: color-mix(in oklab, var(--md-outline) 55%, var(--md-outline-variant));
+  --txt: var(--md-on-surface); --dim: var(--md-on-surface-variant); --accent: var(--md-primary); --accent2: var(--md-tertiary);
+  --good:#8bd8a6; --warn:#f2c94c; --bad: var(--md-error); --blue:#a8c8ff;
+}
+html,body{font-family:var(--md-font);background:var(--md-surface);color:var(--md-on-surface);letter-spacing:.01em;-webkit-font-smoothing:antialiased}
+::selection{background:var(--md-primary-container);color:var(--md-on-primary-container)}
+:focus-visible{outline:2px solid var(--md-primary);outline-offset:2px}
+
+/* ---- top app bar ---- */
+header.top{background:var(--md-surface);border-top:0;border-bottom:0;box-shadow:inset 0 -1px 0 var(--md-outline-variant);min-height:64px}
+body::before{background:var(--md-surface)}
+.brand b{letter-spacing:0;font-weight:500;font-size:20px}
+.brand small{letter-spacing:.1em;font-weight:500}
+
+/* ---- navigation rail (desktop) / scrolling nav pills (narrow) ---- */
+nav.tabs{gap:4px}
+nav.tabs button{border:0;border-radius:999px;min-height:48px;padding:0 16px;color:var(--md-on-surface-variant);font-weight:500;font-size:14px;letter-spacing:.01em;position:relative;transition:background-color .2s}
+nav.tabs button:hover:not(.active){background:color-mix(in srgb, var(--md-on-surface) var(--md-state-hover), transparent);color:var(--md-on-surface)}
+nav.tabs button.active{background:var(--md-secondary-container);color:var(--md-on-secondary-container);font-weight:700}
+nav.tabs button.active .icon{stroke-width:2.1}
+@media(min-width:1024px){
+  /* the setup screen hides the rail: give the view the whole width instead of the rail's column */
+  .shell:has(> nav.tabs[hidden]){grid-template-columns:minmax(0,1fr)}
+  nav.tabs button{border-left:0;padding:0 18px;min-height:52px}
+  nav.tabs button.active{border-left:0}
+}
+
+/* ---- buttons: outlined (default), filled (.primary), tonal, text (.btn-quiet), tertiary (.gold) ---- */
+.btn{font-family:inherit;border-radius:20px;min-height:40px;padding:9px 20px;line-height:20px;font-size:14px;font-weight:500;letter-spacing:.01em;background:transparent;color:var(--md-primary);border:1px solid var(--md-outline);transition:background-color .15s, box-shadow .15s}
+.headctrl .btn,.hero-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{border-color:var(--md-outline);background:color-mix(in srgb, var(--md-primary) var(--md-state-hover), transparent)}
+.btn:active{background:color-mix(in srgb, var(--md-primary) var(--md-state-press), transparent)}
+.btn.primary{background:var(--md-primary);color:var(--md-on-primary);border-color:transparent}
+.btn.primary:hover{filter:none;box-shadow:0 1px 3px rgba(0,0,0,.4);background:color-mix(in srgb, var(--md-on-primary) var(--md-state-hover), var(--md-primary))}
+.btn.primary:active{background:color-mix(in srgb, var(--md-on-primary) var(--md-state-press), var(--md-primary))}
+.btn.tonal{background:var(--md-secondary-container);color:var(--md-on-secondary-container);border-color:transparent}
+.btn.gold{background:var(--md-tertiary);color:var(--md-on-tertiary);border-color:transparent}
+.btn-quiet{border-color:transparent}
+.btn-sm{min-height:32px;padding:5px 14px;font-size:13px}
+.grid>.btn,.btn[style*="text-align:left"]{border-radius:16px}
+.btn:disabled{opacity:1;color:color-mix(in srgb, var(--md-on-surface) 38%, transparent);border-color:color-mix(in srgb, var(--md-on-surface) 12%, transparent);background:transparent;box-shadow:none}
+.btn.primary:disabled{background:color-mix(in srgb, var(--md-on-surface) 12%, transparent)}
+.btn .icon{margin-right:0;vertical-align:middle}
+.hero-cta{min-height:48px;padding:12px 28px;font-size:15px}
+
+/* ---- cards & surfaces: filled cards on surface containers, no borders ---- */
+.card,.panel{background:var(--md-surface-container);border:0;border-radius:16px;padding:20px}
+.card h3,.panel h3{font-size:16px;font-weight:500;letter-spacing:.01em}
+.card h3 .tag{font-weight:400;font-size:12px}
+.panel h2{font-size:22px;font-weight:400;letter-spacing:0}
+.kpi .k,.mu-stats>div{background:var(--md-surface-container-high);border-radius:12px}
+.hero{background:linear-gradient(135deg,var(--md-primary-container) 0%,var(--md-surface-container-high) 62%);border:0;border-radius:28px;padding:32px}
+.hero::before{border-color:color-mix(in srgb, var(--md-on-primary-container) 18%, transparent);box-shadow:0 0 0 48px color-mix(in srgb, var(--md-on-primary-container) 3%, transparent),0 0 0 96px color-mix(in srgb, var(--md-on-primary-container) 2%, transparent)}
+.hero-title{font-weight:400;letter-spacing:0;line-height:1.2}
+.hero-bottom{border-top-color:color-mix(in srgb, var(--md-on-surface) 14%, transparent)}
+.hero .progress>i{background:var(--md-primary)}
+.eyebrow{font-weight:500;letter-spacing:.1em;color:var(--md-primary)}
+.bc{border:0;border-radius:16px;background:var(--md-surface-container)}
+.bc-cap{background:var(--md-surface-container-high)}
+
+/* ---- chips, badges, segmented buttons ---- */
+.chip{border-radius:8px;min-height:28px;border-color:var(--md-outline-variant);background:transparent;font-weight:500}
+.pill{border-radius:8px}
+.count{background:var(--md-error);color:#690005;border-radius:999px;font-weight:700}
+.tabsm{gap:0}
+.tabsm button{border-radius:0;border:1px solid var(--md-outline);background:transparent;color:var(--md-on-surface);min-height:36px;padding:0 14px;font-size:13px;font-weight:500;margin-left:-1px}
+.tabsm button:first-child{border-radius:999px 0 0 999px;margin-left:0}
+.tabsm button:last-child{border-radius:0 999px 999px 0}
+.tabsm button:only-child{border-radius:999px}
+.tabsm button.active{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+
+/* ---- text fields & selects: outlined ---- */
+select,input{font-family:inherit;background:transparent;color:var(--md-on-surface);border:1px solid var(--md-outline);border-radius:4px;min-height:36px;padding:6px 10px;font-size:14px}
+select:hover,input:hover{border-color:var(--md-on-surface)}
+select:focus,input:focus{outline:0;border-color:var(--md-primary);box-shadow:inset 0 0 0 1px var(--md-primary)}
+select option{background:var(--md-surface-container-high);color:var(--md-on-surface)}
+.stat-table select{border-color:var(--md-outline);border-radius:4px;background:transparent}
+input[type=checkbox]{accent-color:var(--md-primary);min-height:auto;width:18px;height:18px}
+
+/* ---- data tables ---- */
+th,td{border-bottom-color:var(--md-outline-variant)}
+th{text-transform:none;letter-spacing:.02em;font-weight:500;font-size:12px;white-space:nowrap}
+td.name{white-space:nowrap}
+tr:hover td{background:color-mix(in srgb, var(--md-on-surface) 5%, transparent)}
+.rankrow.me td,.stat-table .selected td{background:color-mix(in srgb, var(--md-primary) 12%, transparent);color:var(--md-on-surface)}
+.rankrow.me td:first-child,.rankrow.me td.name{color:var(--md-primary);font-weight:700}
+
+/* ---- dialogs ---- */
+.modal-bg{background:var(--md-scrim);backdrop-filter:blur(2px)}
+.modal{background:var(--md-surface-container-high);border:0;border-radius:28px;padding:24px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.modal h2{font-size:24px;font-weight:400;letter-spacing:0;margin-bottom:8px}
+.closeX{width:40px;height:40px;margin:-8px -8px 0 0;border-radius:50%;display:grid;place-items:center;font-size:22px}
+.closeX:hover{background:color-mix(in srgb, var(--md-on-surface) 8%, transparent)}
+
+/* ---- progress, meters, feedback ---- */
+.bar,.progress,.wp-bar{background:var(--md-secondary-container);border-radius:999px}
+.progress>i{background:var(--md-primary);border-radius:999px}
+.deal-result{border-radius:12px;font-weight:500}
+.deal-ok{background:color-mix(in srgb, var(--good) 16%, transparent)}
+.deal-no{background:color-mix(in srgb, var(--md-error) 14%, transparent)}
+.task-list li{border-top-color:var(--md-outline-variant)}
+.task-list .icon{color:var(--md-primary)}
+.checkitem{border-bottom-color:var(--md-outline-variant);border-radius:8px}
+.feed-item:hover p{color:var(--md-primary)}
+.ovr.s90{color:var(--md-tertiary)} .ovr.s80{color:var(--good)} .ovr.s70{color:var(--blue)}
+.stars{color:var(--md-tertiary)}
+.teamdot{box-shadow:0 0 0 1px color-mix(in srgb, var(--md-on-surface) 30%, transparent)}
+footer{color:var(--md-on-surface-variant)}
+@media(max-width:600px){
+  .hero{padding:24px 18px;border-radius:24px}
+  .card,.panel{padding:16px;border-radius:16px}
+  .modal{border-radius:24px;padding:20px}
+}
+@media (prefers-reduced-motion:reduce){ .btn,nav.tabs button{transition:none} }
