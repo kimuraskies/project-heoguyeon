@@ -85,3 +85,34 @@ returns void language sql security definer set search_path = public as $$ delete
 
 revoke all on function public.gate_register(text,text,text), public.gate_login(text,text), public.gate_check(text), public.gate_logout(text) from public;
 grant execute on function public.gate_register(text,text,text), public.gate_login(text,text), public.gate_check(text), public.gate_logout(text) to anon, authenticated;
+
+-- ---- migration "invite_code_entry": enter with the invite code alone (current mode) ----
+-- Sessions can belong to a code instead of an account; deactivating the code ends those sessions.
+alter table public.sessions alter column player_id drop not null;
+alter table public.sessions add column if not exists invite_code text references public.invite_codes(code);
+alter table public.invite_codes add column if not exists entries int not null default 0;
+
+create or replace function public.gate_enter(p_code text)
+returns json language plpgsql security definer set search_path = public, extensions as $$
+declare v_code text := upper(trim(coalesce(p_code,''))); c invite_codes; v_tok text;
+begin
+  select * into c from invite_codes where code = v_code for update;
+  if not found or not c.active then
+    perform pg_sleep(0.4); -- slows down guessing
+    return json_build_object('ok',false,'err','초대코드가 맞지 않아요.');
+  end if;
+  update invite_codes set entries = entries + 1 where code = v_code;
+  v_tok := encode(gen_random_bytes(24), 'hex');
+  insert into sessions(token, invite_code, expires_at) values (v_tok, v_code, now() + interval '30 days');
+  return json_build_object('ok',true,'token',v_tok,'id',null);
+end $$;
+
+create or replace function public.gate_check(p_token text)
+returns json language sql security definer set search_path = public as $$
+  select coalesce((select json_build_object('ok',true,'id',p.login_id) from sessions s left join players p on p.id = s.player_id
+    left join invite_codes c on c.code = s.invite_code
+    where s.token = p_token and s.expires_at > now() and (s.invite_code is null or c.active)), json_build_object('ok',false));
+$$;
+
+revoke all on function public.gate_enter(text) from public;
+grant execute on function public.gate_enter(text) to anon, authenticated;

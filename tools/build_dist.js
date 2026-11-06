@@ -10,6 +10,11 @@ fs.mkdirSync(path.join(out, 'design'), {recursive: true});
 fs.writeFileSync(path.join(out, 'index.html'), html);
 // copy exactly what the page references (src= and href= to local files)
 const refs = [...html.matchAll(/(?:src|href)="([^"#:]+\.(?:js|css))"/g)].map(m => m[1]);
+// images the stylesheets point at (url(...) relative to the css file)
+for (const css of refs.filter(r => r.endsWith('.css'))) {
+  const dir = path.dirname(css), text = fs.readFileSync(path.join(root, css), 'utf8');
+  for (const m of text.matchAll(/url\(['"]?([^)'"]+\.(?:webp|png|jpe?g|svg))['"]?\)/g)) if (!/^(data:|https?:)/.test(m[1])) refs.push(path.posix.join(dir, m[1]));
+}
 for (const r of new Set(refs)) {
   fs.mkdirSync(path.dirname(path.join(out, r)), {recursive: true});
   fs.copyFileSync(path.join(root, r), path.join(out, r));
