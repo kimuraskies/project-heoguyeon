@@ -114,6 +114,18 @@ footer{text-align:center;color:var(--dim);font-size:11px;margin-top:30px;line-he
 .pl-velo,.pl-cnt{color:var(--dim);font-variant-numeric:tabular-nums}
 .mu-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11.5px;color:var(--dim);margin:10px 0}
 .mu-stats>div{background:var(--panel2);border-radius:8px;padding:7px 9px;line-height:1.55;min-width:0}
+/* full-screen match pages: 1 lineup & strategy, 2 in-game */
+.matchpage{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;overflow-x:hidden}
+body:has(.matchpage){overflow:hidden}
+.mp-wrap{max-width:1120px;margin:0 auto;padding:max(14px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px))}
+.mp-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--line-strong)}
+.mp-bar h2{margin:0;font-size:17px;letter-spacing:-.02em}
+.mp-bar small{color:var(--dim);font-size:12px}
+.mp-cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;align-items:start}
+.mp-foot{position:sticky;bottom:0;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;padding:12px 0 calc(12px + env(safe-area-inset-bottom, 0px));background:var(--bg);border-top:1px solid var(--line-strong)}
+.live-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0 20px;padding-bottom:calc(20px + env(safe-area-inset-bottom, 0px))}
+@media(max-width:820px){.mp-cols{grid-template-columns:minmax(0,1fr)}}
+@media(min-width:1000px){.live-grid{grid-template-columns:minmax(0,clamp(420px,calc((100vh - 290px)*1.2),600px)) minmax(0,1fr);align-items:start;justify-content:center}.live-side .mu-stats{margin-top:0}}
 /* ---- design pass 1: shell, header, nav ---- */
 header.top{display:flex;align-items:center;gap:14px;padding:12px 4px;border-top:5px solid var(--team);border-bottom:1px solid var(--line-strong);position:sticky;top:env(safe-area-inset-top, 0px);background:#0d1522;z-index:30;flex-wrap:wrap;margin:0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))) 0;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);background:#0d1522;z-index:31}
@@ -467,8 +479,9 @@ function pendingMatch(){
   if(state.pendingGame==='spring'){ const n=FM.springNext(); return n? {home:n.home, away:n.away, spring:true, label:n.label} : null; }
   const g=state.schedule[state.pendingGame]; return g? {home:g.home, away:g.away, ps:false, label:`${state.year} 시즌`} : null;
 }
+function closePreview(){ const o=$('prematch'); if(o) o.remove(); }
 function openPreview(){
-  const g=pendingMatch(); if(!g) return;
+  const g=pendingMatch(); if(!g){ closePreview(); return; }
   if(!state.matchTac) state.matchTac=Object.assign({}, K.DEFAULT_TAC, state.cfgs[USER].tac||{});
   const st=standings();
   const rankOf=t=>st.findIndex(x=>x.t===t)+1;
@@ -482,31 +495,37 @@ function openPreview(){
       <div class="muted" style="font-size:12px">${g.spring? '시범경기' : g.ps? `정규시즌 ${rankOf(t)}위 · 시리즈 ${t===ps.hi?ps.wHi-(ps.hiStart||0):ps.wLo}승` : (s.W+s.L+s.T? `${rankOf(t)}위 · ${s.W}승 ${s.L}패 ${s.T}무` : '개막전')}</div>
       <div style="font-size:12px;margin-top:4px">최근5: ${recentForm(t)}</div></div>`; };
   const spStat=(t,n)=>{ const s=state.season[t].pit[n]; return s&&s.G>0? `${s.W}승 ${s.L}패 · ERA ${fmtEra(s.ER,s.OUT)}` : '시즌 첫 등판'; };
-  const lineupList=(t)=>{ const c=state.cfgs[t]; const pos=c.positions||K.autoPositions(t,c.lineup); return c.lineup.map((n,i)=>`<div style="display:flex;gap:8px;font-size:12px;padding:2px 0"><span class="muted" style="width:16px">${i+1}</span><span class="pill pos" style="width:30px">${pos[i]||''}</span>${t===USER?pname(t,n):n}</div>`).join(''); };
-  modal(`<span class="closeX" onclick="App.cancelPreview()">×</span>
-    <div class="muted" style="font-size:12px">${g.label} · ${usHome?'홈경기 🏠':'원정경기 ✈'} · 경기 프리뷰</div>
+  const oppLineup=()=>{ const c=state.cfgs[opp]; const pos=c.positions||K.autoPositions(opp,c.lineup); return c.lineup.map((n,i)=>`<div style="display:flex;gap:8px;font-size:12px;padding:2px 0"><span class="muted" style="width:16px">${i+1}</span><span class="pill pos" style="width:30px">${pos[i]||''}</span>${n}</div>`).join(''); };
+  const c=state.cfgs[USER], rotIdx=c.rotation.indexOf(spUser);
+  const spPick = rotIdx<0? pname(USER,spUser) : `<select aria-label="오늘 선발" onchange="App.setRotation(${rotIdx},this.value)">${K.ROSTERS[USER].pitchers.filter(p=>p.n!==c.closer).map(p=>`<option value="${p.n}" ${p.n===spUser?'selected':''}>${p.n} (${p.role}·${K.ovr(p)})</option>`).join('')}</select>`;
+  const html=`<div class="mp-wrap">
+    <div class="mp-bar"><div><h2>라인업 · 전략</h2><small>${g.label} · ${usHome?'홈경기 🏠':'원정경기 ✈'}</small></div>
+      <button class="btn btn-sm" onclick="App.cancelPreview()">나가기</button></div>
     <div class="row" style="align-items:center;margin:10px 0 4px">
       ${teamCard(g.away)}<div class="big" style="color:var(--dim)">VS</div>${teamCard(g.home)}
     </div>
     <div class="card" style="background:var(--panel2);margin:12px 0">
       <div class="muted" style="text-align:center;font-weight:700;margin-bottom:8px">⚾ 선발 맞대결</div>
       <div class="row" style="justify-content:space-around">
-        <div style="text-align:center"><b>${usHome?(opp+' 선발'):'우리 선발'}</b><div style="font-size:15px;margin:2px 0">${usHome? so?so.n:spOpp : pname(USER,spUser)}</div><div class="muted" style="font-size:12px">${usHome? spStat(opp,spOpp):spStat(USER,spUser)}</div></div>
+        <div style="text-align:center"><b>${usHome?(opp+' 선발'):'우리 선발'}</b><div style="font-size:15px;margin:2px 0">${usHome? so?so.n:spOpp : spPick}</div><div class="muted" style="font-size:12px">${usHome? spStat(opp,spOpp):spStat(USER,spUser)}</div></div>
         <div class="muted">VS</div>
-        <div style="text-align:center"><b>${usHome?'우리 선발':(opp+' 선발')}</b><div style="font-size:15px;margin:2px 0">${usHome? pname(USER,spUser):(so?so.n:spOpp)}</div><div class="muted" style="font-size:12px">${usHome? spStat(USER,spUser):spStat(opp,spOpp)}</div></div>
+        <div style="text-align:center"><b>${usHome?'우리 선발':(opp+' 선발')}</b><div style="font-size:15px;margin:2px 0">${usHome? spPick:(so?so.n:spOpp)}</div><div class="muted" style="font-size:12px">${usHome? spStat(USER,spUser):spStat(opp,spOpp)}</div></div>
       </div>
     </div>
-    <div class="grid cols2">
-      <div><div class="muted" style="font-weight:700;margin-bottom:4px">우리 타선 (${USER})</div>${lineupList(USER)}</div>
-      <div><div class="muted" style="font-weight:700;margin-bottom:4px">상대 예상 타선</div>${lineupList(opp)}</div>
+    <div class="mp-cols">
+      <div class="card"><h3>우리 타순 · 수비 위치 <span class="tag">${USER}</span></h3>${userLineupTable()}</div>
+      <div class="card"><h3>상대 예상 타선 <span class="tag">${opp}</span></h3>${oppLineup()}</div>
     </div>
     ${FM.previewNote()}
     ${FM.tacticsCard('match')}
-    <div class="hint" style="margin-top:10px">라인업·선발을 바꾸려면 먼저 닫고 <b>라인업</b> 탭에서 수정하세요. 제출 후 실시간 중계가 시작됩니다.</div>
-    <div class="row" style="justify-content:center;margin-top:14px;gap:8px">
-      <button class="btn" onclick="App.closeModal();App.tab('lineup')">📋 라인업 수정</button>
+    <div class="mp-foot">
+      <button class="btn" onclick="App.cancelPreview();App.tab('lineup')">📋 로테이션·마무리 설정</button>
       <button class="btn primary" onclick="App.startMatch()">✅ 엔트리 제출 & 경기 시작</button>
-    </div>`);
+    </div>
+  </div>`;
+  let o=$('prematch');
+  if(!o){ o=el('<div id="prematch" class="matchpage"></div>'); document.body.appendChild(o); }
+  o.innerHTML=html;
 }
 
 // ---------- live relay ----------
@@ -515,10 +534,10 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
     const g=pendingMatch(); if(!g) return;
     this.idx=state.pendingGame; this.ps=g.ps; this.spring=!!g.spring;
     this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away), {maxInnings:g.ps?15:g.spring?9:12});
-    this._ended=false; this.paused=false; this.panel=null; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
-    closeModal();
+    this._ended=false; this.paused=false; this.panel=null; this.logOpen=window.innerWidth>=1000; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
+    closeModal(); closePreview();
     let o=document.getElementById('relay'); if(o)o.remove();
-    o=el('<div id="relay" class="modal-bg" style="align-items:stretch;padding:0"></div>');
+    o=el('<div id="relay" class="matchpage"></div>');
     document.body.appendChild(o);
     this.renderLive();
     this._tick();
@@ -583,7 +602,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
   },
   order(c){ this.game.orderCmd(USER,c); this.panel=null; this.feed.unshift({sysmsg:{bunt:'희생번트 사인',steal:'도루 사인',ibb:'고의4구 지시'}[c]+' (다음 타석)'}); this.renderLive(); },
   setTac(k,v){ if(v==='true')v=true; if(v==='false')v=false; this.game.setTac(USER,k,v); this.feed.unshift({sysmsg:`작전 변경: ${FM.tacLabel(k,v)}`}); this.renderLive(); },
-  renderLive(){ const o=document.getElementById('relay'); if(o) o.innerHTML=`<div class="modal" style="max-width:560px;width:100%;margin:auto;max-height:96vh;overflow:auto;padding:14px">${relayHTML(this.game,this.feed,this)}</div>`; }
+  renderLive(){ const o=document.getElementById('relay'); if(o) o.innerHTML=`<div class="mp-wrap">${relayHTML(this.game,this.feed,this)}</div>`; }
 };
 
 // ----- pitch-scene helpers -----
@@ -955,21 +974,24 @@ function relayHTML(game,feed,M){
     return `<div class="deal-result ${tie?'':(userWon?'deal-ok':'deal-no')}" style="text-align:center;font-size:15px;margin:8px 0">${tie?'무승부':(userWon?'🎉 '+USER+' 승리!':'😔 '+USER+' 패배')} — 최종 ${a} ${game.score[a]} : ${game.score[h]} ${h}${dec}</div>`; })() : '';
 
   return `
-    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
-      <h3 style="margin:0;font-size:15px">⚾ 실시간 중계</h3>
-      <span class="muted" style="font-size:11px">${a}(원정) @ ${h}(홈)</span>
+    <div class="mp-bar"><h2>⚾ 실시간 중계</h2><small>${a}(원정) @ ${h}(홈)</small></div>
+    <div class="live-grid">
+      <div class="live-main">
+        ${sb}
+        ${resultBanner}
+        ${matchup}
+        <div class="bc">${relayScene(game,shown.filter(p=>p.res!=='IBB'),offId,defId,batName,pitName)}<div class="bc-cap" aria-live="polite">${caption}</div>${wpBox}${pitchList(shown)}</div>
+      </div>
+      <div class="live-side">
+        ${stats}
+        ${ctrl}
+        ${interv}
+        <details ${M.logOpen?'open':''} ontoggle="Match.logOpen=this.open" style="margin-top:12px"><summary class="muted" style="cursor:pointer;font-size:12px;font-weight:700">이닝별 스코어 · 중계 로그 ▾</summary>
+          <table class="linescore" style="margin:8px 0"><thead><tr>${head}</tr></thead><tbody>${lineRow(a)}${lineRow(h)}</tbody></table>
+          <div style="max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px">${feedHtml||'<div class="muted" style="padding:8px">경기 시작!</div>'}</div>
+        </details>
+      </div>
     </div>
-    ${sb}
-    ${resultBanner}
-    ${matchup}
-    <div class="bc">${relayScene(game,shown.filter(p=>p.res!=='IBB'),offId,defId,batName,pitName)}<div class="bc-cap" aria-live="polite">${caption}</div>${wpBox}${pitchList(shown)}</div>
-    ${stats}
-    ${ctrl}
-    ${interv}
-    <details style="margin-top:12px"><summary class="muted" style="cursor:pointer;font-size:12px;font-weight:700">이닝별 스코어 · 중계 로그 ▾</summary>
-      <table class="linescore" style="margin:8px 0"><thead><tr>${head}</tr></thead><tbody>${lineRow(a)}${lineRow(h)}</tbody></table>
-      <div style="max-height:200px;overflow:auto;border:1px solid var(--line);border-radius:8px">${feedHtml||'<div class="muted" style="padding:8px">경기 시작!</div>'}</div>
-    </details>
   `;
 }
 
@@ -1145,6 +1167,7 @@ function render(){
   else if(currentTab==="feed") v.innerHTML=FM.renderFeed();
   else if(currentTab==="club") v.innerHTML=FM.renderClub();
   else if(currentTab==="train") v.innerHTML=FM.renderTraining();
+  if($('prematch')) openPreview(); // lineup edits made from the match page
 }
 function phaseLabel(){
   if(state.phase==="regular"){ const played=state.schedule.slice(0,state.gameIdx).filter(g=>g.home===USER||g.away===USER).length; return `정규시즌 ${played}/${SEASON_GAMES}경기`; }
@@ -1339,7 +1362,7 @@ function renderSquad(){
 
 const POS_OPTS=['C','1B','2B','3B','SS','LF','CF','RF','DH'];
 function userPositions(){ const c=state.cfgs[USER]; if(!c.positions||c.positions.length!==c.lineup.length) c.positions=K.autoPositions(USER,c.lineup); return c.positions; }
-function renderLineup(){
+function userLineupTable(){
   const c=state.cfgs[USER]; const r=K.ROSTERS[USER]; const pos=userPositions();
   const batOpts=(sel)=>r.batters.map(b=>`<option value="${b.n}" ${b.n===sel?'selected':''}>${b.n} (${b.pos}·${K.ovr(b)})</option>`).join("");
   const lineupRows=c.lineup.map((n,i)=>{
@@ -1355,6 +1378,11 @@ function renderLineup(){
   const issues=K.positionIssues(USER,c.lineup,pos);
   const defense=K.teamDefense(USER,c.lineup,pos);
   const defBox=`<div class="${issues.length?'deal-result deal-no':'hint'}" style="margin-top:10px">팀 수비력 <b>${defense.toFixed(1)}</b> <span class="muted">(리그 평균 70)</span>${issues.length?'<br>⚠️ '+issues.join(' · '):''}</div>`;
+  return `<div style="overflow-x:auto"><table><thead><tr><th>순서</th><th class="name">선수</th><th>위치</th><th>적합도</th><th>주요능력</th><th>상태</th></tr></thead><tbody>${lineupRows}</tbody></table></div>
+      ${defBox}`;
+}
+function renderLineup(){
+  const c=state.cfgs[USER]; const r=K.ROSTERS[USER];
 
   const pitOpts=(sel,pool)=>pool.map(p=>`<option value="${p.n}" ${p.n===sel?'selected':''}>${p.n} (${p.role}·${K.ovr(p)})</option>`).join("");
   const rotPool=r.pitchers.filter(p=>p.n!==c.closer);
@@ -1376,8 +1404,7 @@ function renderLineup(){
       </div></div>`; })() : '';
   return banner + `<div class="grid cols2">
     <div class="card"><h3>타순 · 수비 위치 <span class="tag">8개 수비 위치 + 지명타자</span></h3>
-      <div style="overflow-x:auto"><table><thead><tr><th>순서</th><th class="name">선수</th><th>위치</th><th>적합도</th><th>주요능력</th><th>상태</th></tr></thead><tbody>${lineupRows}</tbody></table></div>
-      ${defBox}
+      ${userLineupTable()}
       <button class="btn" style="margin-top:10px" onclick="App.autoLineup()">🤖 자동 추천 라인업 (출루율 중심 타순)</button>
     </div>
     <div class="card"><h3>선발 로테이션</h3>
@@ -1673,7 +1700,7 @@ const App={
   nextGame:()=>startNextUserGame(),
   allTasks:()=>{ showAllTasks=!showAllTasks; render(); },
   startMatch:()=>Match.start(),
-  cancelPreview:()=>{ closeModal(); },
+  cancelPreview:()=>{ closeModal(); closePreview(); },
   takeJob:(t)=>FM.takeJob(t),
   player:(t,n)=>FM.showProfile(t,n),
   userGames:(n)=>advanceUserGames(n),
@@ -1716,5 +1743,6 @@ function beginCareer(user){
 }
 boot();
 </script>
+
 </body>
 </html>

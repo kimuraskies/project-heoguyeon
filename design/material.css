@@ -125,6 +125,12 @@ tr:hover td{background:color-mix(in srgb, var(--md-on-surface) 5%, transparent)}
 .closeX{width:40px;height:40px;margin:-8px -8px 0 0;border-radius:50%;display:grid;place-items:center;font-size:22px}
 .closeX:hover{background:color-mix(in srgb, var(--md-on-surface) 8%, transparent)}
 
+/* ---- full-screen match pages (lineup & strategy, live game) ---- */
+.matchpage{background:var(--md-surface)}
+.mp-bar{border-bottom-color:var(--md-outline-variant);min-height:56px}
+.mp-bar h2{font-size:22px;font-weight:400;letter-spacing:0}
+.mp-foot{background:var(--md-surface-container);border-top:0;box-shadow:0 -1px 0 var(--md-outline-variant);border-radius:16px 16px 0 0;padding-left:16px;padding-right:16px}
+
 /* ---- progress, meters, feedback ---- */
 .bar,.progress,.wp-bar{background:var(--md-secondary-container);border-radius:999px}
 .progress>i{background:var(--md-primary);border-radius:999px}
