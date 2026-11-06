@@ -321,6 +321,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
 <script src="design/scoreboard.js"></script>
 <script src="design/feedback.js"></script>
 <script src="design/gate.js"></script>
+<script src="design/track.js"></script>
 <script src="core.js"></script>
 <script src="career.js"></script>
 <script src="farm.js"></script>
@@ -1049,6 +1050,7 @@ function clamp(x,a,b){return x<a?a:(x>b?b:x);}
 function rint(a,b){return a+Math.floor(Math.random()*(b-a+1));}
 
 function nextSeason(){
+  if(window.Track) Track.season();
   try{ localStorage.setItem(BACKUP_KEY, saveData()); }catch(e){ console.warn('시즌 백업 실패', e); }
   ageRosters();
   FM.offseasonMoves(); // departures, retirements, rookies before lineups are rebuilt
@@ -1610,6 +1612,7 @@ function applySave(data){
 }
 function autosave(){
   if(!state) return;
+  if(window.Track) Track.play();
   try{ localStorage.setItem(AUTOSAVE_KEY, saveData()); }catch(e){ console.warn('자동저장 실패', e); }
 }
 function restoreAutosave(){
@@ -1757,6 +1760,7 @@ function boot(){
   bootGame();
 }
 function bootGame(){
+  if(window.Track) Track.open();
   if(!K){ document.getElementById('view').innerHTML='<div class="card">엔진(core.js) 로드 실패. core.js가 같은 폴더에 있는지 확인하세요.</div>'; return; }
   if(restoreAutosave()){ render(); return; } // pick up where the last session left off (refresh, closed tab)
   FM.showSetup(); // new career: manager profile + club selection
@@ -1767,6 +1771,7 @@ function beginCareer(user){
   initState();
   state.user=user;
   FM.onCareerStart();
+  if(window.Track) Track.career();
   currentTab="dash"; render();
 }
 boot();

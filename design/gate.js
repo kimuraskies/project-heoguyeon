@@ -44,7 +44,7 @@
         <label for="gate-code">초대코드</label>
         <div class="gate-row"><input id="gate-code" name="code" required maxlength="20" placeholder="초대코드 입력" autocapitalize="characters" autocomplete="off" spellcheck="false">
           <button class="gate-go" type="submit" ${busy ? 'disabled' : ''}>${busy ? '확인 중…' : '입장하기'}</button></div>
-        ${msg ? `<div class="gate-msg" role="alert">${esc(msg)}</div>` : '<p class="gate-note">초대받은 감독만 입장할 수 있어요.</p>'}
+        ${msg ? `<div class="gate-msg" role="alert">${esc(msg)}</div>` : '<p class="gate-note">초대받은 감독만 입장할 수 있어요.<br><small>더 나은 게임을 위해 익명 이용 기록(접속, 진행 시즌)을 모아요.</small></p>'}
       </form>`;
     const f = el.querySelector('#gate-code'); if (f && !msg) f.focus();
   }
