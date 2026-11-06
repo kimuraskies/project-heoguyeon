@@ -403,3 +403,25 @@ footer{color:var(--md-on-surface-variant)}
   .sbd-line th,.sbd-line td{min-width:16px;padding:3px 2px;font-size:11px}
 }
 @media(max-width:600px){ .live-ctrl .ic{display:none} .live-ctrl .btn{padding:4px 7px} .live-ctrl select{width:56px} }
+
+/* ---- invite gate (design/gate.js) ---- */
+body.gate-on{overflow:hidden}
+#gate{position:fixed;inset:0;z-index:60;display:grid;place-items:center;overflow-y:auto;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:radial-gradient(ellipse at 50% 0%,#1c2a3a 0%,#06090d 70%)}
+.gate-card{width:100%;max-width:380px;background:#0b1016;border:1px solid #1f2a35;border-radius:20px;padding:28px 24px;color:#e9eef3;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.gate-brand{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.gate-ball{font-size:30px}.gate-brand small{color:#ffd25a;font-size:11px;letter-spacing:.12em;font-weight:700}
+.gate-brand h1{margin:0;font-size:24px;letter-spacing:-.02em}
+.gate-lead{color:#9fb0c2;font-size:13px;margin:4px 0 18px}
+.gate-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:#06090d;border:1px solid #1f2a35;border-radius:999px;margin-bottom:18px}
+.gate-tabs button{border:0;background:none;color:#9fb0c2;font:inherit;font-size:13px;font-weight:700;padding:9px 6px;border-radius:999px;cursor:pointer}
+.gate-tabs button.on{background:#ffd25a;color:#06090d}
+#gate form{display:flex;flex-direction:column;gap:12px}
+#gate label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#9fb0c2;font-weight:600}
+#gate input{background:#06090d;border:1px solid #2a3440;border-radius:10px;color:#fff;font-size:16px;padding:11px 12px;width:100%}
+#gate input:focus{outline:none;border-color:#ffd25a;box-shadow:0 0 0 3px rgba(255,210,90,.18)}
+.gate-msg{background:rgba(255,91,91,.14);color:#ffb3b3;border-radius:10px;padding:10px 12px;font-size:13px}
+.gate-go{margin-top:4px;background:#ffd25a;color:#06090d;border:0;border-radius:999px;font:inherit;font-size:15px;font-weight:800;padding:13px;cursor:pointer}
+.gate-go:disabled{opacity:.6;cursor:wait}
+.gate-note{color:#7d8b99;font-size:12px;margin:14px 0 0;text-align:center}

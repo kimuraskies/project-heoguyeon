@@ -299,6 +299,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.load()"><svg class="icon" aria-hidden="true"><use href="#i-load"/></svg>불러오기</button>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;FM.delegPicker()"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>업무 분담</button>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;Feedback.open()"><svg class="icon" aria-hidden="true"><use href="#i-inbox"/></svg>유저 피드백</button>
+        <button type="button" role="menuitem" hidden onclick="this.closest('details').open=false;Gate.logout()"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg><span id="gate-who">로그아웃</span></button>
         <hr>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.confirmNew()"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg>새 게임</button>
         </div>
@@ -319,6 +320,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
 <script src="design/pitchview.js"></script>
 <script src="design/scoreboard.js"></script>
 <script src="design/feedback.js"></script>
+<script src="design/gate.js"></script>
 <script src="core.js"></script>
 <script src="career.js"></script>
 <script src="farm.js"></script>
@@ -1666,6 +1668,11 @@ window.Match=Match;
 
 // ---------- boot ----------
 function boot(){
+  // invited managers only: sign in (or sign up with the invite code) before anything else
+  if(window.Gate && Gate.required()){ Gate.ensure(bootGame); return; }
+  bootGame();
+}
+function bootGame(){
   if(!K){ document.getElementById('view').innerHTML='<div class="card">엔진(core.js) 로드 실패. core.js가 같은 폴더에 있는지 확인하세요.</div>'; return; }
   if(restoreAutosave()){ render(); return; } // pick up where the last session left off (refresh, closed tab)
   FM.showSetup(); // new career: manager profile + club selection
