@@ -2,7 +2,7 @@
    sign-up and login (gate_register / gate_login) stay on the server for later. Before that, the game
    started Accounts live in the Supabase project behind supabase/gate.sql: passwords are bcrypt-
    hashed in the database, sign-ups need an active invite code, and 10 wrong passwords lock an ID
-   for 10 minutes. The browser keeps only a session token (30 days). Saves stay in this browser.
+   for 10 minutes. The browser keeps the session token for good. Saves stay in this browser.
    The claude.ai preview can't reach outside servers, so the gate is off there. */
 (function () {
   const API = 'https://tshwgeczwwslsoeygajz.supabase.co/rest/v1/rpc/';
@@ -21,15 +21,13 @@
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   }
-  // run cb once the visitor is signed in; a stored session is re-checked, and an unreachable server
-  // lets a known session through so the game still opens offline
+  // run cb once the visitor has entered
   async function ensure(cb) {
     done = cb;
     const s = load();
-    if (s && s.token) {
-      try { const r = await rpc('gate_check', {p_token: s.token}); if (r && r.ok) return finish(s); save(null); }
-      catch (e) { return finish(s); }
-    }
+    // once this device has entered, the gate never asks again (no server round trip); only
+    // 설정 → 로그아웃 or cleared browser data brings it back
+    if (s && s.token) return finish(s);
     render();
   }
   function finish(s) {

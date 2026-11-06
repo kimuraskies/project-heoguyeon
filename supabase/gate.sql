@@ -103,7 +103,7 @@ begin
   end if;
   update invite_codes set entries = entries + 1 where code = v_code;
   v_tok := encode(gen_random_bytes(24), 'hex');
-  insert into sessions(token, invite_code, expires_at) values (v_tok, v_code, now() + interval '30 days');
+  insert into sessions(token, invite_code, expires_at) values (v_tok, v_code, now() + interval '10 years');
   return json_build_object('ok',true,'token',v_tok,'id',null);
 end $$;
 
@@ -116,3 +116,9 @@ $$;
 
 revoke all on function public.gate_enter(text) from public;
 grant execute on function public.gate_enter(text) to anon, authenticated;
+
+-- ---- migration "long_code_sessions": a device that entered stays in ----
+-- gate_enter now issues 10-year sessions, and existing code sessions were extended to match.
+-- The client no longer re-checks a stored session, so deactivating a code only stops new entries.
+-- (function body as above, with interval '10 years')
+update public.sessions set expires_at = created_at + interval '10 years' where invite_code is not null;
