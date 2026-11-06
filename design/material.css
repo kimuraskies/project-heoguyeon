@@ -428,3 +428,11 @@ body.gate-on{overflow:hidden}
 .next-step:empty{display:none}
 .next-cta{white-space:nowrap;font-weight:800}
 @media(max-width:600px){ .next-cta{padding:6px 12px;font-size:13px;min-height:36px} .next-cta .icon{display:none} }
+
+/* save manager */
+.sv-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.sv-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:var(--md-surface-container,var(--panel2))}
+.sv-txt{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.sv-txt span{color:var(--dim);font-size:13px}
+.sv-btns{display:flex;gap:6px;flex-wrap:wrap}
+.sv-btns label.btn{cursor:pointer}

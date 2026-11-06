@@ -72,6 +72,21 @@ class Audit {
     const fu=s.fm.fut;if(fu&&fu.year===s.year){this.stats(h,fu,'futures');if(fu.W+fu.L+fu.T!==fu.g)h.violation('FUTURES_STANDINGS',{W:fu.W,L:fu.L,T:fu.T,g:fu.g});
       if(['regular','postseason','offseason'].includes(s.phase)&&fu.g+(h.expectedFuturesOffset||0)!==games[h.user].g)h.violation('FUTURES_MISSING_GAMES',{expected:games[h.user].g-(h.expectedFuturesOffset||0),actual:fu.g,farm:h.K.ROSTERS[h.user].farm.map(p=>({n:p.n,type:p.type,inj:p.inj,cond:p.cond}))});}
     if(Object.keys(h.K.ROSTERS).some(t=>t.startsWith('F_')))h.violation('TEMP_ROSTER_LEAK',Object.keys(h.K.ROSTERS));
+    // 0.3 systems: fan support, board confidence, inbox deadlines, press pledges, coaching staff, scouting knowledge
+    {const f=s.fm||{},bad=[];
+      if(f.fans!=null&&!(Number.isFinite(f.fans)&&f.fans>=0&&f.fans<=100))bad.push({k:'fans',v:f.fans});
+      if(f.board&&!(Number.isFinite(f.board.conf)&&f.board.conf>=0&&f.board.conf<=100))bad.push({k:'board.conf',v:f.board.conf});
+      if(bad.length)h.violation('FM_VALUE_RANGE',bad);
+      const clock=f.clock||0,overdue=(f.inbox||[]).filter(m=>!m.done&&m.due!=null&&clock>m.due).map(m=>({id:m.id,subject:m.subject,due:m.due,clock}));
+      if(overdue.length)h.violation('INBOX_OVERDUE_UNRESOLVED',overdue);
+      if((f.inbox||[]).length>200)h.violation('INBOX_OVERFLOW',{n:f.inbox.length});
+      if(f.pledge&&f.pledge.year<s.year)h.violation('PLEDGE_NOT_REVIEWED',{pledge:f.pledge,year:s.year});
+      const staffBad=[];for(const t in (f.staff||{}))for(const r in f.staff[t]){const c=f.staff[t][r];
+        if(!c||!c.n||!Number.isFinite(c.q)||c.q<1||c.q>20||!Number.isFinite(c.sal)||c.sal<=0)staffBad.push({t,r,c});}
+      if(staffBad.length)h.violation('COACH_STAFF_INVALID',staffBad);
+      const know=f.know&&f.know.n||{},kb=Object.entries(know).filter(([t,v])=>!Number.isFinite(v)||v<0||!h.K.ROSTERS[t]);
+      if(kb.length)h.violation('SCOUT_KNOWLEDGE_INVALID',kb);
+    }
     if(old){for(const [n,loc] of old.inv)if(!inv.has(n)){
         let reason=null;const p=loc[0];
         if(p.loc==='FA'&&old.phase==='stove'&&s.phase==='spring')reason='documented unsigned FA departure';

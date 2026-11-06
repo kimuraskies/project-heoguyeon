@@ -296,8 +296,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
       <details class="hmenu">
         <summary class="btn" aria-label="설정 메뉴" title="설정"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg><span class="lbl">설정</span></summary>
         <div class="hmenu-list" role="menu">
-        <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.save()"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>저장</button>
-        <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.load()"><svg class="icon" aria-hidden="true"><use href="#i-load"/></svg>불러오기</button>
+        <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.saves()"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>세이브 관리</button>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;FM.delegPicker()"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>업무 분담</button>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;Feedback.open()"><svg class="icon" aria-hidden="true"><use href="#i-inbox"/></svg>유저 피드백</button>
         <button type="button" role="menuitem" hidden onclick="this.closest('details').open=false;Gate.logout()"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg><span id="gate-who">로그아웃</span></button>
@@ -1050,6 +1049,7 @@ function clamp(x,a,b){return x<a?a:(x>b?b:x);}
 function rint(a,b){return a+Math.floor(Math.random()*(b-a+1));}
 
 function nextSeason(){
+  try{ localStorage.setItem(BACKUP_KEY, saveData()); }catch(e){ console.warn('시즌 백업 실패', e); }
   ageRosters();
   FM.offseasonMoves(); // departures, retirements, rookies before lineups are rebuilt
   state.year++;
@@ -1492,8 +1492,37 @@ function execTrade(){
 }
 
 // ---------- modals ----------
-function modal(html){ const bg=el(`<div class="modal-bg" onclick="if(event.target===this)App.closeModal()"><div class="modal">${html}</div></div>`); document.body.appendChild(bg); }
-function closeModal(){ document.querySelectorAll('.modal-bg:not(#relay)').forEach(m=>m.remove()); }
+// dialogs: announced as modal, focus moves in and comes back on close, Tab stays inside, Esc closes
+const FOCUSABLE='button:not([disabled]),[href],input:not([disabled]):not([hidden]),select:not([disabled]),textarea:not([disabled]),label[for],[tabindex]:not([tabindex="-1"])';
+let modalReturn=[];
+function modal(html){
+  const bg=el(`<div class="modal-bg" onclick="if(event.target===this)App.closeModal()"><div class="modal" role="dialog" aria-modal="true" tabindex="-1">${html}</div></div>`);
+  if(!bg||typeof bg.querySelector!=='function'){ document.body.appendChild(bg); return; } // headless (QA) DOM
+  const box=bg.querySelector('.modal'), title=box.querySelector('h2,h3');
+  if(title){ title.id=title.id||'dlg-'+Date.now(); box.setAttribute('aria-labelledby', title.id); }
+  // older close marks are spans: make them real controls
+  box.querySelectorAll('span.closeX').forEach(x=>{ x.setAttribute('role','button'); x.setAttribute('tabindex','0'); x.setAttribute('aria-label','닫기');
+    x.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); x.click(); } }); });
+  modalReturn.push(document.activeElement);
+  document.body.appendChild(bg);
+  const first=[...box.querySelectorAll(FOCUSABLE)].find(n=>!n.classList.contains('closeX'))||box;
+  try{ first.focus({preventScroll:true}); }catch(e){}
+}
+function closeModal(){
+  const open=document.querySelectorAll('.modal-bg:not(#relay)'); if(!open.length) return;
+  open.forEach(m=>m.remove());
+  const back=modalReturn.pop(); modalReturn=[];
+  if(back&&back.isConnected&&back.focus) try{ back.focus({preventScroll:true}); }catch(e){}
+}
+document.addEventListener('keydown',e=>{
+  const bgs=document.querySelectorAll('.modal-bg:not(#relay)'); if(!bgs.length) return;
+  const box=bgs[bgs.length-1].querySelector('.modal');
+  if(e.key==='Escape'){ e.preventDefault(); closeModal(); return; }
+  if(e.key==='Tab'&&box){ const f=[...box.querySelectorAll(FOCUSABLE)].filter(n=>n.offsetParent!==null); if(!f.length) return;
+    const a=f[0], z=f[f.length-1];
+    if(e.shiftKey&&document.activeElement===a){ e.preventDefault(); z.focus(); }
+    else if(!e.shiftKey&&document.activeElement===z){ e.preventDefault(); a.focus(); } }
+});
 
 function findTeamOf(name){ for(const t of K.TEAM_IDS){ if(findPlayer(t,name)) return t; } return null; }
 function posFull(pos){ return {"C":"포수","1B":"1루수","2B":"2루수","3B":"3루수","SS":"유격수","LF":"좌익수","CF":"중견수","RF":"우익수","DH":"지명타자","SP":"선발투수","RP":"불펜투수","CL":"마무리투수"}[pos]||pos; }
@@ -1570,7 +1599,7 @@ function showPS(){
 
 // ---------- save / load ----------
 // Manual save and autosave use separate slots, so autosave never overwrites the manual one.
-const SAVE_KEY='kbo_manager_save', AUTOSAVE_KEY='kbo_manager_autosave', SAVE_VERSION=3;
+const SAVE_KEY='kbo_manager_save', AUTOSAVE_KEY='kbo_manager_autosave', BACKUP_KEY='kbo_manager_season_backup', SAVE_VERSION=3;
 function saveData(){ return JSON.stringify({ v:SAVE_VERSION, savedAt:Date.now(), state, teamGameCount, rosters:K.ROSTERS }); }
 function applySave(data){
   // restore rosters in place
@@ -1608,6 +1637,57 @@ function load(){
     closeModal(); currentTab="dash"; $("tabs").hidden=false; render();
     FM.notify('불러오기 완료!');
   }catch(e){ FM.notify('불러오기 실패: '+e.message); }
+}
+// one place for every save: this browser's slot, a file to keep elsewhere, last season's backup
+function saveInfo(raw){
+  try{ const d=JSON.parse(raw); const u=d.state&&d.state.user||{}; const t=u.team&&K.ROSTERS[u.team];
+    return `${FM.esc(u.name||'무명')} 감독 · ${t?t.name:'-'} · ${d.state.year}년 ${({stove:'스토브리그',spring:'시범경기',regular:'정규시즌',postseason:'포스트시즌',offseason:'시즌 종료'})[d.state.phase]||''} · ${new Date(d.savedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})} 저장`; }
+  catch(e){ return '읽을 수 없는 세이브'; }
+}
+function saveManager(){
+  let slot=null, backup=null; try{ slot=localStorage.getItem(SAVE_KEY); backup=localStorage.getItem(BACKUP_KEY); }catch(e){}
+  const row=(title,desc,btns)=>`<div class="sv-row"><div class="sv-txt"><b>${title}</b><span>${desc}</span></div><div class="sv-btns">${btns}</div></div>`;
+  modal(`<button type="button" class="closeX" onclick="App.closeModal()" aria-label="닫기">×</button><h2>💾 세이브 관리</h2>
+    <div class="hint">게임은 경기마다 이 브라우저에 자동 저장돼요. 브라우저 데이터를 지우거나 기기를 바꾸면 사라지니, 중요한 커리어는 <b>파일로 받아</b> 두세요.</div>
+    <div class="sv-list">
+      ${row('이 브라우저 저장 슬롯', slot? saveInfo(slot) : '비어 있음',
+        `<button type="button" class="btn" onclick="App.save();App.closeModal();App.saves()" ${state?'':'disabled'}>지금 저장</button><button type="button" class="btn" onclick="App.load()" ${slot?'':'disabled'}>불러오기</button>`)}
+      ${row('세이브 파일', '지금 진행 상황을 .json 파일로 받거나, 받아 둔 파일로 이어서 해요. 다른 기기로 옮길 때도 써요.',
+        `<button type="button" class="btn primary" onclick="App.exportSave()" ${state?'':'disabled'}>파일로 받기</button><label class="btn" for="sv-file">파일에서 불러오기</label><input type="file" id="sv-file" accept=".json,application/json" hidden onchange="App.importSave(this.files[0])">`)}
+      ${row('직전 시즌 백업', backup? saveInfo(backup) : '다음 시즌으로 넘어갈 때 자동으로 만들어져요.',
+        `<button type="button" class="btn" onclick="App.restoreBackup()" ${backup?'':'disabled'}>백업으로 되돌리기</button>`)}
+    </div>`);
+}
+function exportSave(){
+  if(!state){ FM.notify('진행 중인 게임이 없습니다.'); return; }
+  try{
+    const u=state.user||{}, name=`KBO매니저_${(u.team||'')}_${state.year}_${new Date().toISOString().slice(0,10)}.json`;
+    const url=URL.createObjectURL(new Blob([saveData()],{type:'application/json'}));
+    const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    FM.notify('세이브 파일을 받았어요: '+name);
+  }catch(e){ FM.notify('파일로 받지 못했어요: '+e.message); }
+}
+function useSave(data, msg){
+  if(!data||!data.state||!data.rosters) throw new Error('KBO 매니저 세이브 파일이 아니에요.');
+  if((data.v||0)>SAVE_VERSION) throw new Error('더 새 버전 게임에서 만든 파일이에요.');
+  applySave(data);
+  const ro=document.getElementById('relay'); if(ro)ro.remove();
+  closeModal(); currentTab="dash"; $("tabs").hidden=false; render(); autosave();
+  FM.notify(msg);
+}
+function importSave(file){
+  if(!file) return;
+  const fr=new FileReader();
+  fr.onload=()=>{ try{ useSave(JSON.parse(fr.result), '세이브 파일에서 이어서 시작해요.'); }catch(e){ FM.notify('불러오지 못했어요: '+e.message); } };
+  fr.onerror=()=>FM.notify('파일을 읽지 못했어요.');
+  fr.readAsText(file);
+}
+function restoreBackup(){
+  let raw=null; try{ raw=localStorage.getItem(BACKUP_KEY); }catch(e){}
+  if(!raw){ FM.notify('백업이 없어요.'); return; }
+  FM.ask('직전 시즌 백업으로 되돌립니다. 지금 진행 상황은 사라져요. (먼저 파일로 받아 두면 안전해요)', '백업으로 되돌리기', ()=>{
+    try{ useSave(JSON.parse(raw), '직전 시즌 백업으로 되돌렸어요.'); }catch(e){ FM.notify('되돌리지 못했어요: '+e.message); } });
 }
 function confirmNew(){ FM.ask('새 게임을 시작하면 현재 진행 상황이 사라집니다. (저장 슬롯은 유지됩니다)', '새 게임 시작', ()=>{ try{ localStorage.removeItem(AUTOSAVE_KEY); }catch(e){} location.reload(); }); }
 
@@ -1664,7 +1744,8 @@ const App={
   showPS:showPS,
   nextSeason:()=>FM.confirmNextSeason(nextSeason),
   closeModal:closeModal,
-  save:save, load:load, confirmNew:confirmNew, selfTest:selfTest
+  save:save, load:load, confirmNew:confirmNew, selfTest:selfTest,
+  saves:saveManager, exportSave:exportSave, importSave:importSave, restoreBackup:restoreBackup
 };
 window.App=App;
 window.Match=Match;
