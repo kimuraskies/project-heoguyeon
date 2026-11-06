@@ -308,6 +308,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
 </div>
 
 <script src="design/badges.js"></script>
+<script src="design/pitchview.js"></script>
 <script src="core.js"></script>
 <script src="career.js"></script>
 <script src="farm.js"></script>
@@ -534,7 +535,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
     const g=pendingMatch(); if(!g) return;
     this.idx=state.pendingGame; this.ps=g.ps; this.spring=!!g.spring;
     this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away), {maxInnings:g.ps?15:g.spring?9:12});
-    this._ended=false; this.paused=false; this.panel=null; this.logOpen=window.innerWidth>=1000; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
+    this._ended=false; this.paused=false; this.panel=null; this.logOpen=window.innerWidth>=1000; this.commentaryOpen=false; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
     closeModal(); closePreview();
     let o=document.getElementById('relay'); if(o)o.remove();
     o=el('<div id="relay" class="matchpage"></div>');
@@ -610,8 +611,8 @@ function jno(name){ let s=0; for(let i=0;i<name.length;i++)s=(s*31+name.charCode
 function handB(name){ let s=0; for(let i=0;i<name.length;i++)s+=name.charCodeAt(i); const m=s%10; return m<3?'좌':(m<4?'양':'우'); }
 function handP(name){ let s=0; for(let i=0;i<name.length;i++)s+=name.charCodeAt(i)*2; return (s%10<3)?'좌':'우'; }
 function countOf(pitches){ let b=0,s=0; pitches.forEach(p=>{ if(p.res==='B')b++; else if(p.res==='F'){ if(s<2)s++; } else if(p.res==='S'||p.res==='SW')s++; }); return {b:Math.min(b,4),s:Math.min(s,3)}; }
-const PITCHCOLOR={B:'#6b7785',S:'#e0556a',SW:'#f0a020',F:'#7fd0ff',IP:'#36c275',HBP:'#c060e0'};
-const PITCHLABEL={B:'볼',S:'스트라이크',SW:'헛스윙',F:'파울',IP:'타격',HBP:'사구'};
+const PITCHCOLOR={B:'#6b7785',S:'#e0556a',SW:'#f0a020',F:'#7fd0ff',IP:'#36c275',HBP:'#c060e0',IBB:'#9aa8b8'};
+const PITCHLABEL={B:'볼',S:'스트라이크',SW:'헛스윙',F:'파울',IP:'타격',HBP:'사구',IBB:'고의4구'};
 function baseMini(bases){
   const f=i=>bases[i]?'var(--accent2)':'rgba(255,255,255,.28)';
   return `<svg width="32" height="32" viewBox="0 0 32 32" style="vertical-align:middle">
@@ -620,82 +621,15 @@ function baseMini(bases){
     <rect x="5" y="12" width="8" height="8" transform="rotate(45 9 16)" fill="${f(2)}"/>
   </svg>`;
 }
-// ----- broadcast view: batter's-eye ballpark, pitch tracks, win probability -----
-const CROWD=(()=>{ const c=['#d9d9d9','#e0556a','#3d6fd1','#f0c040','#9aa4b1','#ffffff','#6fbf73']; let s='';
-  for(let i=0;i<220;i++){ s+=`<circle cx="${(i*47)%362}" cy="${101+(i*29)%27}" r="1.6" fill="${c[(i*7)%c.length]}" opacity=".8"/>`; } return s; })();
-// switch hitters stand on the side opposite the pitcher's throwing hand
+// ----- broadcast view: original ballpark art and pitch projection in design/pitchview.js -----
+// Switch hitters stand on the side opposite the pitcher's throwing hand.
 function batSide(batName,pitName){ const b=handB(batName); return b==='양'? (handP(pitName)==='좌'?'우':'좌') : b; }
-// stylized right-handed hitter in his stance (mirrored for lefties); feet at y=150
-function hitterFigure(color){
-  return `<line x1="47" y1="33" x2="16" y2="-26" stroke="#d6a463" stroke-width="6" stroke-linecap="round"/>
-    <line x1="36" y1="92" x2="22" y2="144" stroke="#e8e8e8" stroke-width="13" stroke-linecap="round"/>
-    <line x1="54" y1="92" x2="68" y2="144" stroke="#e8e8e8" stroke-width="13" stroke-linecap="round"/>
-    <ellipse cx="20" cy="149" rx="10" ry="4" fill="#1b1b1b"/><ellipse cx="71" cy="149" rx="10" ry="4" fill="#1b1b1b"/>
-    <path d="M28 46 Q44 38 60 46 L62 95 L26 95 Z" fill="#f4f4f4" stroke="${color}" stroke-width="2.5"/>
-    <rect x="26" y="88" width="36" height="6" fill="${color}"/>
-    <line x1="31" y1="52" x2="45" y2="35" stroke="#f4f4f4" stroke-width="9" stroke-linecap="round"/>
-    <line x1="58" y1="52" x2="49" y2="36" stroke="#f4f4f4" stroke-width="9" stroke-linecap="round"/>
-    <circle cx="47" cy="33" r="5.5" fill="${color}"/>
-    <circle cx="44" cy="24" r="11" fill="${color}"/><path d="M50 18 Q61 20 63 26 L50 26 Z" fill="${color}"/>
-    <rect x="35" y="24" width="8" height="11" rx="3" fill="${color}"/>`;
-}
-// small pitcher on the mound; feet at (0,0), throwing hand at (11,-31)
-function pitcherFigure(color){
-  return `<line x1="-3" y1="-12" x2="-6" y2="0" stroke="#e8e8e8" stroke-width="4" stroke-linecap="round"/>
-    <line x1="3" y1="-12" x2="7" y2="0" stroke="#e8e8e8" stroke-width="4" stroke-linecap="round"/>
-    <rect x="-6" y="-26" width="12" height="15" rx="4" fill="#f4f4f4" stroke="${color}" stroke-width="1.2"/>
-    <line x1="5" y1="-23" x2="11" y2="-31" stroke="#f4f4f4" stroke-width="3.5" stroke-linecap="round"/>
-    <circle cx="0" cy="-31" r="4.6" fill="#e3b796"/><path d="M-5.2 -31.5 Q0 -38 5.2 -31.5 Z" fill="${color}"/>`;
-}
 function relayScene(game,pitches,offId,defId,batName,pitName){
-  const W=360,H=300, X=x=>180+(x-0.5)*180, Y=y=>212+(y-0.5)*165;
-  const zx0=X(0.33),zx1=X(0.67),zy0=Y(0.30),zy1=Y(0.70),zw=zx1-zx0,zh=zy1-zy0;
-  const h=game.h,a=game.a,cnt=countOf(pitches),f1=v=>v.toFixed(1);
-  let stripes=''; for(let i=0;i<8;i++){ const y0=142+158*Math.pow(i/8,1.5), y1=142+158*Math.pow((i+1)/8,1.5); stripes+=`<rect x="0" y="${f1(y0)}" width="${W}" height="${f1(y1-y0+0.5)}" fill="${i%2?'#2b7436':'#317f3c'}"/>`; }
-  let grid=''; for(let i=1;i<3;i++){ grid+=`<line x1="${f1(zx0+zw*i/3)}" y1="${f1(zy0)}" x2="${f1(zx0+zw*i/3)}" y2="${f1(zy1)}"/><line x1="${f1(zx0)}" y1="${f1(zy0+zh*i/3)}" x2="${f1(zx1)}" y2="${f1(zy0+zh*i/3)}"/>`; }
-  const RX=191,RY=148; // release point = pitcher's hand
-  let tracks='',dots='';
-  pitches.forEach((p,i)=>{
-    const ex=X(p.x),ey=Y(p.y),last=i===pitches.length-1,c=PITCHCOLOR[p.res]||'#888';
-    const dx=ex-RX,dy=ey-RY,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L,w1=last?8:5;
-    tracks+=`<polygon points="${f1(RX+nx)},${f1(RY+ny)} ${f1(ex+nx*w1)},${f1(ey+ny*w1)} ${f1(ex-nx*w1)},${f1(ey-ny*w1)} ${f1(RX-nx)},${f1(RY-ny)}" fill="${last?c:'#fff'}" opacity="${last?.5:.13}"/>`;
-    dots+=`<g opacity="${last?1:.85}"><circle cx="${f1(ex)}" cy="${f1(ey)}" r="${last?11:9}" fill="${c}" stroke="#fff" stroke-width="${last?2.2:1.4}"/><text x="${f1(ex)}" y="${f1(ey+4)}" text-anchor="middle" font-size="${last?12:10.5}" font-weight="800" fill="#fff">${i+1}</text></g>`;
+  return PitchView.scene(game,pitches,{
+    offId,defId,batName,pitName,side:batSide(batName,pitName),pitSide:handP(pitName),
+    batColor:K.ROSTERS[offId].color,pitColor:K.ROSTERS[defId].color,parkColor:K.ROSTERS[game.h].color,
+    colors:PITCHCOLOR,labels:PITCHLABEL,count:countOf(pitches)
   });
-  const lefty=batSide(batName,pitName)==='좌';
-  const hitter=`<g transform="${lefty?'translate(300 148) scale(-1 1)':'translate(60 148)'}">${hitterFigure(K.ROSTERS[offId].color)}</g>`;
-  const lamps=(n,max,col)=>Array.from({length:max},(_,i)=>`<circle cx="${i*7}" cy="0" r="2.6" fill="${i<n?col:'rgba(255,255,255,.18)'}"/>`).join('');
-  const board=`<g transform="translate(124 44)"><rect width="112" height="58" rx="3" fill="#0b0f14" stroke="#3a4350"/>
-    <text x="8" y="17" font-size="10" fill="#9fb0c4" font-weight="700">${a}</text><text x="104" y="17" text-anchor="end" font-size="12" fill="#ffcf3a" font-weight="800">${game.score[a]}</text>
-    <text x="8" y="32" font-size="10" fill="#9fb0c4" font-weight="700">${h}</text><text x="104" y="32" text-anchor="end" font-size="12" fill="#ffcf3a" font-weight="800">${game.score[h]}</text>
-    <text x="8" y="50" font-size="8.5" fill="#cfd8e3">${game.inning}${game.half==='top'?'▲':'▼'}</text>
-    <g transform="translate(38 47)"><text x="-2" y="3" font-size="7" fill="#7fe08a" text-anchor="end">B</text>${lamps(cnt.b,3,'#7fe08a')}</g>
-    <g transform="translate(66 47)"><text x="-2" y="3" font-size="7" fill="#ffd34d" text-anchor="end">S</text>${lamps(cnt.s,2,'#ffd34d')}</g>
-    <g transform="translate(90 47)"><text x="-2" y="3" font-size="7" fill="#ff6b6b" text-anchor="end">O</text>${lamps(game.outs,2,'#ff6b6b')}</g></g>`;
-  const tower=x=>`<line x1="${x}" y1="44" x2="${x}" y2="100" stroke="#55606d" stroke-width="2.5"/><rect x="${x-13}" y="30" width="26" height="16" rx="2" fill="#fffbe6" filter="url(#rsGlow)"/><path d="M${x-13} 36 H${x+13} M${x-13} 41 H${x+13} M${x-4} 30 V46 M${x+4} 30 V46" stroke="#c9c3a3" stroke-width=".8"/>`;
-  const ads=['KBO MANAGER','PROJECT 허구연','KBO MANAGER','PROJECT 허구연'].map((t,i)=>`<text x="${45+i*90}" y="138.5" text-anchor="middle" font-size="7.5" font-weight="800" fill="rgba(255,255,255,.7)" letter-spacing=".5">${t}</text>`).join('');
-  const base=(x,y)=>`<polygon points="${x-5},${y} ${x},${y-2.5} ${x+5},${y} ${x},${y+2.5}" fill="#fff"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block" role="img" aria-label="타석 시점 투구 위치">
-    <defs><linearGradient id="rsSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a1830"/><stop offset="1" stop-color="#2a5583"/></linearGradient>
-      <filter id="rsGlow" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-      <radialGradient id="rsLight" cx=".5" cy=".5" r=".65"><stop offset="0" stop-color="#fff" stop-opacity=".09"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></radialGradient></defs>
-    <rect width="${W}" height="130" fill="url(#rsSky)"/>${tower(36)}${tower(324)}
-    <rect x="0" y="98" width="${W}" height="32" fill="#1d2632"/>${CROWD}${board}
-    <rect x="0" y="128" width="${W}" height="15" fill="#0f3a27"/>${ads}
-    ${stripes}
-    <path d="M28 300 L60 192 Q180 132 300 192 L332 300 Z" fill="#b5764a"/>
-    <path d="M180 166 L262 194 L180 252 L98 194 Z" fill="#358a41"/>
-    <path d="M180 290 L56 145 M180 290 L304 145" stroke="#f2f2f2" stroke-width="1.6" opacity=".85"/>
-    <ellipse cx="180" cy="180" rx="19" ry="5.5" fill="#c08356"/>${base(262,194)}${base(180,165)}${base(98,194)}
-    <ellipse cx="180" cy="291" rx="80" ry="17" fill="#b5764a"/>
-    <g fill="none" stroke="#fff" stroke-opacity=".6"><rect x="124" y="277" width="40" height="22"/><rect x="196" y="277" width="40" height="22"/></g>
-    <polygon points="166,285 194,285 196,290 180,296 164,290" fill="#f6f6f6"/>
-    <g transform="translate(180 179)">${pitcherFigure(K.ROSTERS[defId].color)}</g>
-    <rect width="${W}" height="${H}" fill="url(#rsLight)"/>
-    ${hitter}
-    <rect x="${f1(zx0)}" y="${f1(zy0)}" width="${f1(zw)}" height="${f1(zh)}" fill="rgba(255,255,255,.07)" stroke="rgba(255,255,255,.9)" stroke-width="1.8"/>
-    <g stroke="rgba(255,255,255,.5)" stroke-width="1">${grid}</g>
-    ${tracks}${dots}
-  </svg>`;
 }
 // player chip for the matchup header: cap in club color, jersey number on the chest
 function avatar(color,num){
@@ -723,16 +657,7 @@ function winProb(g){
   return Math.min(0.99,Math.max(0.01,pWin+pTie*0.52)); // a tie goes to extras, a near coin flip
 }
 // pitch-by-pitch list, newest first, with the count after each pitch
-function pitchList(pitches){
-  if(!pitches.length) return '';
-  let b=0,st=0;
-  const rows=pitches.map((p,i)=>{
-    if(p.res==='B')b++; else if(p.res==='F'){ if(st<2)st++; } else if(p.res==='S'||p.res==='SW')st++;
-    const end=p.res==='IP'||p.res==='HBP'||b>=4||st>=3;
-    return `<div class="pl-row"><span class="pl-no" style="background:${PITCHCOLOR[p.res]||'#888'}">${i+1}</span><b>${PITCHLABEL[p.res]||''}</b><span class="pl-velo">${p.velo?p.velo+'km/h ':''}${p.type}</span><span class="pl-cnt">${end?'':b+' - '+st}</span></div>`;
-  });
-  return `<div class="pl-list">${rows.reverse().join('')}</div>`;
-}
+function pitchList(pitches){ return PitchView.pitchList(pitches,PITCHCOLOR,PITCHLABEL); }
 
 // ----- play-by-play commentary (FM-style text lines) -----
 // each line: {t:text, k:'quiet'|'call'|'tense'|'big', wait: how long the next beat waits, as a multiple of the speed}
@@ -901,12 +826,19 @@ function relayHTML(game,feed,M){
   </div>`;
   const cm=M.comm||[], cur=cm[0];
   const caption = cur ? `<div class="cm-now cm-${cur.k||'call'}">${cur.t}</div>${cm.slice(1,3).map(l=>`<div class="cm-prev">${l.t}</div>`).join('')}` : (game.over?'경기 종료':'플레이볼!');
-  // win probability for the user's club, and how much the last play moved it
+  const paResult=PitchView.result(ab,shown[shown.length-1],PITCHLABEL);
+  const paName=ab&&ab.steal ? ab.runner : batName;
+  const paSummary=`<div class="pv-summary"><div class="pv-summary-meta"><span>${ab&&ab.committed?'플레이 결과':'현재 타석'}</span><span>${slot}번 · ${batSide(batName,pitName)}타</span></div><div class="pv-result"><b>${PitchView.escape(paName)}</b><span class="pv-result-colon">:</span><strong>${PitchView.escape(paResult)}</strong></div></div>`;
+  // Same existing estimate, expressed for the user's club. The difference is in
+  // percentage points, and is only exposed after the engine commits the play.
   const wpH=winProb(game), wpU=USER===h?wpH:1-wpH;
-  let wpDelta='';
-  if(ab&&committed&&ab.wp0!=null){ const d=(wpU-(USER===h?ab.wp0:1-ab.wp0))*100; if(Math.abs(d)>=0.05) wpDelta=`<span style="color:${d>0?'#4cc38a':'#6aa7ff'}">(${d>0?'+':''}${d.toFixed(1)}%)</span>`; }
-  const wpBox = `<div class="wp"><div class="wp-line"><b style="color:var(--accent)">${USER}</b> 승리 확률 <b>${(wpU*100).toFixed(1)}%</b> ${wpDelta}</div>
-    <div class="wp-bar"><span style="width:${(wpU*100).toFixed(1)}%;background:var(--accent)"></span></div></div>`;
+  let wpDelta='<span class="pv-wp-pending">타석 종료 후 변동</span>';
+  if(ab&&committed&&ab.wp0!=null){
+    const d=(wpU-(USER===h?ab.wp0:1-ab.wp0))*100;
+    const rounded=Number(d.toFixed(1));
+    wpDelta=`<span class="pv-wp-delta ${rounded>0?'pv-up':rounded<0?'pv-down':'pv-flat'}">이번 ${ab.steal?'플레이':'타석'} ${rounded>0?'+':''}${rounded.toFixed(1)}%p</span>`;
+  } else if(game.over) wpDelta='<span class="pv-wp-pending">경기 종료</span>';
+  const wpBox=`<div class="wp"><div class="wp-line"><span><b>${USER}</b> 승리 확률 <small>추정</small></span><strong>${(wpU*100).toFixed(1)}<small>%</small></strong></div><div class="wp-bar" role="meter" aria-label="${USER} 승리 확률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${(wpU*100).toFixed(1)}"><span style="width:${(wpU*100).toFixed(1)}%"></span></div><div class="pv-wp-note">${wpDelta}</div></div>`;
 
   const ctrl = game.over ? `<button class="btn primary" onclick="Match.finalize()">✅ 경기 종료 & 결과 반영</button>`
     : `<div class="row" style="gap:6px;flex-wrap:wrap">
@@ -980,7 +912,7 @@ function relayHTML(game,feed,M){
         ${sb}
         ${resultBanner}
         ${matchup}
-        <div class="bc">${relayScene(game,shown.filter(p=>p.res!=='IBB'),offId,defId,batName,pitName)}<div class="bc-cap" aria-live="polite">${caption}</div>${wpBox}${pitchList(shown)}</div>
+        <div class="bc pv-broadcast">${relayScene(game,shown,offId,defId,batName,pitName)}<div class="pv-info" aria-live="polite">${paSummary}${wpBox}</div>${pitchList(shown)}<details class="pv-commentary" ${M.commentaryOpen?'open':''} ontoggle="Match.commentaryOpen=this.open"><summary>현장 중계</summary><div class="bc-cap">${caption}</div></details></div>
       </div>
       <div class="live-side">
         ${stats}
