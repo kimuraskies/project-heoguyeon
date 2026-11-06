@@ -44,7 +44,7 @@
     document.body.classList.add('gate-on');
     el.innerHTML = `<form class="gate-panel" onsubmit="event.preventDefault();Gate.submit(this)">
         <label for="gate-code">초대코드</label>
-        <div class="gate-row"><input id="gate-code" name="code" required maxlength="20" placeholder="예: KBO-XXXXXX" autocapitalize="characters" autocomplete="off" spellcheck="false">
+        <div class="gate-row"><input id="gate-code" name="code" required maxlength="20" placeholder="초대코드 입력" autocapitalize="characters" autocomplete="off" spellcheck="false">
           <button class="gate-go" type="submit" ${busy ? 'disabled' : ''}>${busy ? '확인 중…' : '입장하기'}</button></div>
         ${msg ? `<div class="gate-msg" role="alert">${esc(msg)}</div>` : '<p class="gate-note">초대받은 감독만 입장할 수 있어요.</p>'}
       </form>`;
