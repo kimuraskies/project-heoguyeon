@@ -61,19 +61,28 @@
       <svg viewBox="0 0 200 150" aria-label="수비 배치"><path d="M100 128L150 84L100 46L50 84Z" fill="none" stroke="currentColor" stroke-opacity=".35"/>
         <path d="M100 128L10 40M100 128L190 40" stroke="currentColor" stroke-opacity=".2"/>${names}</svg>
       <div class="sbd-next"><span>다음 타순</span>${next.map((n, i) => `<b>${(slot + i) % lu.length + 1}. ${esc(n)}</b>`).join('')}</div></div>`;
-    // 5) linescore with R H E B
-    const h = game.h, a = game.a, n = Math.max(9, game.line[a].length, game.line[h].length);
+    const PL = {B:'볼',S:'스트라이크',SW:'헛스윙',F:'파울',IP:'타격',HBP:'사구',IBB:'고의4구'};
+    const plist = shown.filter(x => x.res !== 'IBB');
+    let cb = 0, cs = 0;
+    const plRows = plist.map((x, i) => { if (x.res === 'B') cb++; else if (x.res === 'F') { if (cs < 2) cs++; } else if (x.res === 'S' || x.res === 'SW') cs++;
+      return `<tr class="${i === plist.length - 1 ? 'on' : ''}"><td><i class="pl-${x.res}">${i + 1}</i></td><td>${PL[x.res] || x.res}</td><td class="n">${x.velo || '-'}</td><td>${esc(x.type || '')}</td><td class="n">${Math.min(cb, 3)}-${Math.min(cs, 2)}</td></tr>`; }).reverse().join('');
+    const pitchBlk = `<div class="sbd-blk sbd-plog" data-v="pitch"><div class="sbd-h" style="--c:${club(defId).color}">투구 기록 <small>${plist.length}구 · 최신순</small></div>
+      ${plist.length ? `<table><thead><tr><th>구</th><th>결과</th><th class="n">km/h</th><th>구종</th><th class="n">B-S</th></tr></thead><tbody>${plRows}</tbody></table>` : '<div class="sbd-wait">첫 투구 대기</div>'}</div>`;
+    const tab = (v, l) => `<button class="${view === v ? 'on' : ''}" onclick="Match.boardView='${v}';Match.renderLive()">${l}</button>`;
+    return `<section class="sbd" data-view="${view}" aria-label="전광판">
+      <div class="sbd-top"><div class="sbd-tabs">${tab('order', '타순')}${tab('bat', '타자·투수')}${tab('def', '수비')}${tab('pitch', '투구')}</div></div>
+      <div class="sbd-grid">${orderBlk}${batBlk}${pitBlk}${defBlk}${pitchBlk}</div></section>`;
+  }
+  // linescore on its own, at the top of the right column
+  function line(game, M) {
+    const feed = (M.feed || []).filter(e => e && e.oc), h = game.h, a = game.a;
+    const n = Math.max(9, game.line[a].length, game.line[h].length);
     const errs = t => feed.filter(e => e.oc === 'E' && e.def === t).length;
     const walks = t => Object.values(game.box[t].bat).reduce((s, b) => s + (b.BB || 0) + (b.HBP || 0), 0);
     const cells = t => Array.from({length: n}, (_, i) => { const v = game.line[t][i]; return `<td>${v == null ? (t === h && i === n - 1 && game.over && game.score[h] > game.score[a] ? 'X' : '') : v}</td>`; }).join('');
-    const row = t => `<tr><th style="--c:${club(t).color}">${esc(t)}</th>${cells(t)}<td class="r">${game.score[t]}</td><td>${game.hits[t]}</td><td>${errs(t)}</td><td>${walks(t)}</td></tr>`;
-    const scoreBlk = `<div class="sbd-blk sbd-line" data-v="score"><table><thead><tr><th></th>${Array.from({length: n}, (_, i) => `<th class="${i + 1 === game.inning ? 'cur' : ''}">${i + 1}</th>`).join('')}<th>R</th><th>H</th><th>E</th><th>B</th></tr></thead>
-      <tbody>${row(a)}${row(h)}</tbody></table></div>`;
-    const tab = (v, l) => `<button class="${view === v ? 'on' : ''}" onclick="Match.boardView='${v}';Match.renderLive()">${l}</button>`;
-    return `<section class="sbd" data-view="${view}" aria-label="전광판">
-      <div class="sbd-top"><b>${esc(a)} ${game.score[a]}</b><span>:</span><b>${game.score[h]} ${esc(h)}</b><em>${game.inning}회${game.half === 'top' ? '초' : '말'}</em>
-        <div class="sbd-tabs">${tab('order', '타순')}${tab('bat', '타자·투수')}${tab('def', '수비')}${tab('score', '스코어')}</div></div>
-      <div class="sbd-grid">${orderBlk}${batBlk}${pitBlk}${defBlk}${scoreBlk}</div></section>`;
+    const row = t => `<tr><th style="--c:${K.ROSTERS[t].color}">${esc(t)}</th>${cells(t)}<td class="r">${game.score[t]}</td><td>${game.hits[t]}</td><td>${errs(t)}</td><td>${walks(t)}</td></tr>`;
+    return `<section class="sbd sbd-linebox" aria-label="이닝별 점수"><div class="sbd-blk sbd-line"><table><thead><tr><th>${game.inning}회${game.half === 'top' ? '초' : '말'}</th>${Array.from({length: n}, (_, i) => `<th class="${i + 1 === game.inning ? 'cur' : ''}">${i + 1}</th>`).join('')}<th>R</th><th>H</th><th>E</th><th>B</th></tr></thead>
+      <tbody>${row(a)}${row(h)}</tbody></table></div></section>`;
   }
-  window.Scoreboard = {board, rpm};
+  window.Scoreboard = {board, line, rpm};
 })();

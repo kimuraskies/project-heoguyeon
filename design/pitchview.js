@@ -249,7 +249,6 @@
     const visiblePitches = pitches.filter(p => p.res !== 'IBB');
     const latestText = last ? (last.res === 'IBB' ? '고의4구' : `${last.velo || '—'} km/h · ${last.type}`) : '첫 투구 대기';
     return `<div class="pv-scene" data-side="${side}">
-      <div class="pv-scene-head"><span><i></i> PITCH VIEW</span><span>${game.over ? '경기 종료' : '타석 시점'} <b>·</b> ${esc(side)}타</span></div>
       <svg class="pv-art" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="960" height="760" role="img" aria-labelledby="${id}-title ${id}-desc">
         <title id="${id}-title">${esc(batName)} 타석 · ${esc(side)}타 · 투구 위치</title>
         <desc id="${id}-desc">홈플레이트 뒤에서 본 야구장. 투수 ${esc(pitName)}, 타자 ${esc(batName)}. ${visiblePitches.length}개의 투구 궤적과 번호.${cellText} 자세한 결과와 구속은 아래 투구 기록에서 확인할 수 있습니다.</desc>
@@ -262,7 +261,6 @@
           <path d="M${point(.33,.7)}L376,708M${point(.67,.7)}L584,708" stroke="#e2efeb" stroke-opacity=".22" stroke-dasharray="4 7"/>
         </g><g class="pv-tracks">${tracks}</g><g class="pv-markers">${markers}</g>
       </svg>
-      <div class="pv-scene-foot"><span>${visiblePitches.length ? `${visiblePitches.length}구 · ${esc(labels[last.res] || last.res)}` : '투구 위치'}<b>${esc(latestText)}</b></span><span class="pv-view-label">HOME PLATE<br><b>01 / ${game.over ? 'FINAL' : 'LIVE'}</b></span></div>
     </div>`;
   }
 

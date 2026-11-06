@@ -10,13 +10,14 @@ rt.eval("FM.setCamp('bal');FM.startSpring();App.nextGame();App.startMatch();Matc
 const read = code => rt.eval(code);
 const render = () => read("relayHTML(Match.game,Match.feed,Match)");
 assert.match(render(), /pv-scene/);
-assert.match(render(), /첫 투구를 기다리고/);
+assert.match(render(), /첫 투구 대기/);
 let beats = 0;
 while (beats++ < 1000 && !read('Match.ab?.committed && Match.ab.shown>=5')) read('Match.stepOne()');
 assert.ok(beats < 1000, 'A completed real plate appearance with at least five pitches');
 const completed = render();
-assert.match(completed, /이번 타석 [+-]?\d+\.\d%p/);
-assert.match(completed, /플레이 결과/);
+assert.match(completed, /class="pv-pitchinfo"/, 'Pitch info sits under the scene');
+assert.match(completed, /class="pv-log"/, 'The play-by-play log sits inside the comment box');
+assert.match(completed, /sbd-linebox/, 'The linescore heads the right column');
 assert.match(completed, /pv-marker-latest/);
 assert.ok(!/NaN|undefined/.test(completed));
 const original = read('JSON.stringify(Match.game)');

@@ -225,10 +225,12 @@ footer{color:var(--md-on-surface-variant)}
   /* the scene (aspect 24:19) is sized from the viewport height so the scene and the commentary under it fit on one screen; the side column takes the rest */
   .live-grid{grid-template-columns:minmax(0,clamp(440px,calc((100vh - 250px)*1.26),640px)) minmax(400px,1fr);gap:0 24px;justify-content:center}
   /* the scoreboard heads the right column; the scene column spans both rows */
-  .live-grid>.live-ctrl{grid-column:2;grid-row:1}
-  .live-grid>.sbd{grid-column:2;grid-row:2}
+  .live-grid{grid-template-rows:auto auto 1fr}
+  .live-grid>.sbd-linebox{grid-column:2;grid-row:1}
+  .live-grid>.live-ctrl{grid-column:2;grid-row:2}
+  .live-grid>.sbd:not(.sbd-linebox){grid-column:2;grid-row:3;align-self:start}
   .live-grid>.live-main{grid-column:1;grid-row:1/span 3}
-  .live-grid>.live-side{grid-column:2;grid-row:3;position:static}
+  .sbd-top{display:none}
   .live-side{position:sticky;top:16px}
 }
 @media(max-width:600px){
@@ -307,7 +309,7 @@ footer{color:var(--md-on-surface-variant)}
   .sbd-tabs{display:flex}
   .sbd-grid{grid-template-columns:minmax(0,1fr)}
   .sbd[data-view] .sbd-blk{display:none}
-  .sbd[data-view="order"] [data-v="order"],.sbd[data-view="bat"] [data-v="bat"],.sbd[data-view="def"] [data-v="def"],.sbd[data-view="score"] [data-v="score"]{display:block}
+  .sbd[data-view="order"] [data-v="order"],.sbd[data-view="bat"] [data-v="bat"],.sbd[data-view="def"] [data-v="def"],.sbd[data-view="pitch"] [data-v="pitch"],.sbd-linebox .sbd-blk{display:block}
   .sbd-def svg{max-width:300px;margin:0 auto}
 }
 
@@ -319,7 +321,7 @@ footer{color:var(--md-on-surface-variant)}
 .sbd-stats>div,.sbd-last>div,.sbd-tbsk>div{padding:3px 6px}
 @media(min-width:1000px){.sbd-def svg{max-height:120px}}
 /* phones: controls, then the pitch view, then the scoreboard and the result box */
-@media(max-width:999px){ .live-grid>.live-ctrl{order:0} .live-grid>.live-main{order:1} .live-grid>.sbd{order:2;margin-top:12px} .live-grid>.live-side{order:3} }
+@media(max-width:999px){ .live-grid>.live-ctrl{order:0} .live-grid>.live-main{order:1} .live-grid>.sbd-linebox{order:2;margin-top:12px} .live-grid>.sbd:not(.sbd-linebox){order:3} }
 /* pitcher cell: pitch type on its own row so long names (슬라이더, 체인지업) fit */
 .sbd-last{grid-template-columns:1fr 1fr}
 .sbd-last>div:first-child{grid-column:1/-1;flex-direction:row;align-items:baseline;gap:8px}
@@ -337,3 +339,23 @@ footer{color:var(--md-on-surface-variant)}
 .fb-star.on{color:#ffc93c}
 .fb-msg{padding:10px 12px;border-radius:8px;font-size:13px;margin-top:8px}
 .fb-msg.ok{background:color-mix(in srgb,var(--good) 18%,transparent)}.fb-msg.err{background:color-mix(in srgb,var(--bad) 16%,transparent)}
+
+/* linescore box at the top of the right column */
+.sbd-linebox{padding:6px}
+.sbd-linebox .sbd-line thead th:first-child{color:var(--led);text-align:left;white-space:nowrap}
+/* pitch info under the scene, above the comment box */
+.pv-pitchinfo{display:flex;align-items:baseline;gap:10px;padding:8px 14px;background:var(--md-surface-container,var(--panel2));border-top:1px solid var(--md-outline-variant,var(--line));font-size:12px;color:var(--dim)}
+.pv-pitchinfo b{font-size:15px;color:var(--txt)}
+/* play-by-play log inside the comment box */
+.pv-live-cap .pv-log{margin-top:10px;max-height:190px;overflow:auto;border-top:1px solid var(--md-outline-variant,var(--line));font-size:12.5px}
+.pv-live-cap .pv-log>div{padding:5px 2px!important}
+/* pitch log as a board block */
+.sbd-plog{grid-column:1/-1}
+.sbd-plog .sbd-h small{font-weight:600;color:var(--sbd-dim);margin-left:6px}
+.sbd-plog th,.sbd-plog td{padding:3px 5px;text-align:left;font-size:12px;white-space:nowrap}
+.sbd-plog thead th{color:var(--sbd-dim);font-size:10.5px;font-weight:700}
+.sbd-plog .n{text-align:right}.sbd-plog td.n{color:var(--led)}
+.sbd-plog tr.on td{background:color-mix(in srgb,var(--led) 16%,transparent)}
+.sbd-plog i{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-style:normal;font-size:10.5px;font-weight:800;background:#333;color:#fff}
+.sbd-plog i.pl-B{background:#5d6875}.sbd-plog i.pl-S{background:#e0556a}.sbd-plog i.pl-SW{background:#f0a020}.sbd-plog i.pl-F{background:#3d8fc0}.sbd-plog i.pl-IP{background:#2e9e5e}.sbd-plog i.pl-HBP{background:#9b4fc8}
+.sbd-plog tbody{display:block;max-height:150px;overflow:auto}.sbd-plog thead,.sbd-plog tbody tr{display:table;width:100%;table-layout:fixed}
