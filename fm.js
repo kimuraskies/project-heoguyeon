@@ -135,11 +135,107 @@ function ensure(){
 
 // ---------- inbox ----------
 // msg: {id, ug, year, from, icon, subject, body, read, actions:[{label, fn, arg}], done, result}
+// ---------- inbox: decisions with deadlines, reports, and work handed to the staff ----------
+// The inbox clock counts the user's games of any kind (spring, regular, postseason); it stands
+// still in the stove league, so nothing lapses there. A decision gets a deadline from its type and
+// a default answer; when the deadline passes the default is applied and the message moves to
+// 자동 처리됨. Delegation applies the staff's answer the moment the message arrives.
+const TALK_FN=['promisePlay','compete','listMe','encourage','scold'], PRESS_FN=['interview','media','press'];
+function clock(){ const f=fm(); return f.clock||0; }
+function tickClock(){ const f=fm(); f.clock=(f.clock||0)+1; expireInbox(); }
+function deleg(){ const f=fm(); f.deleg=f.deleg||{press:'self', talk:'self', trade:'self'}; return f.deleg; }
+function fnsOf(m){ return m.actions.map(a=>a.fn); }
+function isDecision(m){ return m.actions.length && !m.actions.every(a=>a.fn==='ok'); }
+function msgType(m){ const fs=fnsOf(m);
+  if(fs.some(x=>PRESS_FN.includes(x))) return 'press';
+  if(fs.some(x=>TALK_FN.includes(x))) return 'talk';
+  if(fs.includes('acceptTrade')) return 'trade';
+  if(fs.includes('restNext')) return 'rest';
+  if(fs.some(x=>x==='swapLineup'||x==='swapRotation')) return 'coach';
+  return 'other'; }
+// the answer that is applied when nobody decides: the cautious one
+function safePress(m){
+  const i=m.actions.findIndex(a=>{ if(a.fn==='interview') return a.arg.kind==='team'||a.arg.kind==='back';
+    if(a.fn==='media') return a.arg.kind==='players';
+    const fx=(a.arg&&a.arg.fx)||{}; return !fx.pledge&&!fx.rival&&!Object.values(fx).some(v=>typeof v==='number'&&v<0)&&!(fx.mor&&Object.values(fx.mor).some(v=>v<0)); });
+  return i>=0? i : 0; }
+function defaultOf(m){
+  const t=msgType(m), fs=fnsOf(m);
+  if(t==='press') return safePress(m);
+  if(t==='talk') return fs.indexOf('compete')>=0? fs.indexOf('compete') : fs.indexOf('encourage');
+  if(t==='trade') return fs.indexOf('declineTrade');
+  if(t==='rest') return fs.indexOf('restNext');
+  if(t==='coach'){ const i=fs.findIndex(x=>x==='ok'||x==='keepGoing'); return i; }
+  return -1; }
+const DUE={press:3, talk:3, trade:3, rest:1, coach:4};
+function stamp(m){
+  m.at=clock(); m.phase=state.phase;
+  if(!isDecision(m)) return;
+  const t=msgType(m), d=defaultOf(m);
+  if(DUE[t]!=null && d>=0){ m.due=m.at+DUE[t]; m.def=d; }
+}
+function resolveAuto(m, i, why){
+  if(m.done) return;
+  const a=m.actions[i]; let res=a? ACTIONS[a.fn](m,a.arg||{}) : '';
+  if(String(res).startsWith('❌')){ const k=m.actions.findIndex(x=>/^decline|keepGoing|ok$/.test(x.fn)); res = k>=0&&k!==i? ACTIONS[m.actions[k].fn](m,m.actions[k].arg||{}) : '처리하지 못하고 넘어갔습니다.'; }
+  m.done=true; m.read=true; m.auto=why; m.result=`🤖 ${why}: ${a?a.label:''} — ${res}`;
+}
+function expireInbox(){
+  const now=clock();
+  fm().inbox.forEach(m=>{ if(!m.done&&m.due!=null&&now>=m.due) resolveAuto(m, m.def, '기한이 지나 기본 선택으로 처리'); });
+}
+// staff handle the message on arrival when the manager has handed that work over
+function delegate(m){
+  const d=deleg(), t=msgType(m);
+  if(m.from==='KBO 미디어데이'||/^취임 기자회견/.test(m.subject)) return; // big events stay with the manager
+  if(t==='press' && d.press!=='self'){
+    if(d.press==='safe') return resolveAuto(m, safePress(m), '홍보팀이 무난하게 답변');
+    const k=m.actions.findIndex(a=>a.fn==='interview'&&a.arg.kind==='decline');
+    if(k>=0) return resolveAuto(m, k, '홍보팀이 인터뷰를 사양');
+    addFans(-1); m.done=true; m.read=true; m.auto='홍보팀이 인터뷰를 사양'; m.result='🤖 홍보팀이 인터뷰를 사양했습니다. (팬 여론 -1)'; return;
+  }
+  if(t==='talk' && d.talk==='coach'){
+    const n=(m.actions[0].arg||{}).n, p=n&&findPlayer(USER,n), k=p&&pers(p).k, fs=fnsOf(m);
+    const i = fs.includes('compete')? fs.indexOf('compete') : (k==='승부욕'? fs.indexOf('scold') : fs.indexOf('encourage'));
+    return resolveAuto(m, i, '수석코치가 면담');
+  }
+  if(t==='trade' && d.trade==='rejectBad'){
+    const a=m.actions.find(x=>x.fn==='acceptTrade').arg, give=findPlayer(a.team,a.give), want=findPlayer(USER,a.want);
+    if(give&&want&&K.ovr(give)<K.ovr(want)-4) return resolveAuto(m, fnsOf(m).indexOf('declineTrade'), '단장이 불리한 제안을 거절');
+  }
+}
+function setDeleg(k,v){ deleg()[k]=v; render(); if(document.querySelector('.modal-bg')){ closeModal(); delegPicker(); } }
+function delegPicker(){
+  const d=deleg(), f=fm();
+  const row=(k,title,who,opts)=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)"><b>${title}</b> <span class="muted" style="font-size:12px">· ${who}</span>
+    <div class="tabsm" style="margin:6px 0 0">${opts.map(([v,l])=>`<button class="${d[k]===v?'active':''}" onclick="FM.setDeleg('${k}','${v}')">${l}</button>`).join('')}</div></div>`;
+  modal(`<span class="closeX" onclick="App.closeModal()">×</span><h2>⚙ 업무 분담</h2>
+    <div class="hint">맡긴 업무는 메시지가 오는 즉시 담당자가 처리하고 "자동 처리됨"에 기록합니다. 직접 하는 업무도 기한이 지나면 무난한 기본 선택으로 처리됩니다.</div>
+    <div style="padding:10px 0;border-bottom:1px solid var(--line)"><b>휴식 관리</b> <span class="muted" style="font-size:12px">· 수석코치</span>
+      <div class="tabsm" style="margin:6px 0 0"><button class="${f.autoRest?'':'active'}" onclick="FM.setAutoRest(false);App.closeModal();FM.delegPicker()">직접</button><button class="${f.autoRest?'active':''}" onclick="FM.setAutoRest(true);App.closeModal();FM.delegPicker()">맡기기</button></div></div>
+    ${row('press','경기 전후·구단·지역 인터뷰','홍보팀',[['self','직접'],['safe','무난하게 답변'],['decline','모두 사양']])}
+    ${row('talk','선수 면담 요청','수석코치',[['self','직접'],['coach','맡기기']])}
+    ${row('trade','다른 구단의 트레이드 제안','단장',[['self','직접'],['rejectBad','불리한 제안은 자동 거절']])}
+    <div class="hint" style="margin-top:10px">취임 기자회견·미디어데이 같은 큰 행사와 재계약·2군 콜업 추천은 항상 감독이 직접 결정합니다.</div>`);
+}
+// same sender, same game day, plain reports: one message
+function mergeReport(m){
+  if(isDecision(m) || !["regular","postseason","spring"].includes(state.phase)) return null;
+  const f=fm(), o=f.inbox.find(x=>x!==m&&!isDecision(x)&&!x.read&&x.from===m.from&&x.icon===m.icon&&x.at===m.at&&x.year===m.year);
+  if(!o) return null;
+  o.parts=(o.parts||[o.subject]); o.parts.push(m.subject);
+  o.subject=`${o.parts[0]} 외 ${o.parts.length-1}건`;
+  o.body=o.body+'\n\n────────\n\n'+m.subject+'\n'+m.body;
+  return o;
+}
 function send(from, icon, subject, body, actions){
   const f=fm();
   const m={id:f.nextId++, ug:userGamesPlayed(), year:state.year, from, icon, subject, body, read:false, actions:actions||[], done:false};
+  stamp(m);
+  const merged=mergeReport(m); if(merged) return merged;
   f.inbox.unshift(m);
   if(f.inbox.length>200) f.inbox.length=200;
+  delegate(m);
   return m;
 }
 function unread(){ return fm()? fm().inbox.filter(m=>!m.read).length : 0; }
@@ -1180,6 +1276,7 @@ function pogOf(res,t){
 function gameReport(res,kind){
   ensure();
   if(res.home!==USER && res.away!==USER) return;
+  tickClock();
   const home=res.home===USER, opp=home?res.away:res.home, us=home?res.homeRuns:res.awayRuns, th=home?res.awayRuns:res.homeRuns;
   const won=us>th, tie=us===th;
   const pog=pogOf(res,USER), opPog=pogOf(res,opp), d=res.decisions;
@@ -1789,38 +1886,46 @@ function statusInline(p){
 }
 function attrNum(v){ const a=attr20(v); return `<b style="color:${attrColor(a)}">${a}</b>`; }
 function tabBadge(id){
-  if(id==='inbox'){ const u=unread(); return u? ` <span class="count" aria-label="안 읽음 ${u}개">${u}</span>` : ''; }
+  if(id==='inbox'){ const u=fm()? inboxCounts().decide : 0; return u? ` <span class="count" aria-label="결정 필요 ${u}개">${u}</span>` : ''; }
   return '';
 }
 
 // ---------- UI: inbox ----------
-let selMsg=null, inboxFilter='all';
-function openMsg(id){ selMsg=id; const m=fm().inbox.find(x=>x.id===id); if(m) m.read=true; render(); }
+let selMsg=null, inboxFilter='decide';
+function openMsg(id){ selMsg=id; const m=fm().inbox.find(x=>x.id===id); if(m){ m.read=true; inboxFilter= !m.done&&isDecision(m)? 'decide' : m.auto? 'auto' : isDecision(m)&&!m.auto? 'all' : 'report'; } render(); }
 function markAllRead(){ fm().inbox.forEach(m=>m.read=true); render(); }
-function setInboxFilter(f){ inboxFilter=f; render(); }
+function setInboxFilter(f){ inboxFilter=f; selMsg=null; render(); }
+function dueLeft(m){ return m.due==null? null : m.due-clock(); }
+function dueTag(m){ const d=dueLeft(m); if(d==null||m.done) return '';
+  if(state.phase==='stove') return '<span class="pill" style="background:var(--panel2);color:var(--dim)">시즌 중 기한</span>';
+  return `<span class="pill" style="${d<=1?'background:rgba(224,85,106,.22);color:var(--bad)':'background:rgba(240,160,32,.2);color:var(--warn)'}">${d<=0?'오늘 마감':'D-'+d}</span>`; }
+function inboxCounts(){ const L=fm().inbox; return {decide:L.filter(m=>!m.done&&isDecision(m)).length, report:L.filter(m=>!isDecision(m)&&!m.read).length, auto:L.filter(m=>m.auto&&!m.read).length}; }
 function renderInbox(){
   ensure();
-  const f=fm();
-  let list=f.inbox;
-  if(inboxFilter==='unread') list=list.filter(m=>!m.read);
-  if(inboxFilter==='action') list=list.filter(m=>!m.done&&m.actions.length);
-  if(selMsg==null && list.length) selMsg=list[0].id;
-  const sel=f.inbox.find(m=>m.id===selMsg);
+  const f=fm(), c=inboxCounts();
+  const lists={decide:f.inbox.filter(m=>!m.done&&isDecision(m)).sort((x,y)=>(x.due==null?1e9:x.due)-(y.due==null?1e9:y.due)),
+    report:f.inbox.filter(m=>!isDecision(m)), auto:f.inbox.filter(m=>m.auto), all:f.inbox};
+  if(!lists[inboxFilter]) inboxFilter='decide';
+  const list=lists[inboxFilter];
+  if((selMsg==null||!list.some(m=>m.id===selMsg)) && list.length) selMsg=list[0].id;
+  const sel=list.find(m=>m.id===selMsg);
   if(sel&&!sel.read) sel.read=true;
+  const empty={decide:'지금 결정할 메시지가 없습니다. 👍', report:'보고가 없습니다.', auto:'아직 담당자가 처리한 메시지가 없습니다.', all:'메시지가 없습니다.'}[inboxFilter];
   const items=list.map(m=>`<div onclick="FM.openMsg(${m.id})" style="padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;${m.id===selMsg?'background:var(--panel2);':''}${m.read?'':'font-weight:700;'}">
       <div class="row" style="gap:6px;flex-wrap:nowrap"><span>${m.icon}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.subject)}</span>
-      ${!m.done&&m.actions.length?'<span class="pill" style="background:rgba(240,160,32,.2);color:var(--warn)">결정</span>':''}</div>
-      <div class="muted" style="font-size:11px;margin-top:2px">${esc(m.from)} · ${m.year} · ${m.ug}경기차</div></div>`).join('') || '<div class="muted" style="padding:12px">메시지가 없습니다.</div>';
+      ${!m.done&&isDecision(m)? (dueTag(m)||'<span class="pill" style="background:rgba(240,160,32,.2);color:var(--warn)">결정</span>') : m.auto? '<span class="pill" style="background:var(--panel2);color:var(--dim)">🤖 자동</span>' : ''}</div>
+      <div class="muted" style="font-size:11px;margin-top:2px">${esc(m.from)} · ${m.year} · ${m.ug}경기차</div></div>`).join('') || `<div class="muted" style="padding:12px">${empty}</div>`;
+  const defLine = sel&&!sel.done&&sel.due!=null&&sel.actions[sel.def]? `<div class="hint" style="margin-top:10px">⏳ ${state.phase==='stove'?'시즌이 시작되면 ':''}${Math.max(0,dueLeft(sel))}경기 안에 결정하지 않으면 "${esc(sel.actions[sel.def].label)}"(으)로 처리됩니다.</div>` : '';
   const detail = sel? `<div class="muted" style="font-size:12px">${sel.icon} ${esc(sel.from)} · ${sel.year} 시즌 ${sel.ug}경기차</div>
       <h3 style="margin:6px 0 12px;font-size:17px">${esc(sel.subject)}</h3>
       <div style="white-space:pre-wrap;line-height:1.7">${esc(sel.body)}</div>
       ${sel.actions.length? (sel.done? `<div class="deal-result deal-ok" style="margin-top:14px">${esc(sel.result||'처리됨')}</div>`
-        : `<div class="row" style="margin-top:16px;gap:8px">${sel.actions.map((a,i)=>`<button class="btn ${i===0?'primary':''}" onclick="FM.act(${sel.id},${i})">${esc(a.label)}</button>`).join('')}</div>`) : ''}`
+        : `<div class="row" style="margin-top:16px;gap:8px">${sel.actions.map((a,i)=>`<button class="btn ${i===0?'primary':''}" onclick="FM.act(${sel.id},${i})">${esc(a.label)}</button>`).join('')}</div>${defLine}`) : ''}`
     : '<div class="muted">메시지를 선택하세요.</div>';
-  const ft=(id,l)=>`<button class="${inboxFilter===id?'active':''}" onclick="FM.setInboxFilter('${id}')">${l}</button>`;
-  return `<div class="grid" style="grid-template-columns:minmax(260px,360px) 1fr;gap:14px" id="inboxgrid">
-    <div class="card" style="padding:10px"><h3>📥 받은편지함 <span class="tag"><a href="javascript:void(0)" onclick="FM.markAllRead()" style="color:var(--dim)">모두 읽음</a></span></h3>
-      <div class="tabsm">${ft('all','전체')}${ft('unread','안 읽음 '+unread())}${ft('action','결정 필요 '+pending())}</div>
+  const ft=(id,l,n)=>`<button class="${inboxFilter===id?'active':''}" onclick="FM.setInboxFilter('${id}')">${l}${n?` <b>${n}</b>`:''}</button>`;
+  return `<div class="grid" style="grid-template-columns:minmax(260px,380px) 1fr;gap:14px" id="inboxgrid">
+    <div class="card" style="padding:10px"><h3>📥 받은편지함 <span class="tag"><a href="javascript:void(0)" onclick="FM.delegPicker()" style="color:var(--dim)">⚙ 업무 분담</a> · <a href="javascript:void(0)" onclick="FM.markAllRead()" style="color:var(--dim)">모두 읽음</a></span></h3>
+      <div class="tabsm">${ft('decide','결정 필요',c.decide)}${ft('report','보고',c.report)}${ft('auto','자동 처리됨',c.auto)}${ft('all','전체')}</div>
       <div style="max-height:620px;overflow:auto">${items}</div></div>
     <div class="card">${detail}</div></div>
     <style>@media(max-width:820px){#inboxgrid{grid-template-columns:1fr!important}}</style>`;
@@ -1835,14 +1940,12 @@ function dashTasks(){
   const dr=draftState(); if(dr&&!draftDone(dr)&&draftOnClock(dr)===USER) out.push({ic:'trophy', t:`신인 드래프트 ${Math.floor(dr.pick/dr.order.length)+1}라운드 — 우리 차례`, d:`스카우트 팀 · 지명 ${dr.picks[USER].length}/${DRAFT_ROUNDS}`, a:'지명하기', go:'FM.showDraft()'});
   const tw=tradeWindow(); if(state.phase==='regular'&&tw.open&&tw.daysLeft!=null&&tw.daysLeft<=14) out.push({ic:'trade', t:`트레이드 마감 D-${tw.daysLeft}`, d:`단장 · ${DEADLINE[0]}월 ${DEADLINE[1]}일까지 · 마감이 가까워 제안이 늘어납니다`, a:'트레이드', go:"App.tab('trade')"});
   if(state.phase==='stove' && !camp) out.push({ic:'camp', t:'스프링캠프 방향 선택', d:'수석코치 · '+Object.values(CAMP).map(x=>x.label).join(' / '), a:'훈련 선택', go:"FM.campPicker()"});
-  // real decisions only: skip plain acknowledgements, and let press/interview requests lapse after 3 games
-  const now=userGamesPlayed(), PRESS=['media','interview','press'];
-  const open=f.inbox.filter(m=>!m.done&&m.actions.length&&!m.actions.every(a=>a.fn==='ok')
-    &&!(m.actions.every(a=>PRESS.includes(a.fn))&&(m.year!==state.year||now-m.ug>3)));
-  const rankOf=m=>m.actions.some(a=>PRESS.includes(a.fn))? 1 : 0;
+  // real decisions only (plain acknowledgements are reports), soonest deadline first, press last
+  const open=f.inbox.filter(m=>!m.done&&isDecision(m));
+  const rankOf=m=>(msgType(m)==='press'?1000:0)+(m.due==null?500:dueLeft(m));
   open.sort((a,b)=>rankOf(a)-rankOf(b)).forEach(m=>{
     const renew=m.actions.some(a=>a.fn==='renew'), trade=m.actions.some(a=>/Trade$/.test(a.fn));
-    out.push({ic:renew?'contract':trade?'trade':'inbox', t:m.subject, d:`받은편지함 · ${m.from} · ${m.ug}경기차`, a:renew?'조건 검토':trade?'제안 검토':'검토', go:`App.tab('inbox');FM.openMsg(${m.id})`});
+    out.push({ic:renew?'contract':trade?'trade':'inbox', t:m.subject, d:`받은편지함 · ${m.from}${m.due!=null&&state.phase!=='stove'?` · ${dueLeft(m)<=0?'오늘 마감':'D-'+dueLeft(m)} (기본: ${m.actions[m.def].label})`:''}`, a:renew?'조건 검토':trade?'제안 검토':'검토', go:`App.tab('inbox');FM.openMsg(${m.id})`});
   });
   const inj=allPlayers(USER).filter(K.isInjured), used=c.lineup.concat(c.rotation);
   const injIn=inj.filter(p=>used.includes(p.n));
@@ -2499,7 +2602,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, staffCard, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, staffCard, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,
