@@ -370,17 +370,20 @@ function renderSetup(){
     .setup-bg{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--panel2)}
     .setup-bg.sel{border-color:var(--accent2)}
     .setup-bg input{margin-top:3px}
-    .setup-prof{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start}
+    .setup-prof{display:flex;flex-direction:column;gap:18px}
+    .setup-prof-card>h3{text-align:center;justify-content:center}
+    .setup-bgs{display:grid;gap:8px;grid-template-columns:repeat(4,minmax(0,1fr))}
     .setup-photo{display:flex;flex-direction:column;align-items:center;gap:8px}
     .setup-foot{position:sticky;bottom:0;z-index:5;margin-top:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
     .setup-foot .sum{flex:1 1 240px;min-width:0;display:flex;gap:12px;align-items:center}
-    @media (max-width:560px){ .setup-prof{grid-template-columns:minmax(0,1fr)} .setup-photo{flex-direction:row;flex-wrap:wrap} }
+    @media (max-width:900px){ .setup-bgs{grid-template-columns:repeat(2,minmax(0,1fr))} }
+    @media (max-width:480px){ .setup-bgs{grid-template-columns:minmax(0,1fr)} }
   </style>
   <div class="card" style="margin-top:12px">
     <h3 style="font-size:18px">⚾ 새 커리어 시작 <span class="tag">${state&&state.year||2026} 시즌</span></h3>
     <div class="hint">① 감독 프로필을 정하고 ② 지휘할 구단을 고른 뒤 ③ 맨 아래에서 취임하세요. 구단마다 전력과 이사회 기대치가 다릅니다.</div>
   </div>
-  <div class="card" style="margin-top:14px"><h3>① 감독 프로필</h3>
+  <div class="card setup-prof-card" style="margin-top:14px"><h3>① 감독 프로필</h3>
     <div class="setup-prof">
       <div class="setup-photo">${mgrAvatar(104,me)}
         <label class="btn" for="mgrphoto" style="font-size:12px;cursor:pointer">📷 사진 ${setup.photo?'바꾸기':'올리기'}</label>
@@ -391,7 +394,7 @@ function renderSetup(){
         <label for="mgrname" class="muted" style="font-size:12px">감독 이름</label>
         <input id="mgrname" maxlength="12" placeholder="예: 김하늘" value="${esc(setup.name)}" oninput="FM.setupName(this.value)" style="width:100%;margin:4px 0 14px;font-size:15px;padding:8px 10px">
         <div class="muted" style="font-size:12px;margin-bottom:6px">경력</div>
-        <div class="grid" style="gap:8px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${Object.keys(MGR_BG).map(bgOpt).join('')}</div>
+        <div class="setup-bgs">${Object.keys(MGR_BG).map(bgOpt).join('')}</div>
       </div>
     </div>
   </div>
