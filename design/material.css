@@ -222,7 +222,8 @@ footer{color:var(--md-on-surface-variant)}
 .pv-commentary .cm-prev{font-size:11px}
 .live-main,.live-side{min-width:0}
 @media(min-width:1000px){
-  .live-grid{grid-template-columns:minmax(0,1fr) minmax(280px,320px);gap:0 24px}
+  /* the scene (aspect 24:19) is sized from the viewport height so the scene and the commentary under it fit on one screen; the side column takes the rest */
+  .live-grid{grid-template-columns:minmax(0,clamp(440px,calc((100vh - 340px)*1.26),720px)) minmax(320px,1fr);gap:0 24px;justify-content:center}
   .live-side{position:sticky;top:16px}
 }
 @media(max-width:600px){
