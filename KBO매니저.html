@@ -298,6 +298,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.save()"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>저장</button>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.load()"><svg class="icon" aria-hidden="true"><use href="#i-load"/></svg>불러오기</button>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;FM.delegPicker()"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>업무 분담</button>
+        <button type="button" role="menuitem" onclick="this.closest('details').open=false;Feedback.open()"><svg class="icon" aria-hidden="true"><use href="#i-inbox"/></svg>유저 피드백</button>
         <hr>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.confirmNew()"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg>새 게임</button>
         </div>
@@ -317,6 +318,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
 <script src="design/badges.js"></script>
 <script src="design/pitchview.js"></script>
 <script src="design/scoreboard.js"></script>
+<script src="design/feedback.js"></script>
 <script src="core.js"></script>
 <script src="career.js"></script>
 <script src="farm.js"></script>
