@@ -912,7 +912,7 @@ function relayHTML(game,feed,M){
         ${sb}
         ${resultBanner}
         ${matchup}
-        <div class="bc pv-broadcast">${relayScene(game,shown,offId,defId,batName,pitName)}<div class="pv-info" aria-live="polite">${paSummary}${wpBox}</div>${pitchList(shown)}<details class="pv-commentary" ${M.commentaryOpen?'open':''} ontoggle="Match.commentaryOpen=this.open"><summary>현장 중계</summary><div class="bc-cap">${caption}</div></details></div>
+        <div class="bc pv-broadcast">${relayScene(game,shown,offId,defId,batName,pitName)}<div class="bc-cap pv-live-cap" aria-live="polite">${caption}</div><div class="pv-info">${paSummary}${wpBox}</div>${pitchList(shown)}</div>
       </div>
       <div class="live-side">
         ${stats}
