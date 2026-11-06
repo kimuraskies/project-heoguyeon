@@ -395,16 +395,28 @@ var TAC_LABELS={
 };
 function tacOf(cfg){ var t={}, k; for(k in DEFAULT_TAC) t[k]=DEFAULT_TAC[k]; if(cfg&&cfg.tac) for(k in cfg.tac) if(cfg.tac[k]!=null) t[k]=cfg.tac[k]; return t; }
 // rate shifts for one plate appearance from both dugouts' settings and the base/out state
-function paMods(offTac, defTac, bases, outs){
-  var m={K:0,BB:0,HR:0,BIP:0,X2:0};
-  if(offTac.atk==="aggr"){ m.BB-=0.015; m.K-=0.008; m.HR+=0.002; m.BIP-=0.004; }
-  else if(offTac.atk==="patient"){ m.BB+=0.015; m.K+=0.012; m.HR-=0.001; }
-  if(offTac.teamBat && bases[1] && !bases[2] && outs===0){ m.K-=0.02; m.HR-=0.006; m.BIP-=0.006; }
-  if(defTac.bat==="attack"){ m.BB-=0.012; m.K-=0.004; m.HR+=0.003; m.BIP+=0.004; }
-  else if(defTac.bat==="nibble"){ m.BB+=0.014; m.K+=0.008; m.HR-=0.003; m.BIP-=0.004; }
+// exO/exD(k) give how well each dugout executes its setting for tactic k: 1 = fully drilled
+// (AI clubs, or no data), lower = a plan the players haven't learned yet. An unlearned plan
+// delivers only part of its upside and adds some confusion of its own.
+function ONE(){ return 1; }
+function paMods(offTac, defTac, bases, outs, exO, exD){
+  exO=exO||ONE; exD=exD||ONE;
+  var m={K:0,BB:0,HR:0,BIP:0,X2:0}, e;
+  if(offTac.atk==="aggr"){ e=exO("atk"); m.BB-=0.015*e; m.K-=0.008*e; m.HR+=0.002*e; m.BIP-=0.004*e; m.K+=0.010*(1-e); }
+  else if(offTac.atk==="patient"){ e=exO("atk"); m.BB+=0.015*e; m.K+=0.012*e; m.HR-=0.001*e; m.K+=0.006*(1-e); }
+  if(offTac.teamBat && bases[1] && !bases[2] && outs===0){ e=exO("teamBat"); m.K-=0.02*e; m.HR-=0.006; m.BIP-=0.006; }
+  if(defTac.bat==="attack"){ e=exD("bat"); m.BB-=0.012*e; m.K-=0.004*e; m.HR+=0.003; m.BIP+=0.004; m.HR+=0.003*(1-e); }
+  else if(defTac.bat==="nibble"){ e=exD("bat"); m.BB+=0.014; m.K+=0.008*e; m.HR-=0.003*e; m.BIP-=0.004*e; m.BB+=0.008*(1-e); }
   if(defTac.shift==="infieldIn" && bases[2] && outs<2) m.BIP+=0.03;
   else if(defTac.shift==="dp" && bases[0] && outs<2) m.BIP+=0.008;
-  else if(defTac.shift==="deep"){ m.X2-=0.05; m.BIP+=0.012; }
+  else if(defTac.shift==="deep"){ e=exD("shift"); m.X2-=0.05*e; m.BIP+=0.012; }
+  return m;
+}
+// what the scouting staff know about the other dugout (0..1): hitters read the pitchers a
+// little better, pitchers attack the hitters' holes a little better
+function scoutMods(m, offKnow, defKnow){
+  if(offKnow){ m.K-=0.006*offKnow; m.BB+=0.003*offKnow; }
+  if(defKnow){ m.K+=0.006*defKnow; m.BB-=0.003*defKnow; }
   return m;
 }
 
@@ -697,6 +709,8 @@ function InteractiveGame(cfgH, cfgA, opts){
   this.pos=both(function(c,t){ return (c.positions&&c.positions.length===c.lineup.length)? c.positions.slice() : autoPositions(t,c.lineup); });
   this.removed=both(function(){return [];}); // batters taken out of the game (pinch-hit for) can't come back
   this.tac=both(function(c){return tacOf(c);});  // live tactics, changeable mid-game
+  this.fam=both(function(c){return c.tacFam||null;}); // {tactic:{value:execution 0..1}}; null = fully drilled
+  this.know={}; this.know[this.h]=(cfgH.scoutKnow&&cfgH.scoutKnow[this.a])||0; this.know[this.a]=(cfgA.scoutKnow&&cfgA.scoutKnow[this.h])||0;
   this.cmd=both(function(){return null;});        // one-off order for the next plate appearance: 'bunt' | 'steal' | 'ibb'
   this.pitcher=both(function(c){return c.spName;}); this.pUsed=both(function(c){return [c.spName];});
   this.pBF=both(function(){return 0;}); this.pRuns=both(function(){return 0;});
@@ -722,6 +736,8 @@ IP.dueBatter=function(){return getB(this.offId(), this.dueBatterName());};
 IP.curPitcher=function(){return getP(this.defId(), this.pitcher[this.defId()]);};
 IP.defense=function(t){ return teamDefense(t, this.lineup[t], this.pos[t]); };
 IP.setTac=function(t,k,v){ this.tac[t][k]=v; };
+// how well team t executes its current setting for tactic k (1 = fully drilled)
+IP.ex=function(t,k){ var f=this.fam[t]; if(!f||!f[k]) return 1; var v=f[k][String(this.tac[t][k])]; return v==null? 1 : v; };
 IP.orderCmd=function(t,c){ this.cmd[t]=c; };
 IP.catcher=function(t){ var i=this.pos[t].indexOf('C'); return i>=0? getB(t,this.lineup[t][i]) : null; };
 IP.bench=function(t){var lu=this.lineup[t], gone=this.removed[t];return ROSTERS[t].batters.filter(function(b){return lu.indexOf(b.n)<0 && gone.indexOf(b.n)<0 && !isInjured(b);});};
@@ -820,11 +836,11 @@ IP._stealTry=function(off,def,forced){
     var diff=this.score[off]-this.score[def];
     if(this.inning>=7 && Math.abs(diff)>=4) return null;
     var run=this.tac[off].run;
-    var tryP = clamp((p.spd-60)*0.011, 0.01, 0.24) * (run==="aggr"?1.8:run==="hold"?0.25:1);
+    var tryP = clamp((p.spd-60)*0.011, 0.01, 0.24) * (run==="aggr"?1+0.8*this.ex(off,"run"):run==="hold"?0.25:1);
     if(rnd()>=tryP) return null;
   }
   var c=this.catcher(def), arm=c? c.arm-posFit(c,'C')*0.5 : 60;
-  var ok = rnd() < clamp(0.66 + (p.spd-75)*0.009 - (arm-70)*0.007 - (this.tac[off].run==="aggr"?0.04:0), 0.4, 0.93);
+  var ok = rnd() < clamp(0.66 + (p.spd-75)*0.009 - (arm-70)*0.007 - (this.tac[off].run==="aggr"?0.04+0.06*(1-this.ex(off,"run")):0), 0.4, 0.93);
   return {runner:r.n, oc: ok?'SB':'CS'};
 };
 // sacrifice bunt: runner on first or second, nobody out (one out on the dugout's sign), weak bat or a tight late game
@@ -872,7 +888,7 @@ IP.prepareAB=function(){
     return this._pending;
   }
   var fatigue=Math.max(0,(this.pBF[def]-(pit.role==='SP'?18:4))*0.7);
-  var oc=simPA(bat,pit,fatigue,this.defense(def),paMods(this.tac[off],this.tac[def],this.bases,this.outs));
+  var oc=simPA(bat,pit,fatigue,this.defense(def),scoutMods(paMods(this.tac[off],this.tac[def],this.bases,this.outs,this.ex.bind(this,off),this.ex.bind(this,def)),this.know[off],this.know[def]));
   var pitches=genPitchSeq(bat,pit,oc,(this.tac[off].atk==="patient"?0.35:0)+(this.tac[def].bat==="nibble"?0.35:0));
   this._pending={off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:oc,pitches:pitches,slot:slot};
   return this._pending;
@@ -930,7 +946,7 @@ IP.commitAB=function(){
   var rbiTxt=function(){return ev.runs?' ('+ev.runs+'타점)':'';};
   var dfn=this.defense(def);
   if(oc==='OUT'){
-    var dp=clamp(0.12 + (dfn-70)*0.002 - (bat.spd-70)*0.002 + (this.tac[def].shift==="dp"?0.05:0) - (this.tac[off].run==="aggr"?0.02:0), 0.04, 0.26);
+    var dp=clamp(0.12 + (dfn-70)*0.002 - (bat.spd-70)*0.002 + (this.tac[def].shift==="dp"?0.05*this.ex(def,"shift"):0) - (this.tac[off].run==="aggr"?0.02*this.ex(off,"run"):0), 0.04, 0.26);
     var err=clamp(0.03 - (dfn-70)*0.0009, 0.012, 0.05);
     if(rnd()<err){ oc='E'; ev.oc='E'; }
     else if(this.bases[0]&&this.outs<2&&rnd()<dp){ this.bases[0]=null; this._out(def,2); bs.AB++; ev.oc='GIDP'; ev.desc='병살타'; bs.GDP++; oc='DONE'; }
@@ -939,11 +955,11 @@ IP.commitAB=function(){
   else if(oc==='K'){ bs.AB++; bs.SO++; ps.SO++; this._out(def); ev.desc='삼진 아웃'; }
   else if(oc==='E'){ bs.AB++; me.ue=true; this.errOuts=(this.errOuts||0)+1; credit(applyOutcome(this,'E',me),false,true); ev.desc='실책 출루'+(ev.runs?' ('+ev.runs+'점)':''); }
   else if(oc==='OUT'){
-    if(this.bases[2]&&this.outs<2&&rnd()<(this.tac[def].shift==="infieldIn"?0.14:0.30)){ var runner=this.bases[2]; this.bases[2]=null; bs.RBI++; bs.SF++; this._out(def); this._run(off,def,runner,false); ev.oc='SF'; ev.runs=1; ev.desc='희생플라이 (1타점)'; }
+    if(this.bases[2]&&this.outs<2&&rnd()<(this.tac[def].shift==="infieldIn"?0.14+0.16*(1-this.ex(def,"shift")):0.30)){ var runner=this.bases[2]; this.bases[2]=null; bs.RBI++; bs.SF++; this._out(def); this._run(off,def,runner,false); ev.oc='SF'; ev.runs=1; ev.desc='희생플라이 (1타점)'; }
     else {
       bs.AB++; this._out(def); ev.desc='범타 아웃';
       // productive out: a runner on second moves up to third
-      if(this.outs<3 && this.bases[1] && !this.bases[2] && rnd()<(this.tac[off].teamBat?0.7:0.35)){ this.bases[2]=this.bases[1]; this.bases[1]=null; ev.adv=true; }
+      if(this.outs<3 && this.bases[1] && !this.bases[2] && rnd()<(this.tac[off].teamBat?0.35+0.35*this.ex(off,"teamBat"):0.35)){ this.bases[2]=this.bases[1]; this.bases[1]=null; ev.adv=true; }
     }
   }
   else if(oc==='BB'){ bs.BB++; ps.BB++; credit(applyOutcome(this,'BB',me),true); ev.desc='볼넷'+rbiTxt(); }

@@ -418,7 +418,8 @@ function prepareCfg(team, cfg){
   const opts={ restBelow: (!isUser||f.autoRest)? 70 : 0, forceRest: isUser? f.restNext : [] };
   // relievers who joined after the bullpen was set (rookies, call-ups, trades) go to the back of it
   const extraRP=r.pitchers.filter(p=>p.role!=='SP' && p.n!==cfg.closer && (cfg.bullpen||[]).indexOf(p.n)<0).map(p=>p.n);
-  return K.restAdjust(team, Object.assign({}, cfg, {rotation: state.cfgs[team].rotation, bullpen:(cfg.bullpen||[]).concat(extraRP)}), opts);
+  const extra=isUser? {tacFam:execTable(), scoutKnow:knowTable()} : {};
+  return K.restAdjust(team, Object.assign({}, cfg, extra, {rotation: state.cfgs[team].rotation, bullpen:(cfg.bullpen||[]).concat(extraRP)}), opts);
 }
 // what prepareCfg will change for the user's next game, for the preview screen
 function previewNote(){
@@ -450,6 +451,7 @@ function afterGame(res){
   const ug=userGamesPlayed();
   if(res.home===USER||res.away===USER){
     f.restNext=[]; // one-game rests are used up by the user's game, not by other teams' games
+    tacticsAfterGame(res);
     financeGame(res.home===USER);
     checkPromises(res, ug);
     checkUnhappy(ug);
@@ -565,9 +567,9 @@ function doTrade(team, fromUser, fromThem){
   const why=tradeCheck(team, fromUser, fromThem); if(why) return why;
   function move(srcT,dstT,name){
     const r=K.ROSTERS[srcT]; let i=r.batters.findIndex(x=>x.n===name);
-    if(i>=0){ const p=r.batters.splice(i,1)[0]; p.listed=false; p.bench=0; K.ROSTERS[dstT].batters.push(p); return; }
+    if(i>=0){ const p=r.batters.splice(i,1)[0]; p.listed=false; p.bench=0; if(dstT===USER) p.newG=NEW_GAMES; K.ROSTERS[dstT].batters.push(p); return; }
     i=r.pitchers.findIndex(x=>x.n===name);
-    if(i>=0){ const p=r.pitchers.splice(i,1)[0]; p.listed=false; K.ROSTERS[dstT].pitchers.push(p); }
+    if(i>=0){ const p=r.pitchers.splice(i,1)[0]; p.listed=false; if(dstT===USER) p.newG=NEW_GAMES; K.ROSTERS[dstT].pitchers.push(p); }
   }
   fromUser.forEach(n=>move(USER,team,n));
   fromThem.forEach(n=>move(team,USER,n));
@@ -670,7 +672,7 @@ function signFA(i){
   const p=x.p;
   ask(`${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})과 ${x.yrs}년 연봉 ${x.ask}억 원에 계약합니다.\n계약금 ${bonus}억 원은 구단 잔고에서 나갑니다.`, 'FA 계약', ()=>{
     f.fa.splice(f.fa.indexOf(x),1);
-    p.sal=x.ask; p.yrs=x.yrs; p.mor=72; p.cond=100; p.inj=0; p.listed=false; p.bench=0;
+    p.sal=x.ask; p.yrs=x.yrs; p.mor=72; p.cond=100; p.inj=0; p.listed=false; p.bench=0; p.newG=NEW_GAMES;
     const where=joinClub(USER,p);
     f.fin.balance-=bonus; f.fin.exp+=bonus;
     send('단장','✍️',`FA ${p.n} 영입`, `${p.n}과(와) ${x.yrs}년 연봉 ${x.ask}억 원에 계약했습니다. 계약금 ${bonus}억 원.` +
@@ -740,7 +742,7 @@ function fxSign(i,outName){
   const room=entryCount(USER)-(onEntry?1:0)<ENTRY_MAX;
   const why=entryProblem(USER, onEntry?[out]:[], room?[cand]:[]); if(why){ notify(why); return; }
   if(out){ if(out.type==='B') r.batters=r.batters.filter(x=>x!==out); else r.pitchers=r.pitchers.filter(x=>x!==out); r.farm=farmOf(USER).filter(x=>x!==out); }
-  joinClub(USER,cand);
+  cand.newG=NEW_GAMES; joinClub(USER,cand);
   f.scout.list.splice(i,1);
   f.fxSwaps={year:state.year, n:(f.fxSwaps&&f.fxSwaps.year===state.year?f.fxSwaps.n:0)+(out&&state.phase==='regular'?1:0)};
   f.fin.balance-=fee; f.fin.exp+=fee;
@@ -791,6 +793,7 @@ function afterPsGame(res){
     moraleAfterGame(t,res);
     if(t===USER) hurt.forEach(h=>send('의무 트레이너','🩹',`${h.n} 부상`, `${h.n} 선수가 포스트시즌 경기 중 부상을 입었습니다. 예상 결장 약 ${h.games}경기.`, []));
   });
+  if(res.home===USER||res.away===USER) tacticsAfterGame(res);
 }
 
 // ---------- after being fired: other clubs that want the manager ----------
@@ -846,9 +849,107 @@ function curTac(scope){
   if(scope==='match'){ if(!state.matchTac) state.matchTac=Object.assign({},K.DEFAULT_TAC,c.tac||{}); return state.matchTac; }
   if(!c.tac) c.tac=Object.assign({},K.DEFAULT_TAC); return c.tac;
 }
+// ---------- 작전 숙련도 · 선수 능력 · 선수 신뢰 · 상대 정보 ----------
+// FM27's tactical effectiveness, for a baseball dugout. Every non-default plan has to be learned:
+// each tactic value has a familiarity of 0..100 that grows with games played under it (spring
+// games and the postseason count) and with a tactics camp, more slowly the more plans run at
+// once, and fades slowly when unused. How well a plan is carried out in a game also depends on
+// whether the roster suits it and whether the players buy in. The engine scales each plan's
+// effect by that execution (core.js paMods); AI clubs execute at 1.
+const TF_LEARN={atk:['aggr','patient'], run:['aggr'], teamBat:['true'], shift:['dp','infieldIn','deep'], bat:['attack','nibble']};
+const TF_START={rookie:30, coach:45, legend:35}, TF_GAIN=1.2, TF_FORGET=0.25, TF_FLOOR=20, TF_CAMP=20, NEW_GAMES=20;
+function tfState(){
+  const f=fm(); if(f.tf) return f.tf;
+  // a save from before familiarity existed: plans already in use start half-learned
+  const start=TF_START[state.user&&state.user.bg]||35, inUse=new Set(activePlans().map(x=>x.k+':'+x.v)), played=userGamesPlayed()>0;
+  f.tf={}; for(const k in TF_LEARN){ f.tf[k]={}; TF_LEARN[k].forEach(v=>f.tf[k][v]= played&&inUse.has(k+':'+v)? 70 : start); }
+  return f.tf;
+}
+function activePlans(tac){ tac=tac||(state.cfgs[USER].tac||K.DEFAULT_TAC); return Object.keys(TF_LEARN).filter(k=>TF_LEARN[k].indexOf(String(tac[k]))>=0).map(k=>({k,v:String(tac[k])})); }
+function famOf(k,v){ const t=TF_LEARN[k]&&TF_LEARN[k].indexOf(String(v))>=0? tfState()[k] : null; return t? Math.round(t[String(v)]) : 100; }
+function learnRate(tac){ const c=activePlans(tac).length; return 1/(1+0.2*Math.max(0,c-1)); }
+// does the roster suit the plan? 0..100 from the relevant ratings (55 -> 0, 90 -> 100)
+function lineupBats(){ return state.cfgs[USER].lineup.map(n=>findPlayer(USER,n)).filter(Boolean); }
+function rotArms(){ return state.cfgs[USER].rotation.map(n=>findPlayer(USER,n)).filter(Boolean); }
+function avgOf(ps,f){ return ps.length? ps.reduce((a,p)=>a+f(p),0)/ps.length : 60; }
+function fieldersAt(set){ const c=state.cfgs[USER], pos=c.positions||K.autoPositions(USER,c.lineup);
+  return c.lineup.map((n,i)=>set.indexOf(pos[i])>=0? findPlayer(USER,n) : null).filter(Boolean); }
+const FIT_RULE={
+  'atk:aggr':['타선 컨택',()=>avgOf(lineupBats(),p=>p.con)], 'atk:patient':['타선 선구안',()=>avgOf(lineupBats(),p=>p.eye)],
+  'run:aggr':['타선 주력',()=>avgOf(lineupBats(),p=>p.spd)], 'teamBat:true':['타선 컨택',()=>avgOf(lineupBats(),p=>p.con)],
+  'shift:dp':['내야 수비',()=>avgOf(fieldersAt(['1B','2B','3B','SS']),p=>p.fld)], 'shift:infieldIn':['내야 수비',()=>avgOf(fieldersAt(['1B','2B','3B','SS']),p=>p.fld)],
+  'shift:deep':['외야 수비·주력',()=>avgOf(fieldersAt(['LF','CF','RF']),p=>(p.fld+p.spd)/2)],
+  'bat:attack':['선발 구위',()=>avgOf(rotArms(),p=>p.stu)], 'bat:nibble':['선발 제구·무브',()=>avgOf(rotArms(),p=>(p.ctl+p.mov)/2)]
+};
+function fitOf(k,v){ const r=FIT_RULE[k+':'+v]; return r? clampN(Math.round((r[1]()-55)*100/35),0,100) : 100; }
+// do the players follow the manager? morale, the board's backing, and how many are new to the club
+function buyIn(){
+  const ps=lineupBats().concat(rotArms()); if(!ps.length) return 60;
+  const conf=(fm().board&&fm().board.conf)||60, fresh=ps.filter(p=>(p.newG||0)>0).length;
+  return clampN(Math.round(0.55*avgOf(ps,p=>K.mor(p))+0.3*conf+15*(1-fresh/ps.length)),0,100);
+}
+function buyInParts(){ const ps=lineupBats().concat(rotArms());
+  return {mor:Math.round(avgOf(ps,p=>K.mor(p))), conf:(fm().board&&fm().board.conf)||60, fresh:ps.filter(p=>(p.newG||0)>0).length}; }
+// execution in a game: familiarity first, then roster fit (50 = neutral) and buy-in (67 = neutral)
+function execOf(k,v,b){ b=b==null?buyIn():b;
+  return clampN((0.3+0.7*famOf(k,v)/100)*(0.9+0.2*fitOf(k,v)/100)*(0.9+0.15*b/100),0.2,1.05); }
+function execTable(){ const b=buyIn(), t={}; for(const k in TF_LEARN){ t[k]={}; TF_LEARN[k].forEach(v=>t[k][v]=execOf(k,v,b)); } return t; }
+// what the analysts know about a club: grows with every meeting this season, half carries over
+function knowState(){ const f=fm();
+  if(!f.know||f.know.year!==state.year){ const old=(f.know&&f.know.n)||{}, n={}; for(const t in old) n[t]=Math.floor(old[t]/2); f.know={year:state.year,n}; }
+  return f.know; }
+function knowOf(t){ return clampN(0.15+0.085*(knowState().n[t]||0),0,1); }
+function knowTable(){ const o={}; K.TEAM_IDS.forEach(t=>{ if(t!==USER) o[t]=knowOf(t); }); return o; }
+function tacticsAfterGame(res,meet){
+  const opp=res.home===USER?res.away:res.home;
+  if(meet!==false){ const k=knowState(); k.n[opp]=(k.n[opp]||0)+1; }
+  const tf=tfState(), rate=learnRate()*(0.7+0.3*buyIn()/100), act=new Set(activePlans().map(x=>x.k+':'+x.v));
+  for(const k in TF_LEARN) TF_LEARN[k].forEach(v=>{ const cur=tf[k][v];
+    tf[k][v]= act.has(k+':'+v)? Math.min(100,cur+TF_GAIN*rate) : Math.max(TF_FLOOR,cur-TF_FORGET); });
+  allPlayers(USER).forEach(p=>{ if(p.newG>0) p.newG--; });
+}
+function nextOpp(){ const pm=state.pendingGame!=null&&pendingMatch(); if(pm) return pm.home===USER?pm.away:pm.home;
+  const g=state.schedule.find(g=>!g.played&&(g.home===USER||g.away===USER)); return g? (g.home===USER?g.away:g.home) : null; }
+function gaugeBox(label,val,sub){ const v=val==null?null:Math.round(val), col=v==null?'var(--dim)':v>=75?'var(--good)':v>=50?'var(--accent)':v>=30?'var(--warn)':'var(--bad)';
+  return `<div style="min-width:0"><div class="row" style="justify-content:space-between;gap:6px"><span class="muted" style="font-size:12px">${label}</span><b style="color:${col}">${v==null?'-':v}</b></div>
+    <span class="bar" style="display:block;width:100%;margin:4px 0"><i style="width:${v==null?0:v}%;background:${col}"></i></span><div class="hint" style="font-size:11px">${sub}</div></div>`; }
+// the four gauges and each running plan's numbers, on the lineup tab and the preview
+function effectPanel(scope){
+  const T=curTac(scope), plans=activePlans(T), b=buyIn(), bp=buyInParts(), opp=nextOpp();
+  const fam=plans.length? plans.reduce((a,x)=>a+famOf(x.k,x.v),0)/plans.length : 100;
+  const fit=plans.length? plans.reduce((a,x)=>a+fitOf(x.k,x.v),0)/plans.length : null;
+  const lines=plans.map(x=>`• ${tacName(x.k)} <b>${esc(tacLabel(x.k,x.v==='true'?true:x.v))}</b> — 숙련 ${famOf(x.k,x.v)}% · 적합 ${fitOf(x.k,x.v)} (${FIT_RULE[x.k+':'+x.v][0]}) · 실행률 <b>${Math.round(execOf(x.k,x.v,b)*100)}%</b>`);
+  return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line-strong)">
+    <div style="font-weight:700;margin-bottom:6px">📊 작전 효과</div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+      ${gaugeBox('작전 이해',fam, plans.length? `복잡도 ${plans.length}/5 · 익히는 속도 ${Math.round(learnRate(T)*100)}%` : '기본 작전만 사용 — 익힐 것이 없습니다')}
+      ${gaugeBox('선수 능력',fit, plans.length? '작전에 맞는 능력치 (50 = 보통)' : '특수 작전 없음')}
+      ${gaugeBox('선수 신뢰',b, `사기 ${bp.mor} · 이사회 ${bp.conf}${bp.fresh?` · 새 얼굴 ${bp.fresh}명`:''}`)}
+      ${gaugeBox('상대 정보',opp? knowOf(opp)*100 : null, opp? `${K.ROSTERS[opp].name} · 맞대결 ${knowState().n[opp]||0}경기` : '다음 상대 없음')}
+    </div>
+    ${lines.length? `<div class="hint" style="margin-top:8px;font-size:12px">${lines.join('<br>')}</div>` : ''}
+    <div class="hint" style="margin-top:6px;font-size:11.5px">실행률 100% = 완전히 익힌 작전. 낮을수록 효과가 줄고 혼선이 생깁니다. 경기를 치를수록 숙련도가 오르고, 쓰지 않는 작전은 조금씩 잊습니다.</div></div>`;
+}
+// the analysts' report for the preview: deeper the more the club has been seen
+function scoutReport(opp){
+  const k=knowOf(opp), n=knowState().n[opp]||0, sp=findPlayer(opp,projectedSP(opp)), out=[];
+  const gs=state.schedule.filter(g=>g.played&&((g.home===USER&&g.away===opp)||(g.away===USER&&g.home===opp)));
+  const w=gs.filter(g=>(g.home===USER?g.hr>g.ar:g.ar>g.hr)).length, l=gs.filter(g=>(g.home===USER?g.hr<g.ar:g.ar<g.hr)).length;
+  if(sp){ const s=state.season[opp].pit[sp.n], parts=[['구위',sp.stu],['제구',sp.ctl],['무브먼트',sp.mov]].sort((a,b)=>b[1]-a[1]);
+    out.push(`선발 ${sp.n}: 강점 ${parts[0][0]}${k>=0.3?` · 약점 ${parts[2][0]}`:''}${s&&s.OUT? ` · ERA ${fmtEra(s.ER,s.OUT)}, 9이닝당 삼진 ${(s.SO*27/s.OUT).toFixed(1)}`:''}`);
+    if(k>=0.3){ if(sp.ctl<=64) out.push('제구가 흔들리는 투수입니다 — "공 많이 보기"로 투구수를 늘리세요.');
+      else if(sp.ctl>=76&&sp.stu<74) out.push('스트라이크를 넣는 투수입니다 — "초구부터 적극 타격"이 통합니다.'); } }
+  out.push(...scoutTip(opp));
+  if(k>=0.5){ const ops=x=>(x.H+x.BB+x.HBP)/Math.max(1,x.AB+x.BB+x.HBP)+(x.H+x._2B+2*x._3B+3*x.HR)/Math.max(1,x.AB);
+    const hot=Object.entries(state.season[opp].bat).filter(([nm,x])=>x.PA>=30&&findPlayer(opp,nm)).sort((a,b)=>ops(b[1])-ops(a[1]))[0];
+    if(hot) out.push(`경계 대상: ${hot[0]} (시즌 OPS ${ops(hot[1]).toFixed(3)})`); }
+  if(k<0.3) out.push('맞대결이 쌓이면 약점과 경계 대상까지 분석합니다.');
+  return `<div class="hint" style="margin-top:8px">🔎 <b>전력분석</b> — 상대 정보 ${Math.round(k*100)}%${gs.length?` · 올 시즌 상대 전적 ${w}승 ${l}패`:''}${n?'':' · 첫 맞대결'}<br>${out.map(esc).join('<br>')}</div>`;
+}
 function setTac(scope,k,v){
   if(v==='true') v=true; if(v==='false') v=false;
   curTac(scope)[k]=v;
+  { const fam=famOf(k,v); if(fam<70) notify(`${tacName(k)} '${tacLabel(k,v)}' 숙련도 ${fam}% — 익숙해질 때까지 효과가 떨어집니다.`); }
   if(scope==='match'){ closeModal(); openPreview(); } else render();
 }
 // a coach's read on the opponent for the preview
@@ -868,10 +969,11 @@ function tacticsCard(scope){
   const T=curTac(scope);
   const row=(k)=>`<div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px;align-items:center;padding:4px 0">
       <span class="muted" style="font-size:12.5px">${tacName(k)}</span>
-      <div style="min-width:0"><select onchange="App.setTac('${scope}','${k}',this.value)">${TAC_OPTS[k].map(o=>`<option value="${o}" ${String(T[k])===String(o)?'selected':''}>${esc(tacLabel(k,o))}</option>`).join('')}</select>
+      <div style="min-width:0"><select onchange="App.setTac('${scope}','${k}',this.value)">${TAC_OPTS[k].map(o=>`<option value="${o}" ${String(T[k])===String(o)?'selected':''}>${esc(tacLabel(k,o))}${famOf(k,o)<100?` (숙련 ${famOf(k,o)}%)`:''}</option>`).join('')}</select>
       <div class="hint" style="font-size:11.5px;margin-top:2px">${esc(TAC_HELP[k][String(T[k])]||'')}</div></div></div>`;
   let tip='';
-  if(scope==='match'){ const pm=pendingMatch(); if(pm){ const opp=pm.home===USER?pm.away:pm.home; tip=`<div class="hint" style="margin-top:8px">🔎 전력분석: ${scoutTip(opp).map(esc).join(' ')}</div>`; } }
+  if(scope==='match'){ const pm=pendingMatch(); if(pm){ const opp=pm.home===USER?pm.away:pm.home; tip=scoutReport(opp); } }
+  tip+=effectPanel(scope);
   return `<div class="card" style="margin-top:14px${scope==='match'?';background:var(--panel2)':''}"><h3>🎯 ${scope==='match'?'이번 경기 작전':'팀 기본 전술'} <span class="tag">${scope==='match'?'경기 중에도 🎯 작전 버튼으로 변경':'경기 프리뷰에서 경기별로 바꿀 수 있습니다'}</span></h3>
     <div class="grid cols2" style="gap:4px 18px">
       <div><div style="font-weight:700;margin:2px 0 4px">⚔️ 공격 · 주루</div>${['atk','run','bunt','teamBat'].map(row).join('')}</div>
@@ -886,7 +988,8 @@ const CAMP={
   pit:{label:'투수 강화', d:'구위·제구·무브먼트', keys:['stu','ctl','mov'], type:'P'},
   def:{label:'수비·주루', d:'수비·송구·주력', keys:['fld','arm','spd'], type:'B'},
   fit:{label:'체력 훈련', d:'투수 체력, 시즌 초반 컨디션', keys:['sta'], type:'P'},
-  bal:{label:'균형 훈련', d:'모든 능력 조금씩', keys:null}
+  bal:{label:'균형 훈련', d:'모든 능력 조금씩', keys:null},
+  tac:{label:'작전 훈련', d:'지금 팀 기본 작전의 숙련도 +20 (능력치 성장 없음)', keys:[], type:'-'}
 };
 function stoveTasks(){
   const f=fm();
@@ -946,6 +1049,9 @@ function setCamp(k){ fm().camp={year:state.year, focus:k}; closeModal(); render(
 // camp: young players gain most in the chosen area
 function applyCamp(){
   const f=fm(), c=CAMP[f.camp.focus], gains=[];
+  if(f.camp.focus==='tac'){ const tf=tfState(), plans=activePlans();
+    plans.forEach(x=>tf[x.k][x.v]=Math.min(100,tf[x.k][x.v]+TF_CAMP)); allPlayers(USER).forEach(p=>addMor(p,2));
+    return `${c.label} — ${plans.length? plans.map(x=>`${tacName(x.k)} '${tacLabel(x.k,x.v==='true'?true:x.v)}' 숙련 ${famOf(x.k,x.v)}%`).join(', ') : '특수 작전이 없어 기본기 위주로 훈련했습니다'}`; }
   allPlayers(USER).forEach(p=>{
     const keys = c.keys? (c.type===p.type? c.keys : []) : (p.type==='B'? ['con','pow','eye','spd','fld','arm'] : ['stu','ctl','mov','sta']);
     if(!keys.length) return;
@@ -986,6 +1092,7 @@ function springRecord(res){
   const add=(dst,src)=>{ for(const k in src) if(typeof src[k]==='number') dst[k]=(dst[k]||0)+src[k]; };
   for(const nm in bx.bat){ add(sp.stats.bat[nm]||(sp.stats.bat[nm]={}), bx.bat[nm]); }
   for(const nm in bx.pit){ add(sp.stats.pit[nm]||(sp.stats.pit[nm]={}), bx.pit[nm]); }
+  tacticsAfterGame(res,false); // spring games drill the plans but teach little about opponents
   gameReport(res,'spring');
   if(!springNext()) send('수석코치','📋',`시범경기 종료 (${sp.W}승 ${sp.L}패 ${sp.T}무)`, '시범경기 일정을 모두 마쳤습니다. 대시보드에서 정규시즌 개막을 선언하세요.', []);
 }
@@ -1819,8 +1926,8 @@ function offseasonFarm(t){
   const f=farmOf(t), r=K.ROSTERS[t];
   const retired=[]; for(let i=f.length-1;i>=0;i--){ const p=f[i]; if(p.age>=37 || (p.age>=33&&K.ovr(p)<66)){ retired.push(p.n); f.splice(i,1); } }
   f.forEach(p=>{ p.cond=100; p.inj=0; p.bench=0; });
-  const draft=[makeRookie('B'),makeRookie('B'),makeRookie('P','SP'),makeRookie('P')];
-  draft.forEach(p=>{ ensurePlayer(p); f.push(p); });
+  // one at a time, so each draftee's name is checked against the ones drafted before him
+  const draft=[['B'],['B'],['P','SP'],['P']].map(([type,pos])=>{ const p=makeRookie(type,pos); ensurePlayer(p); f.push(p); return p; });
   const best=(type,role)=>f.filter(p=>p.type===type&&(!role||p.role===role)).sort((a,b)=>K.ovr(b)-K.ovr(a))[0];
   const up=[], lift=(type,role)=>{ const p=best(type,role)||makeRookie(type,role); if(f.indexOf(p)<0) f.push(p); doPromote(t,p); up.push(p); };
   while(r.batters.length<MIN_1B) lift('B');
@@ -1942,7 +2049,7 @@ function farmView(){
 }
 
 window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, showSetup, setupPick, setupBg, setupName, setupStart, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
-  tradeBudget, tradeCheck, doTrade, payroll, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
+  tradeBudget, tradeCheck, doTrade, payroll, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,
   springNext, springPlayNext, springRecord, springSimAll, openSeason, SPRING_GAMES, gameReport, renderFeed, setFeedFilter, logGame, profileTab,
