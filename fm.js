@@ -1891,8 +1891,8 @@ function tabBadge(id){
 }
 
 // ---------- UI: inbox ----------
-let selMsg=null, inboxFilter='decide';
-function openMsg(id){ selMsg=id; const m=fm().inbox.find(x=>x.id===id); if(m){ m.read=true; inboxFilter= !m.done&&isDecision(m)? 'decide' : m.auto? 'auto' : isDecision(m)&&!m.auto? 'all' : 'report'; } render(); }
+let selMsg=null, inboxFilter='all';
+function openMsg(id){ selMsg=id; const m=fm().inbox.find(x=>x.id===id); if(m){ m.read=true; if(!inboxLists()[inboxFilter].includes(m)) inboxFilter='all'; } render(); }
 function markAllRead(){ fm().inbox.forEach(m=>m.read=true); render(); }
 function setInboxFilter(f){ inboxFilter=f; selMsg=null; render(); }
 function dueLeft(m){ return m.due==null? null : m.due-clock(); }
@@ -1900,17 +1900,17 @@ function dueTag(m){ const d=dueLeft(m); if(d==null||m.done) return '';
   if(state.phase==='stove') return '<span class="pill" style="background:var(--panel2);color:var(--dim)">시즌 중 기한</span>';
   return `<span class="pill" style="${d<=1?'background:rgba(224,85,106,.22);color:var(--bad)':'background:rgba(240,160,32,.2);color:var(--warn)'}">${d<=0?'오늘 마감':'D-'+d}</span>`; }
 function inboxCounts(){ const L=fm().inbox; return {decide:L.filter(m=>!m.done&&isDecision(m)).length, report:L.filter(m=>!isDecision(m)&&!m.read).length, auto:L.filter(m=>m.auto&&!m.read).length}; }
+function inboxLists(){ const f=fm(); return {decide:f.inbox.filter(m=>!m.done&&isDecision(m)).sort((x,y)=>(x.due==null?1e9:x.due)-(y.due==null?1e9:y.due)),
+    report:f.inbox.filter(m=>!isDecision(m)), auto:f.inbox.filter(m=>m.auto), all:f.inbox}; }
 function renderInbox(){
   ensure();
-  const f=fm(), c=inboxCounts();
-  const lists={decide:f.inbox.filter(m=>!m.done&&isDecision(m)).sort((x,y)=>(x.due==null?1e9:x.due)-(y.due==null?1e9:y.due)),
-    report:f.inbox.filter(m=>!isDecision(m)), auto:f.inbox.filter(m=>m.auto), all:f.inbox};
-  if(!lists[inboxFilter]) inboxFilter='decide';
+  const f=fm(), c=inboxCounts(), lists=inboxLists();
+  if(!lists[inboxFilter]) inboxFilter='all';
   const list=lists[inboxFilter];
   if((selMsg==null||!list.some(m=>m.id===selMsg)) && list.length) selMsg=list[0].id;
   const sel=list.find(m=>m.id===selMsg);
   if(sel&&!sel.read) sel.read=true;
-  const empty={decide:'지금 결정할 메시지가 없습니다. 👍', report:'보고가 없습니다.', auto:'아직 담당자가 처리한 메시지가 없습니다.', all:'메시지가 없습니다.'}[inboxFilter];
+  const empty={decide:'지금 결정할 메시지가 없습니다. 👍', report:'피드가 없습니다.', auto:'아직 담당자가 처리한 메시지가 없습니다.', all:'메시지가 없습니다.'}[inboxFilter];
   const items=list.map(m=>`<div onclick="FM.openMsg(${m.id})" style="padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;${m.id===selMsg?'background:var(--panel2);':''}${m.read?'':'font-weight:700;'}">
       <div class="row" style="gap:6px;flex-wrap:nowrap"><span>${m.icon}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.subject)}</span>
       ${!m.done&&isDecision(m)? (dueTag(m)||'<span class="pill" style="background:rgba(240,160,32,.2);color:var(--warn)">결정</span>') : m.auto? '<span class="pill" style="background:var(--panel2);color:var(--dim)">🤖 자동</span>' : ''}</div>
@@ -1925,7 +1925,7 @@ function renderInbox(){
   const ft=(id,l,n)=>`<button class="${inboxFilter===id?'active':''}" onclick="FM.setInboxFilter('${id}')">${l}${n?` <b>${n}</b>`:''}</button>`;
   return `<div class="grid" style="grid-template-columns:minmax(260px,380px) 1fr;gap:14px" id="inboxgrid">
     <div class="card" style="padding:10px"><h3>📥 받은편지함 <span class="tag"><a href="javascript:void(0)" onclick="FM.delegPicker()" style="color:var(--dim)">⚙ 업무 분담</a> · <a href="javascript:void(0)" onclick="FM.markAllRead()" style="color:var(--dim)">모두 읽음</a></span></h3>
-      <div class="tabsm">${ft('decide','결정 필요',c.decide)}${ft('report','보고',c.report)}${ft('auto','자동 처리됨',c.auto)}${ft('all','전체')}</div>
+      <div class="tabsm">${ft('all','전체')}${ft('report','피드',c.report)}${ft('decide','결정 필요',c.decide)}${ft('auto','자동 처리')}</div>
       <div style="max-height:620px;overflow:auto">${items}</div></div>
     <div class="card">${detail}</div></div>
     <style>@media(max-width:820px){#inboxgrid{grid-template-columns:1fr!important}}</style>`;
