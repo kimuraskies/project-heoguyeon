@@ -47,7 +47,7 @@
     const era = ps && ps.OUT ? (ps.ER * 27 / ps.OUT).toFixed(2) : '-.--', whip = ps && ps.OUT ? ((ps.H + ps.BB) * 3 / ps.OUT).toFixed(2) : '-.--';
     const lamp = (n, max, cls) => Array.from({length: max}, (_, i) => `<i class="${i < n ? cls : ''}"></i>`).join('');
     const pitBlk = `<div class="sbd-blk sbd-pit" data-v="bat"><div class="sbd-h" style="--c:${club(defId).color}">투수 · ${esc(pitName)}</div>
-      <div class="sbd-last">${last ? `<div><span>구종</span><b>${esc(last.type || '-')}</b></div><div><span>구속 km/h</span><b>${last.velo || '-'}</b></div><div><span>회전수 <em>추정</em></span><b>${last.velo ? rpm(last.type, p.stu) : '-'}</b></div>`
+      <div class="sbd-last">${last ? `<div><span>구종</span><b>${esc(last.type || '-')}</b></div><div><span>구속 km/h</span><b>${last.velo || '-'}</b></div><div><span>회전수 <em>(추정)</em></span><b>${last.velo ? rpm(last.type, p.stu) : '-'}</b></div>`
         : '<div class="sbd-wait">투구 대기</div>'}</div>
       <div class="sbd-tbsk"><div><span>T</span><b>${ptot}</b></div><div><span>B</span><b>${pball}</b></div><div><span>S</span><b>${pstr}</b></div><div><span>K</span><b>${box.SO || 0}</b></div></div>
       <div class="sbd-pline">오늘 ${ipStr(box.OUT || 0)}이닝 · 시즌 ERA ${era} · WHIP ${whip}</div>
