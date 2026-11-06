@@ -920,12 +920,10 @@ function relayHTML(game,feed,M){
   return `
     <div class="mp-bar"><h2>⚾ 실시간 중계</h2><small>${a}(원정) @ ${h}(홈)</small></div>
     <div class="live-grid">
-      ${Scoreboard.line(game,M)}
-      <div class="live-ctrl">${ctrl}${interv}</div>
       ${Scoreboard.board(game,M,{offId,defId,batName,pitName,slot,shown,cnt,ptot,pstr,pball})}
       <div class="live-main">
         ${resultBanner}
-        <div class="bc pv-broadcast">${relayScene(game,shown,offId,defId,batName,pitName)}${pitchInfo}<div class="bc-cap pv-live-cap"><div aria-live="polite">${caption}</div><div class="pv-log" aria-label="중계 로그">${feedHtml||'<div class="muted" style="padding:8px">경기 시작!</div>'}</div></div></div>
+        <div class="bc pv-broadcast">${relayScene(game,shown,offId,defId,batName,pitName).replace(/(<div class="pv-scene"[^>]*>)/,m=>m+Scoreboard.bug(game,{offId,defId,batName,pitName,slot,cnt,ptot}))}<div class="live-ctrl">${ctrl}${interv}</div>${pitchInfo}<div class="bc-cap pv-live-cap"><div aria-live="polite">${caption}</div><div class="pv-log" aria-label="중계 로그">${feedHtml||'<div class="muted" style="padding:8px">경기 시작!</div>'}</div></div></div>
       </div>
     </div>
   `;

@@ -225,11 +225,8 @@ footer{color:var(--md-on-surface-variant)}
   /* the scene (aspect 24:19) is sized from the viewport height so the scene and the commentary under it fit on one screen; the side column takes the rest */
   .live-grid{grid-template-columns:minmax(0,clamp(440px,calc((100vh - 250px)*1.26),640px)) minmax(400px,1fr);gap:0 24px;justify-content:center}
   /* the scoreboard heads the right column; the scene column spans both rows */
-  .live-grid{grid-template-rows:auto auto 1fr}
-  .live-grid>.sbd-linebox{grid-column:2;grid-row:1}
-  .live-grid>.live-ctrl{grid-column:2;grid-row:2}
-  .live-grid>.sbd:not(.sbd-linebox){grid-column:2;grid-row:3;align-self:start}
-  .live-grid>.live-main{grid-column:1;grid-row:1/span 3}
+  .live-grid>.sbd{grid-column:2;grid-row:1;align-self:start}
+  .live-grid>.live-main{grid-column:1;grid-row:1}
   .sbd-top{display:none}
   .live-side{position:sticky;top:16px}
 }
@@ -321,7 +318,7 @@ footer{color:var(--md-on-surface-variant)}
 .sbd-stats>div,.sbd-last>div,.sbd-tbsk>div{padding:3px 6px}
 @media(min-width:1000px){.sbd-def svg{max-height:120px}}
 /* phones: controls, then the pitch view, then the scoreboard and the result box */
-@media(max-width:999px){ .live-grid>.live-ctrl{order:0} .live-grid>.live-main{order:1} .live-grid>.sbd-linebox{order:2;margin-top:12px} .live-grid>.sbd:not(.sbd-linebox){order:3} }
+@media(max-width:999px){ .live-grid>.live-main{order:1} .live-grid>.sbd{order:2;margin-top:12px} }
 /* pitcher cell: pitch type on its own row so long names (슬라이더, 체인지업) fit */
 .sbd-last{grid-template-columns:1fr 1fr}
 .sbd-last>div:first-child{grid-column:1/-1;flex-direction:row;align-items:baseline;gap:8px}
@@ -359,3 +356,35 @@ footer{color:var(--md-on-surface-variant)}
 .sbd-plog i{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-style:normal;font-size:10.5px;font-weight:800;background:#333;color:#fff}
 .sbd-plog i.pl-B{background:#5d6875}.sbd-plog i.pl-S{background:#e0556a}.sbd-plog i.pl-SW{background:#f0a020}.sbd-plog i.pl-F{background:#3d8fc0}.sbd-plog i.pl-IP{background:#2e9e5e}.sbd-plog i.pl-HBP{background:#9b4fc8}
 .sbd-plog tbody{display:block;max-height:150px;overflow:auto}.sbd-plog thead,.sbd-plog tbody tr{display:table;width:100%;table-layout:fixed}
+
+/* ---- TV score bug over the scene ---- */
+.pv-scene{container-type:inline-size}
+.bug{position:absolute;left:2.2cqw;top:2.2cqw;z-index:2;display:flex;align-items:stretch;font-size:clamp(9px,2.35cqw,15px);
+  background:linear-gradient(#141b24,#06090d);color:#fff;border-radius:.45em;overflow:hidden;box-shadow:0 .3em 1em rgba(0,0,0,.55);font-variant-numeric:tabular-nums}
+.bug-t{display:flex;flex-direction:column;min-width:7.6em;border-right:1px solid #2a3440}
+.bug-n{display:flex;align-items:center;justify-content:space-between;gap:.8em;padding:.25em .6em;background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 55%,#000))}
+.bug-n b{font-size:1.25em;font-weight:900;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.bug-n strong{font-size:1.45em;font-weight:900;font-family:ui-monospace,Consolas,monospace}
+.bug-p{display:flex;align-items:center;gap:.35em;padding:.2em .5em;font-size:.85em;white-space:nowrap}
+.bug-p i{font-style:normal;font-weight:900;font-size:.8em;background:#fff;color:#000;border-radius:2px;padding:0 .3em;line-height:1.3}
+.bug-p em{font-style:normal;color:#9fb0c2;margin-left:auto;font-family:ui-monospace,Consolas,monospace}
+.bug-st{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.15em;padding:.2em .6em;border-right:1px solid #2a3440}
+.bug-st svg{width:2.4em;height:auto}.bug-st rect{fill:#3a4652}.bug-st rect.on{fill:#ffd25a}
+.bug-st b{font-size:.95em}
+.bug-c{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3em;padding:.2em .65em}
+.bug-c b{font-family:ui-monospace,Consolas,monospace;font-size:1.15em;color:#ffd25a}
+.bug-c span{display:flex;gap:.25em}.bug-c i{width:.6em;height:.6em;border-radius:50%;background:#3a4652}.bug-c i.on{background:#ff5b5b;box-shadow:0 0 .4em #ff5b5b}
+/* ---- controls and comment box in the LED board style ---- */
+.pv-broadcast .live-ctrl{margin:0;padding:10px 12px;background:#06090d;border-top:1px solid #1a242e;display:flex;flex-direction:column;gap:8px}
+.live-ctrl .row{gap:6px!important;margin:0!important}
+.live-ctrl .btn{background:#0f151c;color:#e9eef3;border:1px solid #1f2a35;border-radius:8px;min-height:34px;padding:6px 12px;font-size:13px;box-shadow:none}
+.live-ctrl .btn:hover{border-color:#ffd25a;color:#ffd25a}
+.live-ctrl .btn.primary{background:#ffd25a;color:#06090d;border-color:#ffd25a;font-weight:800}
+.live-ctrl select{background:#0f151c;color:#e9eef3;border:1px solid #1f2a35;border-radius:8px;min-height:34px}
+.live-ctrl .card{background:#0f151c!important;border:1px solid #1f2a35}
+.pv-pitchinfo{background:#0b1016;border-top:1px solid #1a242e;color:#7d8b99}
+.pv-pitchinfo b{color:#ffd25a;font-family:ui-monospace,Consolas,"Malgun Gothic",monospace}
+.pv-broadcast .pv-live-cap{background:#06090d;color:#e9eef3;border-top:1px solid #1a242e}
+.pv-live-cap .cm-now{color:#fff}.pv-live-cap .cm-prev{color:#7d8b99}
+.pv-live-cap .pv-log{border-top-color:#1f2a35}
+.pv-live-cap .pv-log>div{border-bottom-color:#141c25!important}

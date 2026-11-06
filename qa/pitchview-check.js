@@ -17,7 +17,8 @@ assert.ok(beats < 1000, 'A completed real plate appearance with at least five pi
 const completed = render();
 assert.match(completed, /class="pv-pitchinfo"/, 'Pitch info sits under the scene');
 assert.match(completed, /class="pv-log"/, 'The play-by-play log sits inside the comment box');
-assert.match(completed, /sbd-linebox/, 'The linescore heads the right column');
+assert.match(completed, /class="pv-scene"[^>]*><div class="bug"/, 'The score bug sits inside the scene');
+assert.ok(!completed.includes('sbd-linebox'), 'The separate linescore box is gone');
 assert.match(completed, /pv-marker-latest/);
 assert.ok(!/NaN|undefined/.test(completed));
 const original = read('JSON.stringify(Match.game)');

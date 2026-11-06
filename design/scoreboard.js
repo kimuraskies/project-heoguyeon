@@ -84,5 +84,18 @@
     return `<section class="sbd sbd-linebox" aria-label="이닝별 점수"><div class="sbd-blk sbd-line"><table><thead><tr><th>${game.inning}회${game.half === 'top' ? '초' : '말'}</th>${Array.from({length: n}, (_, i) => `<th class="${i + 1 === game.inning ? 'cur' : ''}">${i + 1}</th>`).join('')}<th>R</th><th>H</th><th>E</th><th>B</th></tr></thead>
       <tbody>${row(a)}${row(h)}</tbody></table></div></section>`;
   }
-  window.Scoreboard = {board, line, rpm};
+  // TV-style score bug laid over the top-left of the scene: teams and runs, the fielding side's
+  // pitcher with his pitch count, the batting side's hitter with his season AVG, bases, inning, count, outs
+  function bug(game, ctx) {
+    const {offId, defId, batName, pitName, slot, cnt, ptot} = ctx, S = state, h = game.h, a = game.a;
+    const bs = S.season[offId].bat[batName];
+    const sub = t => t === defId ? `<i>P</i>${esc(pitName)}<em>${ptot}구</em>` : `<i>${slot}</i>${esc(batName)}<em>${bs ? avg3(bs.H, bs.AB) : '.---'}</em>`;
+    const team = t => `<div class="bug-t" style="--c:${K.ROSTERS[t].color}"><div class="bug-n"><b>${esc(t)}</b><strong>${game.score[t]}</strong></div><div class="bug-p">${sub(t)}</div></div>`;
+    const base = (on, x, y) => `<rect x="${x}" y="${y}" width="9" height="9" transform="rotate(45 ${x + 4.5} ${y + 4.5})" class="${on ? 'on' : ''}"/>`;
+    const outs = [0, 1].map(i => `<i class="${i < game.outs ? 'on' : ''}"></i>`).join('');
+    return `<div class="bug" aria-label="스코어">${team(a)}${team(h)}
+      <div class="bug-st"><svg viewBox="0 0 34 24" aria-hidden="true">${base(game.bases[1], 12.5, 1)}${base(game.bases[2], 3, 10)}${base(game.bases[0], 22, 10)}</svg><b>${game.inning}${game.half === 'top' ? '▲' : '▼'}</b></div>
+      <div class="bug-c"><b>${cnt.b}-${cnt.s}</b><span>${outs}</span></div></div>`;
+  }
+  window.Scoreboard = {board, line, bug, rpm};
 })();
