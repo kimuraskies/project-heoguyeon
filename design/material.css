@@ -225,8 +225,10 @@ footer{color:var(--md-on-surface-variant)}
   /* the scene (aspect 24:19) is sized from the viewport height so the scene and the commentary under it fit on one screen; the side column takes the rest */
   .live-grid{grid-template-columns:minmax(0,clamp(440px,calc((100vh - 250px)*1.26),640px)) minmax(400px,1fr);gap:0 24px;justify-content:center}
   /* the scoreboard heads the right column; the scene column spans both rows */
-  .live-grid>.sbd{grid-column:2;grid-row:1;align-self:start}
-  .live-grid>.live-main{grid-column:1;grid-row:1}
+  .live-grid{grid-template-rows:auto 1fr}
+  .live-grid>.sbd-linebox{grid-column:2;grid-row:1}
+  .live-grid>.sbd:not(.sbd-linebox){grid-column:2;grid-row:2;align-self:start}
+  .live-grid>.live-main{grid-column:1;grid-row:1/span 2}
   .sbd-top{display:none}
   .live-side{position:sticky;top:16px}
 }
@@ -318,7 +320,7 @@ footer{color:var(--md-on-surface-variant)}
 .sbd-stats>div,.sbd-last>div,.sbd-tbsk>div{padding:3px 6px}
 @media(min-width:1000px){.sbd-def svg{max-height:120px}}
 /* phones: controls, then the pitch view, then the scoreboard and the result box */
-@media(max-width:999px){ .live-grid>.live-main{order:1} .live-grid>.sbd{order:2;margin-top:12px} }
+@media(max-width:999px){ .live-grid>.live-main{order:1} .live-grid>.sbd-linebox{order:2;margin-top:12px} .live-grid>.sbd:not(.sbd-linebox){order:3} }
 /* pitcher cell: pitch type on its own row so long names (슬라이더, 체인지업) fit */
 .sbd-last{grid-template-columns:1fr 1fr}
 .sbd-last>div:first-child{grid-column:1/-1;flex-direction:row;align-items:baseline;gap:8px}

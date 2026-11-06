@@ -920,6 +920,7 @@ function relayHTML(game,feed,M){
   return `
     <div class="mp-bar"><h2>⚾ 실시간 중계</h2><small>${a}(원정) @ ${h}(홈)</small></div>
     <div class="live-grid">
+      ${Scoreboard.line(game,M)}
       ${Scoreboard.board(game,M,{offId,defId,batName,pitName,slot,shown,cnt,ptot,pstr,pball})}
       <div class="live-main">
         ${resultBanner}
