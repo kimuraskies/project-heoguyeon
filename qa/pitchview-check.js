@@ -32,9 +32,12 @@ const fixture = () => read('PitchView.scene(pvFixture.game,pvFixture.pitches,pvF
 const first = fixture(), rerender = fixture();
 assert.match(first, /pv-flight/);
 assert.ok(!rerender.includes('pv-flight'), 'Pause/commentary rerenders must not replay a pitch');
-assert.match(first, /M411\.5,448\.0L548\.5,448\.0L550\.9,616\.0L409\.1,616\.0Z/);
-assert.match(first, /cx="411\.5" cy="448\.0"/, 'Upper-left zone pitch meets the projected zone');
-assert.match(first, /cx="550\.9" cy="616\.0"/, 'Lower-right zone pitch meets the projected zone');
+assert.match(first, /M325\.1,343\.0L634\.9,343\.0L641\.3,627\.0L318\.7,627\.0Z/);
+assert.match(first, /cx="325\.1" cy="343\.0"/, 'Upper-left zone pitch meets the projected zone');
+assert.match(first, /cx="641\.3" cy="627\.0"/, 'Lower-right zone pitch meets the projected zone');
+assert.match(first, /class="pv-zone-cell" data-cell="3-3"/, 'Inclusive bottom/right zone edge highlights the final cell');
+assert.ok(first.indexOf('class="pv-batter"') < first.indexOf('class="pv-tracks"') &&
+  first.indexOf('class="pv-tracks"') < first.indexOf('class="pv-markers"'), 'All tracks and numbers paint above the hitter');
 const images = s => [...s.matchAll(/<image[^>]*href="([^"]+)"/g)].map(m=>m[1]);
 assert.deepEqual(images(first),images(rerender),'Static SVG art is cached across renders');
 read("pvFixture.opts.side='좌';pvFixture.opts.batName='<테스트>&';");
@@ -44,8 +47,21 @@ assert.match(left, /&lt;테스트&gt;&amp;/);
 assert.match(decodeURIComponent(images(left)[1]), /translate\(960 0\) scale\(-1 1\)/);
 assert.ok(!/https?:\/\//.test(decodeURIComponent(images(left)[0]).replace('http://www.w3.org/2000/svg','')));
 assert.equal(read("PitchView.result({committed:false,oc:'HR'},pvFixture.pitches[0],PITCHLABEL)"),'스트라이크','Uncommitted outcomes stay hidden');
+// Each landing cell uses the same projection; a new ball outside the zone clears it.
+for (let row=0;row<3;row++) for (let col=0;col<3;col++) {
+  read(`pvFixture.pitches=[{res:'S',x:${.33+(col+.5)*.34/3},y:${.3+(row+.5)*.4/3}}];`);
+  assert.ok(fixture().includes(`data-cell="${row+1}-${col+1}"`));
+}
+read("pvFixture.pitches=[{res:'S',x:.5,y:.5},{res:'B',x:.68,y:.5}];");
+assert.ok(!fixture().includes('pv-zone-cell'), 'Only the newest pitch can highlight a zone cell');
+read("pvFixture.pitches=[{res:'B',x:0,y:0},{res:'B',x:1,y:1}];");
+for (const m of fixture().matchAll(/class="pv-marker-disc" cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)) {
+  const [x,y,r]=m.slice(1).map(Number);
+  assert.ok(x-r>=0 && x+r<=960 && y-r>=0 && y+r<=760, 'Even extreme balls keep their complete numbered marker in the frame');
+}
 read("pvFixture.pitches=[{res:'IBB',type:'고의4구',velo:0,x:.5,y:.5}];");
 assert.ok(!fixture().includes('data-pitch="'),'Intentional walks have no plotted pitch');
+assert.ok(!fixture().includes('pv-zone-cell'),'Intentional walks have no highlighted cell');
 const walk = read('pitchList(pvFixture.pitches)');
 assert.match(walk,/고의4구/);
 assert.match(walk,/종료/);
@@ -62,10 +78,12 @@ if(process.argv.includes('--preview')){
   const head = source.slice(source.indexOf('<head>')+6,source.indexOf('</head>'));
   const snapshot = body => '<!doctype html><html lang="ko" data-team="KIA"><head><base href="../../../">'+head+'</head><body><div id="relay" class="matchpage"><div class="mp-wrap">'+body.replace(/\s+on\w+="[^"]*"/g,'').replace(/<(button|select)\b/g,'<$1 disabled')+'</div></div></body></html>';
   fs.writeFileSync(path.join(out,'desktop.html'),snapshot(completed));
+  read("globalThis.pvOldName=Match.ab.batName;Match.ab.batName=K.ROSTERS[Match.ab.off].batters.find(p=>batSide(p.n,Match.ab.pitName)==='우').n;");
+  fs.writeFileSync(path.join(out,'phone-right.html'),snapshot(render()));
   // Same actual live page with a left-handed batter selected only for the visual fixture.
-  read("globalThis.pvOldName=Match.ab.batName;Match.ab.batName=K.ROSTERS[Match.ab.off].batters.find(p=>batSide(p.n,Match.ab.pitName)==='좌').n;");
+  read("Match.ab.batName=K.ROSTERS[Match.ab.off].batters.find(p=>batSide(p.n,Match.ab.pitName)==='좌').n;");
   fs.writeFileSync(path.join(out,'phone.html'),snapshot(render()));
   read('Match.ab.batName=pvOldName;');
-  fs.writeFileSync(path.join(out,'review.html'),`<!doctype html><html><meta charset="utf-8"><title>Pitch view · local visual review</title><style>body{margin:0;background:#090f17;color:#c6d3df;font:14px system-ui}header{padding:12px 20px}main{display:flex;gap:20px;padding:0 20px;align-items:start}iframe{border:1px solid #3c4758;height:1100px;display:block}h3{font-size:12px;font-weight:500}</style><header>Original pitch-view art · real relayHTML snapshots · static review, controls are inactive</header><main><section><h3>375px / left-handed</h3><iframe title="375 pixel phone" src="phone.html" width="375"></iframe></section><section><h3>1280px / actual plate appearance</h3><iframe title="1280 pixel desktop" src="desktop.html" width="1280"></iframe></section></main></html>`);
+  fs.writeFileSync(path.join(out,'review.html'),`<!doctype html><html><meta charset="utf-8"><title>Pitch view · local visual review</title><style>body{margin:0;background:#090f17;color:#c6d3df;font:14px system-ui}header{padding:12px 20px}main{display:flex;gap:20px;padding:0 20px;align-items:start}iframe{border:1px solid #3c4758;height:1100px;display:block}h3{font-size:12px;font-weight:500}</style><header>Original pitch-view art · real relayHTML snapshots · static review, controls are inactive</header><main><section><h3>375px / right-handed (screen left)</h3><iframe title="375 pixel right-handed phone" src="phone-right.html" width="375"></iframe><h3>375px / left-handed (screen right)</h3><iframe title="375 pixel left-handed phone" src="phone.html" width="375"></iframe></section><section><h3>1280px / actual plate appearance</h3><iframe title="1280 pixel desktop" src="desktop.html" width="1280"></iframe></section></main></html>`);
   console.log('Preview: /qa/results/pitchview/review.html');
 }

@@ -4,6 +4,7 @@
 (function (root) {
   'use strict';
   const W = 960, H = 760;
+  const MOUND = {x:480, y:385, scale:1.45};
   const backgrounds = new Map(), hitters = new Map(), deliveries = new WeakMap();
   let serial = 0;
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -84,9 +85,9 @@
       <path d="M-50 760L197 456Q290 364 480 340Q670 364 763 456L1010 760Z" fill="url(#clay)"/>
       <path d="M480 354L711 455L480 638L249 455Z" fill="url(#grass)"/>
       <path d="M480 354L540 380L350 535L313 507ZM610 411L651 428L441 607L401 576Z" fill="#a3b779" opacity=".13"/>
-      <path d="M480 699L89 321M480 699L871 321" fill="none" stroke="#e0ddc5" stroke-width="3" opacity=".84"/>
-      <path d="M480 698L248 455L480 354L712 455Z" fill="none" stroke="#c1ae88" stroke-width="5" opacity=".42"/>
-      <ellipse cx="480" cy="698" rx="171" ry="58" fill="url(#clay)"/>
+      <path d="M480 820L89 321M480 820L871 321" fill="none" stroke="#e0ddc5" stroke-width="4" opacity=".84"/>
+      <path d="M480 820L248 455L480 354L712 455Z" fill="none" stroke="#c1ae88" stroke-width="5" opacity=".42"/>
+      <ellipse cx="480" cy="790" rx="480" ry="150" fill="url(#clay)"/>
       <path d="M0 260H960V760H0Z" fill="url(#grain)"/>
     </g>
     <ellipse cx="480" cy="391" rx="50" ry="13" fill="#172e25" opacity=".18"/>
@@ -95,10 +96,10 @@
     <path d="M471 378H492L494 381H469Z" fill="#e0dfcf"/>
     <g fill="#eeeadd" stroke="#c3bca5"><path d="M237 453L250 447L264 453L250 460Z"/><path d="M472 351L480 348L489 351L480 355Z"/><path d="M698 453L712 447L725 453L712 460Z"/></g>
     ${fielder(239,347,.64)}${fielder(720,351,.64)}${fielder(474,306,.46)}${fielder(336,408,.84)}${fielder(623,409,.84)}
-    <g fill="none" stroke="#e5dbc1" stroke-width="2.5" opacity=".55"><path d="M328 629L405 634L398 719L300 708Z"/><path d="M555 634L632 629L660 708L562 719Z"/></g>
-    <g fill="none" stroke="#5f4934" opacity=".28" stroke-width="3"><path d="M317 700q38 14 74 5m-58-14q30 7 49 5m198-4q30 0 49-7m-47 18q23 1 45-7"/></g>
-    <path d="M457 678H503L508 688L480 707L452 688Z" fill="#e6e4d5" stroke="#ad9f83" stroke-width="2"/>
-    <path d="M459 681H500L502 686H457Z" fill="#fffdf0" opacity=".7"/>
+    <g fill="none" stroke="#e5dbc1" stroke-width="4" opacity=".45"><path d="M85 650L286 662L260 860L-15 840Z"/><path d="M674 662L875 650L975 840L700 860Z"/></g>
+    <g fill="none" stroke="#5f4934" opacity=".28" stroke-width="4"><path d="M75 718q70 18 153 9m-115-31q50 13 97 10m526 0q50 0 97-10m-105 33q54 2 107-12"/></g>
+    <path d="M376 708H584L605 735L480 805L355 735Z" fill="#e6e4d5" stroke="#ad9f83" stroke-width="3"/>
+    <path d="M381 714H579L590 730H369Z" fill="#fffdf0" opacity=".7"/>
     <path d="M0 0H960V760H0Z" fill="url(#vignette)"/>`;
     const uri = svgImage(art);
     backgrounds.set(clubColor, uri);
@@ -106,7 +107,8 @@
   }
 
   // Original rear three-quarter batting stance: helmet, face profile, gripping hands,
-  // tailored jersey, folds, belt, bent legs, shin guard and cleats. Mirroring changes stance.
+  // tailored jersey, folds, belt, bent legs and shin guard. The close camera crops
+  // the shins. From behind the catcher, a right-handed hitter stands on screen LEFT.
   function batter(clubColor, lefty) {
     const key = clubColor + lefty;
     if (hitters.has(key)) return hitters.get(key);
@@ -115,7 +117,7 @@
       <linearGradient id="pants"><stop stop-color="#8d9c9f"/><stop offset=".25" stop-color="#dfe2dc"/><stop offset=".48" stop-color="#c5ceca"/><stop offset=".8" stop-color="#93a2a3"/><stop offset="1" stop-color="#526875"/></linearGradient>
       <linearGradient id="skin"><stop stop-color="#e5bd99"/><stop offset=".5" stop-color="#b88768"/><stop offset="1" stop-color="#725140"/></linearGradient>
       <linearGradient id="bat"><stop stop-color="#b3915f"/><stop offset=".35" stop-color="#ecd2a0"/><stop offset=".7" stop-color="#d0b27c"/><stop offset="1" stop-color="#876542"/></linearGradient>
-    </defs><g ${lefty ? 'transform="translate(960 0) scale(-1 1)"' : ''}>
+    </defs><g ${lefty ? 'transform="translate(960 0) scale(-1 1)"' : ''}><g transform="translate(-410 -334) scale(1.7)">
       <ellipse cx="322" cy="706" rx="98" ry="13" fill="#0a1820" opacity=".36"/>
       <path d="M284 689L194 752L346 735L387 699Z" fill="#16211f" opacity=".14"/>
       <path d="M300 486Q278 510 282 550L270 600L265 674L292 682L313 609L330 565L341 530Z" fill="url(#pants)"/>
@@ -148,18 +150,19 @@
       <path d="M352 402L360 392Q367 390 374 399L377 411L368 421L358 415Z" fill="#dce2d9" stroke="#93a2a6" stroke-width="1.5"/><path d="M344 409L352 399Q359 398 367 409L365 420L357 427L349 422Z" fill="#e0e7df" stroke="#93a2a6" stroke-width="1.5"/>
       <path d="M351 406l9 9m-5-12 10 9m-6-15 11 10M349 418l8 6" fill="none" stroke="#86999f" stroke-width="1.5"/>
       <path d="M302 407Q307 410 315 408" fill="none" stroke="#e6e5d6" stroke-width="3" opacity=".6"/>
-    </g>`;
+    </g></g>`;
     const uri = svgImage(art);
     hitters.set(key, uri);
     return uri;
   }
 
   function pitcher(clubColor, lefty) {
-    return `<g transform="translate(480 385) scale(${lefty ? -1 : 1} 1)">
+    // He faces the camera: his right throwing hand is on screen left.
+    return `<g class="pv-pitcher" transform="translate(${MOUND.x} ${MOUND.y}) scale(${lefty ? MOUND.scale : -MOUND.scale} ${MOUND.scale})">
       <ellipse cy="3" rx="24" ry="5" fill="#25322c" opacity=".4"/>
       <path d="M-8 -38L-12 -18L-18 0L-9 1L2 -18L6 -33M4 -34L12 -17L18 0H26L19 -23L13 -39" fill="#d0d9d5" stroke="#789095" stroke-width="1.4"/>
       <path d="M-19 -3L-9 -2L-8 3H-23ZM18 -3L25 -2L30 3H19Z" fill="#142333"/>
-      <path d="M-12 -66L4 -68L13 -55L13 -35L-6 -32L-13 -46Z" fill="#dbe2d8"/>
+      <path d="M-12 -66L4 -68L13 -55L13 -35L-6 -32L-13 -46Z" fill="${clubColor}" stroke="#e5eddf" stroke-width=".8"/>
       <path d="M-11 -63L-22 -51L-15 -42L-5 -53M5 -64L16 -56L21 -64" fill="none" stroke="${clubColor}" stroke-width="8" stroke-linejoin="round"/>
       <path d="M20 -61L21 -68" stroke="#c8a383" stroke-width="5" stroke-linecap="round"/>
       <path d="M-19 -49L-12 -53L-8 -44L-16 -39Z" fill="#72533c"/>
@@ -167,28 +170,42 @@
       <path d="M-3 -66L-5 -73L3 -76L7 -67Z" fill="#ad896d"/>
       <circle cx="-1" cy="-78" r="7" fill="#c6a483"/>
       <path d="M-8 -79Q-7 -90 2 -86L7 -81L12 -79L3 -77Z" fill="${clubColor}"/>
-      <path d="M-10 -60L-5 -43M3 -61L9 -43" stroke="#7e969a" stroke-width="1.5" opacity=".6"/>
+      <path d="M-10 -60L-5 -43M0 -63L5 -43M-9 -56L7 -58" fill="none" stroke="#f0f1e6" stroke-width="1.5" opacity=".6"/>
+      <path d="M8 -50L10 -41L-4 -38" fill="none" stroke="#071522" stroke-width="2" opacity=".3"/>
     </g>`;
   }
 
   // Shared projection for the zone AND locations. Zone boundaries remain exactly
   // x=.33/.67 and y=.30/.70; the near edge widens slightly with perspective.
+  // Beyond the shadow border, compress the vertical margins so low/high balls
+  // remain readable in the close crop. This changes only their screen position.
   function project(x, y) {
-    const py = 532 + (y - .5) * 420;
-    const width = 410 + (y - .5) * 35;
-    return [480 + (x - .5) * width, py];
+    const py = y < .27 ? 321.7 + (y - .27) * 550 :
+      y > .73 ? 648.3 + (y - .73) * 200 : 485 + (y - .5) * 710;
+    const width = 930 + (y - .5) * 95;
+    return [Math.max(44, Math.min(W-44, 480 + (x - .5) * width)), py];
   }
   const point = (x, y) => project(x, y).map(f).join(',');
+  const zonePath = (x1, y1, x2, y2) => `M${point(x1,y1)}L${point(x2,y1)}L${point(x2,y2)}L${point(x1,y2)}Z`;
 
   function scene(game, pitches, opts) {
     const {batName, pitName, side, pitSide, colors, labels, count} = opts;
     const batColor = color(opts.batColor), pitColor = color(opts.pitColor), parkColor = color(opts.parkColor);
-    const id = 'pv' + (++serial), lefty = side === '좌', release = [pitSide === '좌' ? 459 : 501, 317];
+    const id = 'pv' + (++serial), lefty = side === '좌';
+    const release = [MOUND.x + (pitSide === '좌' ? 21 : -21) * MOUND.scale, MOUND.y - 68 * MOUND.scale];
     const lastIndex = pitches.length - 1, last = pitches[lastIndex];
     // The same pitch object survives commentary/pause rerenders. It only flies once.
     const fly = !!last && deliveries.get(game) !== last;
     deliveries.set(game, last);
-    let grid = '', tracks = '', markers = '';
+    let grid = '', tracks = '', markers = '', highlight = '', cellText = '';
+    if (last && last.res !== 'IBB' && Number.isFinite(last.x) && Number.isFinite(last.y) &&
+        last.x >= .33 && last.x <= .67 && last.y >= .3 && last.y <= .7) {
+      const col = Math.min(2, Math.floor((last.x - .33) / (.34 / 3)));
+      const row = Math.min(2, Math.floor((last.y - .3) / (.4 / 3)));
+      const x = .33 + col * .34 / 3, y = .3 + row * .4 / 3;
+      highlight = `<path class="pv-zone-cell" data-cell="${row+1}-${col+1}" d="${zonePath(x,y,x+.34/3,y+.4/3)}" fill="${color(colors[last.res])}" fill-opacity=".24" stroke="${color(colors[last.res])}" stroke-opacity=".65" stroke-width="2.5"/>`;
+      cellText = ` 최신 투구는 스트라이크 존 ${row+1}행 ${col+1}열.`;
+    }
     for (let i = 1; i < 3; i++) {
       const x = .33 + .34 * i / 3, y = .3 + .4 * i / 3;
       grid += `<path d="M${point(x,.3)}L${point(x,.7)}M${point(.33,y)}L${point(.67,y)}"/>`;
@@ -198,18 +215,28 @@
       const x = Number.isFinite(p.x) ? Math.max(0,Math.min(1,p.x)) : .5;
       const y = Number.isFinite(p.y) ? Math.max(0,Math.min(1,p.y)) : .5;
       const [ex,ey] = project(x,y), latest = i === lastIndex, c = color(colors[p.res]);
-      const curve = `M${release.join(' ')}Q${f(release[0]+(ex-release[0])*.2)} ${f(release[1]+(ey-release[1])*.62)} ${f(ex)} ${f(ey)}`;
-      tracks += `<g fill="none" stroke="${c}" stroke-linecap="round" opacity="${latest ? 1 : .36}">
-        <path d="${curve}" stroke-width="${latest ? 12 : 5}" opacity=".12"/>
-        <path d="${curve}" stroke-width="${latest ? 5 : 2}" opacity=".5"/>
-        <path d="${curve}" stroke="${latest ? '#fff8da' : c}" stroke-width="${latest ? 1.8 : 1.5}"/>
-      </g>`;
-      if (latest && fly) tracks += `<circle class="pv-flight" r="5" fill="#fffdeb" style="offset-path:path('${curve}')"/>`;
+      const cx = release[0]+(ex-release[0])*.2, cy = release[1]+(ey-release[1])*.62;
+      const curve = `M${release.map(f).join(' ')}Q${f(cx)} ${f(cy)} ${f(ex)} ${f(ey)}`;
+      if (latest) {
+        // A tapered ribbon follows the same quadratic as the bright centerline.
+        // It begins at the actual hand, widening from a point to 22 scene units.
+        const length = Math.hypot(ex-cx, ey-cy) || 1, nx = -(ey-cy)/length, ny = (ex-cx)/length;
+        const ribbon = `M${release.map(f).join(' ')}Q${f(cx+nx*4)} ${f(cy+ny*4)} ${f(ex+nx*11)} ${f(ey+ny*11)}L${f(ex-nx*11)} ${f(ey-ny*11)}Q${f(cx-nx*4)} ${f(cy-ny*4)} ${release.map(f).join(' ')}Z`;
+        tracks += `<g class="pv-track-latest">
+          <defs><linearGradient id="${id}-trail" gradientUnits="userSpaceOnUse" x1="${f(release[0])}" y1="${f(release[1])}" x2="${f(ex)}" y2="${f(ey)}"><stop stop-color="${c}" stop-opacity=".12"/><stop offset=".35" stop-color="${c}" stop-opacity=".55"/><stop offset="1" stop-color="${c}" stop-opacity=".95"/></linearGradient></defs>
+          <path d="${ribbon}" fill="${c}" stroke="${c}" stroke-width="12" opacity=".6" filter="url(#${id}-glow)"/>
+          <path d="${ribbon}" fill="url(#${id}-trail)"/>
+          <path d="${curve}" fill="none" stroke="#fff8da" stroke-width="3.5" stroke-linecap="round" opacity=".95"/>
+        </g>`;
+      } else {
+        tracks += `<path class="pv-track-earlier" d="${curve}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" opacity=".28"/>`;
+      }
+      if (latest && fly) tracks += `<circle class="pv-flight" r="7" fill="#fffdeb" style="offset-path:path('${curve}')"/>`;
       markers += `<g class="pv-marker${latest ? ' pv-marker-latest' : ''}" data-pitch="${i+1}">
         <title>${i+1}구 · ${esc(labels[p.res] || p.res)} · ${esc(p.type)} · ${p.velo || 0} km/h</title>
-        ${latest ? `<circle cx="${f(ex)}" cy="${f(ey)}" r="36" fill="${c}" opacity=".16"/><circle cx="${f(ex)}" cy="${f(ey)}" r="33" fill="none" stroke="${c}" stroke-width="1.5" opacity=".9"/>` : ''}
-        <circle cx="${f(ex)}" cy="${f(ey)}" r="${latest ? 26 : 23}" fill="#10202d" stroke="${c}" stroke-width="${latest ? 4 : 3}"/>
-        <text x="${f(ex)}" y="${f(ey+1)}" text-anchor="middle" dominant-baseline="central" font-size="${latest ? 34 : 30}" font-weight="750" fill="#fff">${i+1}</text>
+        ${latest ? `<circle cx="${f(ex)}" cy="${f(ey)}" r="40" fill="${c}" opacity=".16"/><circle cx="${f(ex)}" cy="${f(ey)}" r="36" fill="none" stroke="${c}" stroke-width="2" opacity=".9"/>` : ''}
+        <circle class="pv-marker-disc" cx="${f(ex)}" cy="${f(ey)}" r="${latest ? 29 : 27}" fill="#10202d" stroke="${c}" stroke-width="${latest ? 4 : 3}"/>
+        <text x="${f(ex)}" y="${f(ey+1)}" text-anchor="middle" dominant-baseline="central" font-size="${i+1 > 9 ? 29 : 34}" font-weight="750" fill="#fff">${i+1}</text>
       </g>`;
     });
     const board = `<g font-family="system-ui,sans-serif">
@@ -229,12 +256,15 @@
       <div class="pv-scene-head"><span><i></i> PITCH VIEW</span><span>${game.over ? '경기 종료' : '타석 시점'} <b>·</b> ${esc(side)}타</span></div>
       <svg class="pv-art" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="960" height="760" role="img" aria-labelledby="${id}-title ${id}-desc">
         <title id="${id}-title">${esc(batName)} 타석 · ${esc(side)}타 · 투구 위치</title>
-        <desc id="${id}-desc">홈플레이트 뒤에서 본 야구장. 투수 ${esc(pitName)}, 타자 ${esc(batName)}. ${visiblePitches.length}개의 투구 궤적과 번호. 자세한 결과와 구속은 아래 투구 기록에서 확인할 수 있습니다.</desc>
-        ${image(ballpark(parkColor))}${board}${pitcher(pitColor,pitSide==='좌')}${image(batter(batColor,lefty))}
-        <g class="pv-zone" fill="none"><path d="M${point(.33,.3)}L${point(.67,.3)}L${point(.67,.7)}L${point(.33,.7)}Z" fill="#0a2636" fill-opacity=".16" stroke="#edf7f4" stroke-opacity=".86" stroke-width="2.5"/>
-          <g stroke="#e2efeb" stroke-opacity=".38" stroke-width="1.5">${grid}</g>
-          <path d="M${point(.33,.7)}L453,682M${point(.67,.7)}L507,682" stroke="#e2efeb" stroke-opacity=".22" stroke-dasharray="4 7"/>
-        </g>${tracks}${markers}
+        <desc id="${id}-desc">홈플레이트 뒤에서 본 야구장. 투수 ${esc(pitName)}, 타자 ${esc(batName)}. ${visiblePitches.length}개의 투구 궤적과 번호.${cellText} 자세한 결과와 구속은 아래 투구 기록에서 확인할 수 있습니다.</desc>
+        <defs><filter id="${id}-glow" x="-100%" y="-100%" width="300%" height="300%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="6"/></filter></defs>
+        ${image(ballpark(parkColor))}${board}${pitcher(pitColor,pitSide==='좌')}<g class="pv-batter">${image(batter(batColor,lefty))}</g>
+        <g class="pv-zone" fill="none">
+          <path class="pv-zone-shadow" d="${zonePath(.30,.27,.70,.73)}" stroke="#edf7f4" stroke-opacity=".2" stroke-width="2"/>
+          <path class="pv-zone-border" d="${zonePath(.33,.3,.67,.7)}" fill="#0a2636" fill-opacity=".16" stroke="#edf7f4" stroke-opacity=".9" stroke-width="3"/>
+          ${highlight}<g stroke="#e2efeb" stroke-opacity=".48" stroke-width="2">${grid}</g>
+          <path d="M${point(.33,.7)}L376,708M${point(.67,.7)}L584,708" stroke="#e2efeb" stroke-opacity=".22" stroke-dasharray="4 7"/>
+        </g><g class="pv-tracks">${tracks}</g><g class="pv-markers">${markers}</g>
       </svg>
       <div class="pv-scene-foot"><span>${visiblePitches.length ? `${visiblePitches.length}구 · ${esc(labels[last.res] || last.res)}` : '투구 위치'}<b>${esc(latestText)}</b></span><span class="pv-view-label">HOME PLATE<br><b>01 / ${game.over ? 'FINAL' : 'LIVE'}</b></span></div>
     </div>`;
