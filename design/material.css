@@ -390,3 +390,16 @@ footer{color:var(--md-on-surface-variant)}
 .pv-live-cap .cm-now{color:#fff}.pv-live-cap .cm-prev{color:#7d8b99}
 .pv-live-cap .pv-log{border-top-color:#1f2a35}
 .pv-live-cap .pv-log>div{border-bottom-color:#141c25!important}
+/* game controls on one row: play / step / to end / speed / pinch-hit / tactics (panels open below) */
+.pv-broadcast .live-ctrl{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px}
+.pv-broadcast .live-ctrl>.row{display:contents}
+.pv-broadcast .live-ctrl>.card{flex:1 1 100%;margin-top:4px!important}
+@media(max-width:600px){
+  .pv-broadcast .live-ctrl{flex-wrap:nowrap;overflow-x:auto;gap:4px;padding:8px;scrollbar-width:none}
+  .pv-broadcast .live-ctrl::-webkit-scrollbar{display:none}
+  .pv-broadcast .live-ctrl>.card{flex:0 0 100%}
+  .live-ctrl .btn{flex:none;min-height:32px;padding:4px 8px;font-size:12px;gap:3px}
+  .live-ctrl select{flex:none;min-height:32px;padding:2px 4px;font-size:12px;width:62px}
+  .sbd-line th,.sbd-line td{min-width:16px;padding:3px 2px;font-size:11px}
+}
+@media(max-width:600px){ .live-ctrl .ic{display:none} .live-ctrl .btn{padding:4px 7px} .live-ctrl select{width:56px} }

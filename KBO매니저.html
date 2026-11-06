@@ -852,9 +852,9 @@ function relayHTML(game,feed,M){
 
   const ctrl = game.over ? `<button class="btn primary" onclick="Match.finalize()">✅ 경기 종료 & 결과 반영</button>`
     : `<div class="row" style="gap:6px;flex-wrap:wrap">
-        ${M.paused?`<button class="btn primary" onclick="Match.play()">▶ 재생</button>`:`<button class="btn" onclick="Match.pause()">⏸ 일시정지</button>`}
-        <button class="btn" onclick="Match.stepOne()">⏭ 한 구</button>
-        <button class="btn" onclick="Match.toEnd()">⏩ 끝까지</button>
+        ${M.paused?`<button class="btn primary" onclick="Match.play()"><span class="ic">▶</span> 재생</button>`:`<button class="btn" onclick="Match.pause()"><span class="ic">⏸</span> 일시정지</button>`}
+        <button class="btn" onclick="Match.stepOne()"><span class="ic">⏭</span> 한 구</button>
+        <button class="btn" onclick="Match.toEnd()"><span class="ic">⏩</span> 끝까지</button>
         <select onchange="Match.setSpeed(this.value)">
           <option value="1900" ${M.speed==1900?'selected':''}>느리게</option>
           <option value="1300" ${M.speed==1300?'selected':''}>보통</option>
@@ -866,9 +866,9 @@ function relayHTML(game,feed,M){
   let interv='';
   if(!game.over){
     const btns=[];
-    if(userPitching) btns.push(`<button class="btn" onclick="Match.togglePanel('sub')">🔄 투수 교체</button>`);
-    if(userBatting) btns.push(`<button class="btn" onclick="Match.togglePanel('pinch')">🏏 대타</button>`);
-    btns.push(`<button class="btn" onclick="Match.togglePanel('tac')">🎯 작전</button>`);
+    if(userPitching) btns.push(`<button class="btn" onclick="Match.togglePanel('sub')"><span class="ic">🔄</span> 투수 교체</button>`);
+    if(userBatting) btns.push(`<button class="btn" onclick="Match.togglePanel('pinch')"><span class="ic">🏏</span> 대타</button>`);
+    btns.push(`<button class="btn" onclick="Match.togglePanel('tac')"><span class="ic">🎯</span> 작전</button>`);
     interv = btns.length? `<div class="row" style="margin-top:8px;gap:6px">${btns.join('')}</div>`:'';
     if(M.panel==='sub'&&userPitching){
       const avail=game.availPitchers(USER).sort((x,y)=>K.ovr(y)-K.ovr(x));
