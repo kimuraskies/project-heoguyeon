@@ -47,7 +47,6 @@
       <path d="M-70 12H70M0 -18V42" stroke="#f1f9e8" opacity=".22"/>
       <path d="M-30 23L-110 220H190L30 23Z" fill="url(#beam)"/>
     </g>`;
-    const fielder = (x, y, size) => `<g transform="translate(${x} ${y}) scale(${size})"><ellipse cy="2" rx="10" ry="2.5" fill="#13281c" opacity=".55"/><path d="M-3 -10L-5 0M3 -10L5 0" stroke="#b4c4c0" stroke-width="3"/><path d="M-5 -22L-4 -9H5L5 -22Z" fill="#d0d6cd"/><path d="M-5 -20L-9 -12M5 -20L9 -13" stroke="#c7d0c6" stroke-width="3"/><circle cy="-26" r="3.5" fill="#c6aa85"/><path d="M-4 -27Q0 -32 4 -27Z" fill="${clubColor}"/></g>`;
     const art = `<defs>
       <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#071424"/><stop offset=".6" stop-color="#294656"/><stop offset="1" stop-color="#718282"/></linearGradient>
       <radialGradient id="dusk" cx=".12" cy=".8" r=".8"><stop stop-color="#bdad94" stop-opacity=".36"/><stop offset="1" stop-color="#708b9c" stop-opacity="0"/></radialGradient>
@@ -77,9 +76,6 @@
     <path d="M0 298Q480 224 960 298V339Q480 267 0 339Z" fill="url(#wall)"/>
     <path d="M0 299Q480 225 960 299" fill="none" stroke="#d7b96c" stroke-width="3"/>
     <g stroke="#071e26" stroke-width="2" opacity=".4">${seams}</g>
-    <g fill="#cbd6c9" font-family="system-ui,sans-serif" font-size="13" font-weight="700" letter-spacing="2" opacity=".8">
-      <text x="77" y="313" transform="rotate(-6 77 313)">KBO MANAGER</text><text x="702" y="297" transform="rotate(6 702 297)">PROJECT 허구연</text><text x="466" y="279" font-size="11">122</text>
-    </g>
     <g clip-path="url(#field)"><path d="M0 260H960V760H0Z" fill="url(#grass)"/>${stripes}
       <path d="M-40 344Q480 243 1000 344" fill="none" stroke="#b8aa7d" stroke-width="17" opacity=".65"/>
       <path d="M-50 760L197 456Q290 364 480 340Q670 364 763 456L1010 760Z" fill="url(#clay)"/>
@@ -95,11 +91,11 @@
     <path d="M431 387Q478 400 529 387" fill="none" stroke="#dcc7a0" stroke-opacity=".36" stroke-width="2"/>
     <path d="M471 378H492L494 381H469Z" fill="#e0dfcf"/>
     <g fill="#eeeadd" stroke="#c3bca5"><path d="M237 453L250 447L264 453L250 460Z"/><path d="M472 351L480 348L489 351L480 355Z"/><path d="M698 453L712 447L725 453L712 460Z"/></g>
-    ${fielder(239,347,.64)}${fielder(720,351,.64)}${fielder(474,306,.46)}${fielder(336,408,.84)}${fielder(623,409,.84)}
     <g fill="none" stroke="#e5dbc1" stroke-width="4" opacity=".45"><path d="M85 650L286 662L260 860L-15 840Z"/><path d="M674 662L875 650L975 840L700 860Z"/></g>
     <g fill="none" stroke="#5f4934" opacity=".28" stroke-width="4"><path d="M75 718q70 18 153 9m-115-31q50 13 97 10m526 0q50 0 97-10m-105 33q54 2 107-12"/></g>
     <path d="M376 708H584L605 735L480 805L355 735Z" fill="#e6e4d5" stroke="#ad9f83" stroke-width="3"/>
     <path d="M381 714H579L590 730H369Z" fill="#fffdf0" opacity=".7"/>
+    <g fill="#ffffff" font-family="system-ui,sans-serif" font-size="17" font-weight="900" letter-spacing="1.2"><g transform="rotate(-4 290 276)"><rect x="195" y="263" width="190" height="26" rx="3" fill="#0b2426" stroke="#d7b96c" stroke-width="1.5"/><text x="290" y="282" text-anchor="middle">KBO MANAGER</text></g><g transform="rotate(4 670 276)"><rect x="575" y="263" width="190" height="26" rx="3" fill="#0b2426" stroke="#d7b96c" stroke-width="1.5"/><text x="670" y="282" text-anchor="middle">PROJECT 허구연</text></g></g>
     <path d="M0 0H960V760H0Z" fill="url(#vignette)"/>`;
     const uri = svgImage(art);
     backgrounds.set(clubColor, uri);

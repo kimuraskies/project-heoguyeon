@@ -241,3 +241,6 @@ footer{color:var(--md-on-surface-variant)}
   .pv-flight{display:none;animation:none}
   .pv-broadcast .wp-bar span{transition:none}
 }
+
+/* play result and win probability moved to the right column */
+.pv-side-info{margin-bottom:12px}
