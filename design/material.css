@@ -159,3 +159,85 @@ footer{color:var(--md-on-surface-variant)}
 .profpage{z-index:45}
 .profpage .prof-body{padding:20px}
 .profpage .prof-body h2{font-size:24px}
+
+/* Original pitch view. All type remains system-font and all art is embedded SVG. */
+.pv-broadcast{isolation:isolate;border:1px solid var(--md-outline-variant);background:var(--md-surface-container-low)}
+.pv-scene{position:relative;overflow:hidden;background:#0c1a28;aspect-ratio:24/19}
+.pv-art{display:block;width:100%;height:auto;font-family:var(--md-font)}
+.pv-scene-head,.pv-scene-foot{position:absolute;left:0;right:0;z-index:1;display:flex;justify-content:space-between;pointer-events:none;color:#d9e6e8}
+.pv-scene-head{top:0;padding:16px 18px 35px;background:linear-gradient(#071420c9,transparent);font-size:11px;letter-spacing:.12em}
+.pv-scene-head>span:first-child{display:flex;align-items:center;gap:7px;font-weight:700}
+.pv-scene-head i{width:5px;height:5px;border-radius:50%;background:#b3e2ce;box-shadow:0 0 8px #a8edcf80}
+.pv-scene-head>span:last-child{letter-spacing:.02em;font-size:11px;color:#b4c6d0}
+.pv-scene-head b{padding:0 5px;color:#8396a3}
+.pv-scene-foot{bottom:0;align-items:end;padding:26px 18px 14px;background:linear-gradient(transparent,#071420dd);font-size:11px}
+.pv-scene-foot>span:first-child{display:grid;gap:3px;color:#b9c9cd}
+.pv-scene-foot>span:first-child b{font-size:14px;font-weight:650;color:#f1f4ec;font-variant-numeric:tabular-nums}
+.pv-view-label{text-align:right;font-size:9px;letter-spacing:.13em;line-height:1.65;color:#9db2bd}
+.pv-view-label b{font-size:10px;font-weight:500;color:#d9e4e2}
+.pv-flight{offset-distance:100%;opacity:0;animation:pv-delivery .48s cubic-bezier(.3,.05,.65,1) both}
+@keyframes pv-delivery{0%{offset-distance:0%;opacity:1}88%{opacity:1}100%{offset-distance:100%;opacity:0}}
+.pv-info{padding:17px 18px 14px;background:var(--md-surface-container)}
+.pv-summary-meta{display:flex;justify-content:space-between;gap:12px;color:var(--md-on-surface-variant);font-size:11px;line-height:1.5}
+.pv-summary-meta>span:first-child{letter-spacing:.06em}
+.pv-result{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:19px;line-height:1.5;letter-spacing:-.025em}
+.pv-result>b{font-weight:600;overflow-wrap:anywhere}
+.pv-result-colon{font-weight:400;color:var(--md-outline)}
+.pv-result strong{color:var(--md-primary);font-weight:600}
+.pv-broadcast .wp{padding:13px 0 0;margin-top:12px;border-top:1px solid var(--md-outline-variant)}
+.pv-broadcast .wp-line{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12px;margin-bottom:8px}
+.pv-broadcast .wp-line b{color:var(--md-primary);font-weight:600;margin-right:3px}
+.pv-broadcast .wp-line small{color:var(--md-on-surface-variant);font-size:10px;margin-left:4px;font-weight:400}
+.pv-broadcast .wp-line>strong{font-size:22px;letter-spacing:-.04em;line-height:1;font-weight:650;font-variant-numeric:tabular-nums}
+.pv-broadcast .wp-line>strong small{font-size:13px;margin-left:2px}
+.pv-broadcast .wp-bar{height:4px;background:var(--md-surface-container-highest)}
+.pv-broadcast .wp-bar>span{background:var(--md-primary);border-radius:inherit}
+.pv-wp-note{margin-top:7px;text-align:right;font-size:11px;line-height:1.4;font-variant-numeric:tabular-nums}
+.pv-wp-pending,.pv-flat{color:var(--md-on-surface-variant)}
+.pv-up{color:#a4e4bd}.pv-down{color:#ffb4ab}
+.pv-broadcast .pl-list{display:block;max-height:254px;overflow:auto;padding:0 18px 10px;scrollbar-width:thin;scrollbar-color:var(--md-outline-variant) transparent}
+.pv-pitch-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px}
+.pv-pitch-table caption{text-align:left;padding:14px 0 10px;font-size:12px;font-weight:600;color:var(--md-on-surface)}
+.pv-pitch-table caption span{float:right;font-size:10px;font-weight:400;color:var(--md-on-surface-variant)}
+.pv-pitch-table th{position:sticky;top:0;z-index:1;background:var(--md-surface-container-low);padding:7px 3px;text-align:left;font-size:10px;color:var(--md-on-surface-variant);font-weight:500;border-bottom:1px solid var(--md-outline-variant)}
+.pv-pitch-table th:first-child{width:29px}
+.pv-pitch-table th:nth-child(2){width:25%}
+.pv-pitch-table th:nth-child(3){width:17%}
+.pv-pitch-table th:last-child{width:17%}
+.pv-pitch-table td{padding:9px 3px;border-bottom:1px solid color-mix(in srgb,var(--md-outline-variant) 60%,transparent);text-align:left;line-height:1.3;overflow-wrap:anywhere}
+.pv-pitch-table td b{font-weight:500}
+.pv-pitch-table th:nth-child(3),.pv-pitch-table td:nth-child(3){text-align:right;padding-right:12px}
+.pv-pitch-table th:last-child,.pv-pitch-table td:last-child{text-align:right}
+.pv-pitch-table .pl-latest td{background:color-mix(in srgb,var(--md-primary) 7%,transparent)}
+.pv-pitch-table .pl-latest td b{font-weight:700}
+.pv-pitch-table .pl-no{width:21px;height:21px;border:2px solid var(--pitch);background:#13212d;color:#fff;font-size:11px;box-sizing:border-box}
+.pv-pitch-table .pl-velo{color:var(--md-on-surface);font-weight:600}
+.pv-pitch-table .pl-cnt{font-size:11px;white-space:nowrap;color:var(--md-on-surface-variant)}
+.pl-type{color:var(--md-on-surface-variant);font-size:11px}
+.pv-pitches-empty{padding:18px;color:var(--md-on-surface-variant);font-size:12px}
+.pv-commentary{border-top:1px solid var(--md-outline-variant)}
+.pv-commentary>summary{padding:12px 18px;cursor:pointer;font-size:12px;color:var(--md-on-surface-variant)}
+.pv-commentary .bc-cap{padding:0 18px 16px;min-height:0;background:transparent}
+.pv-commentary .cm-now{font-size:13px;font-weight:500}
+.pv-commentary .cm-prev{font-size:11px}
+.live-main,.live-side{min-width:0}
+@media(min-width:1000px){
+  .live-grid{grid-template-columns:minmax(0,600px) minmax(280px,1fr);gap:0 24px}
+  .live-side{position:sticky;top:16px}
+}
+@media(max-width:600px){
+  .pv-scene-head{padding:12px 12px 30px;font-size:10px}
+  .pv-scene-head>span:last-child{font-size:10px}
+  .pv-scene-foot{padding:24px 12px 11px;font-size:10px}
+  .pv-scene-foot>span:first-child b{font-size:12px}
+  .pv-view-label{font-size:8px}
+  .pv-view-label b{font-size:9px}
+  .pv-info{padding:14px 14px 12px}
+  .pv-result{font-size:18px}
+  .pv-broadcast .pl-list{padding:0 12px 8px}
+  .live-side{margin-top:16px}
+}
+@media(prefers-reduced-motion:reduce){
+  .pv-flight{display:none;animation:none}
+  .pv-broadcast .wp-bar span{transition:none}
+}
