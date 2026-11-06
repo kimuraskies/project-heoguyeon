@@ -422,3 +422,9 @@ body.gate-on{overflow:hidden}
 .gate-note{color:#9fb0c2;font-size:12px;margin:0}
 /* phones: scale the art by width so the whole logo stays in view; the lower part fades into the panel */
 @media(max-aspect-ratio:4/5){ #gate{background-size:255% auto;background-position:52% max(0px,env(safe-area-inset-top,0px))} #gate::before{background:linear-gradient(180deg,rgba(4,8,14,0) 46%,#06090d 70%)} }
+
+/* header: the next step (camp, spring, game, postseason, new season) left of the settings menu */
+.headctrl{display:flex;align-items:center;gap:8px}
+.next-step:empty{display:none}
+.next-cta{white-space:nowrap;font-weight:800}
+@media(max-width:600px){ .next-cta{padding:6px 12px;font-size:13px;min-height:36px} .next-cta .icon{display:none} }

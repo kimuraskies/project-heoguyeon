@@ -345,6 +345,7 @@ function showSetup(){
   ensurePlayers();
   document.getElementById('tabs').hidden=true;
   document.getElementById('teaminfo').innerHTML='<span class="muted">새 커리어</span>';
+  { const ns=document.getElementById('nextStep'); if(ns) ns.innerHTML=''; }
   renderSetup();
 }
 function renderSetup(){

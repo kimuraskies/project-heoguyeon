@@ -292,6 +292,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
     <div class="brand"><span id="brandBadge"></span><div><small id="brandSub">KBO MANAGER 2026</small><b id="brandName">KBO 매니저</b></div></div>
     <div class="teaminfo" id="teaminfo"></div>
     <div class="headctrl">
+      <span id="nextStep" class="next-step"></span>
       <details class="hmenu">
         <summary class="btn" aria-label="설정 메뉴" title="설정"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg><span class="lbl">설정</span></summary>
         <div class="hmenu-list" role="menu">
@@ -1089,6 +1090,8 @@ function render(){
   $("brandBadge").innerHTML = FM.badge(USER,44);
   $("brandName").textContent = `${K.ROSTERS[USER].name} 감독실`;
   $("brandSub").textContent = `${state.year} / CLUB MANAGEMENT`;
+  { const st=standings(), info=heroInfo(st.findIndex(x=>x.t===USER)+1);
+    $("nextStep").innerHTML = (info.cta||"").replace("btn primary hero-cta","btn primary next-cta"); }
   $("teaminfo").innerHTML = `${FM.mgrAvatar(26)} ${FM.esc(state.user.name)} 감독 · <span class="chip team">${phaseLabel()}</span>`;
   // tabs
   $("tabs").innerHTML = TABS.map(([id,ic,lbl])=>`<button class="${currentTab===id?'active':''}" ${currentTab===id?'aria-current="page"':''} onclick="App.tab('${id}')">${FM.icon(ic)}${lbl}${FM.tabBadge(id)}</button>`).join("");
