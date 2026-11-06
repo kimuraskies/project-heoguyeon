@@ -5,6 +5,7 @@
   'use strict';
   const W = 960, H = 760;
   const MOUND = {x:480, y:385, scale:1.45};
+  const ZOOM = .82, BAT_ZOOM = .88;   // < 1 = camera pulled back
   const backgrounds = new Map(), hitters = new Map(), deliveries = new WeakMap();
   let serial = 0;
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -181,6 +182,7 @@
     const width = 930 + (y - .5) * 95;
     return [Math.max(44, Math.min(W-44, 480 + (x - .5) * width)), py];
   }
+  const zoomAt = (x, y, k) => `translate(${x} ${y}) scale(${k}) translate(${-x} ${-y})`;
   const point = (x, y) => project(x, y).map(f).join(',');
   const zonePath = (x1, y1, x2, y2) => `M${point(x1,y1)}L${point(x2,y1)}L${point(x2,y2)}L${point(x1,y2)}Z`;
 
@@ -228,24 +230,13 @@
         tracks += `<path class="pv-track-earlier" d="${curve}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" opacity=".28"/>`;
       }
       if (latest && fly) tracks += `<circle class="pv-flight" r="7" fill="#fffdeb" style="offset-path:path('${curve}')"/>`;
-      markers += `<g class="pv-marker${latest ? ' pv-marker-latest' : ''}" data-pitch="${i+1}">
+      markers += `<g class="pv-marker${latest ? ' pv-marker-latest' : ''}" data-pitch="${i+1}"><g transform="${zoomAt(ex,ey,1/ZOOM)}">
         <title>${i+1}구 · ${esc(labels[p.res] || p.res)} · ${esc(p.type)} · ${p.velo || 0} km/h</title>
         ${latest ? `<circle cx="${f(ex)}" cy="${f(ey)}" r="40" fill="${c}" opacity=".16"/><circle cx="${f(ex)}" cy="${f(ey)}" r="36" fill="none" stroke="${c}" stroke-width="2" opacity=".9"/>` : ''}
         <circle class="pv-marker-disc" cx="${f(ex)}" cy="${f(ey)}" r="${latest ? 29 : 27}" fill="#10202d" stroke="${c}" stroke-width="${latest ? 4 : 3}"/>
         <text x="${f(ex)}" y="${f(ey+1)}" text-anchor="middle" dominant-baseline="central" font-size="${i+1 > 9 ? 29 : 34}" font-weight="750" fill="#fff">${i+1}</text>
-      </g>`;
+      </g></g>`;
     });
-    const board = `<g font-family="system-ui,sans-serif">
-      <path d="M355 136V251M605 136V251" stroke="#273b47" stroke-width="8"/>
-      <rect x="342" y="109" width="276" height="126" rx="3" fill="#0b1721" stroke="#5d7279" stroke-width="3"/>
-      <path d="M346 113H614V132H346Z" fill="${parkColor}"/>
-      <text x="480" y="126" text-anchor="middle" font-size="10" font-weight="700" letter-spacing="3" fill="#f2f2e3">KBO MANAGER</text>
-      <text x="359" y="158" font-size="14" fill="#b6c9ce">${esc(game.a)}</text><text x="597" y="159" text-anchor="end" font-size="22" font-weight="700" fill="#f0db9a">${game.score[game.a]}</text>
-      <text x="359" y="187" font-size="14" fill="#b6c9ce">${esc(game.h)}</text><text x="597" y="188" text-anchor="end" font-size="22" font-weight="700" fill="#f0db9a">${game.score[game.h]}</text>
-      <path d="M357 198H603" stroke="#31434d"/>
-      <text x="359" y="220" font-size="14" fill="#dde8df">${game.inning}${game.half==='top'?'▲':'▼'}</text>
-      <text x="430" y="219" font-size="12" fill="#c9dbce">B ${count.b}　 S ${count.s}　 O ${game.outs}</text>
-    </g>`;
     const visiblePitches = pitches.filter(p => p.res !== 'IBB');
     const latestText = last ? (last.res === 'IBB' ? '고의4구' : `${last.velo || '—'} km/h · ${last.type}`) : '첫 투구 대기';
     return `<div class="pv-scene" data-side="${side}">
@@ -253,13 +244,14 @@
         <title id="${id}-title">${esc(batName)} 타석 · ${esc(side)}타 · 투구 위치</title>
         <desc id="${id}-desc">홈플레이트 뒤에서 본 야구장. 투수 ${esc(pitName)}, 타자 ${esc(batName)}. ${visiblePitches.length}개의 투구 궤적과 번호.${cellText} 자세한 결과와 구속은 아래 투구 기록에서 확인할 수 있습니다.</desc>
         <defs><filter id="${id}-glow" x="-100%" y="-100%" width="300%" height="300%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="6"/></filter></defs>
-        ${image(ballpark(parkColor))}${board}${pitcher(pitColor,pitSide==='좌')}<g class="pv-batter">${image(batter(batColor,lefty))}</g>
+        ${image(ballpark(parkColor))}<g transform="${zoomAt(MOUND.x,MOUND.y,ZOOM)}">${pitcher(pitColor,pitSide==='좌')}</g><g class="pv-batter" transform="${zoomAt(lefty?W-150:150,H,BAT_ZOOM)}">${image(batter(batColor,lefty))}</g>
+        <g class="pv-fore" transform="${zoomAt(MOUND.x,MOUND.y,ZOOM)}">
         <g class="pv-zone" fill="none">
           <path class="pv-zone-shadow" d="${zonePath(.30,.27,.70,.73)}" stroke="#edf7f4" stroke-opacity=".2" stroke-width="2"/>
           <path class="pv-zone-border" d="${zonePath(.33,.3,.67,.7)}" fill="#0a2636" fill-opacity=".16" stroke="#edf7f4" stroke-opacity=".9" stroke-width="3"/>
           ${highlight}<g stroke="#e2efeb" stroke-opacity=".48" stroke-width="2">${grid}</g>
           <path d="M${point(.33,.7)}L376,708M${point(.67,.7)}L584,708" stroke="#e2efeb" stroke-opacity=".22" stroke-dasharray="4 7"/>
-        </g><g class="pv-tracks">${tracks}</g><g class="pv-markers">${markers}</g>
+        </g><g class="pv-tracks">${tracks}</g><g class="pv-markers">${markers}</g></g>
       </svg>
     </div>`;
   }
