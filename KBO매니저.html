@@ -1143,7 +1143,7 @@ function nextSeason(){
 }
 
 // ================= RENDERING =================
-const TABS=[["dash","dashboard","대시보드"],["inbox","inbox","받은편지함"],["feed","feed","피드"],["squad","squad","스쿼드"],["lineup","lineup","라인업"],["train","camp","훈련"],["sched","schedule","일정·경기"],["stand","standings","순위"],["leaders","records","기록실"],["trade","trade","트레이드"],["club","club","구단"]];
+const TABS=[["dash","dashboard","대시보드"],["inbox","inbox","받은편지함"],["feed","feed","피드"],["squad","squad","스쿼드"],["lineup","lineup","라인업"],["tactics","settings","팀 전술"],["train","camp","훈련"],["sched","schedule","일정·경기"],["stand","standings","순위"],["leaders","records","기록실"],["trade","trade","트레이드"],["club","club","구단"]];
 
 function render(){
   FM.ensure();
@@ -1152,22 +1152,24 @@ function render(){
   $("brandBadge").innerHTML = FM.badge(USER,44);
   $("brandName").textContent = `${K.ROSTERS[USER].name} 감독실`;
   $("brandSub").textContent = `${state.year} / CLUB MANAGEMENT`;
-  $("teaminfo").innerHTML = `${FM.esc(state.user.name)} 감독 · <span class="chip team">${phaseLabel()}</span>`;
+  $("teaminfo").innerHTML = `${FM.mgrAvatar(26)} ${FM.esc(state.user.name)} 감독 · <span class="chip team">${phaseLabel()}</span>`;
   // tabs
   $("tabs").innerHTML = TABS.map(([id,ic,lbl])=>`<button class="${currentTab===id?'active':''}" ${currentTab===id?'aria-current="page"':''} onclick="App.tab('${id}')">${FM.icon(ic)}${lbl}${FM.tabBadge(id)}</button>`).join("");
   const v=$("view");
   if(currentTab==="dash") v.innerHTML=renderDash();
   else if(currentTab==="squad") v.innerHTML=renderSquad();
   else if(currentTab==="lineup") v.innerHTML=renderLineup();
+  else if(currentTab==="tactics") v.innerHTML=FM.renderTacticsTab();
   else if(currentTab==="sched") v.innerHTML=renderSched();
   else if(currentTab==="stand") v.innerHTML=renderStand();
   else if(currentTab==="leaders") v.innerHTML=renderLeaders();
   else if(currentTab==="trade") v.innerHTML=renderTrade();
   else if(currentTab==="inbox") v.innerHTML=FM.renderInbox();
   else if(currentTab==="feed") v.innerHTML=FM.renderFeed();
-  else if(currentTab==="club") v.innerHTML=FM.renderClub();
+  else if(currentTab==="club") v.innerHTML=FM.renderClub()+FM.staffCard();
   else if(currentTab==="train") v.innerHTML=FM.renderTraining();
   if($('prematch')) openPreview(); // lineup edits made from the match page
+  FM.refreshProfile();
 }
 function phaseLabel(){
   if(state.phase==="regular"){ const played=state.schedule.slice(0,state.gameIdx).filter(g=>g.home===USER||g.away===USER).length; return `정규시즌 ${played}/${SEASON_GAMES}경기`; }
@@ -1413,7 +1415,7 @@ function renderLineup(){
       <div class="row">${closerSel}</div>
       <div class="hint" style="margin-top:10px">선발은 투구수(체력에 따라 70~112구)나 5실점에서 교체됩니다. 불펜은 능력치 순으로 한 이닝씩 맡고, 지친 투수(컨디션 55% 미만)는 건너뜁니다. 9회 1~3점 차 리드 때 마무리가 등판합니다.</div>
     </div>
-  </div>` + FM.tacticsCard('team') + FM.lineupCard();
+  </div>` + FM.lineupCard();
 }
 
 function renderSched(){
@@ -1694,7 +1696,7 @@ function selfTest(){
 
 // ---------- App API ----------
 const App={
-  tab:(t)=>{currentTab=t;render();},
+  tab:(t)=>{FM.closeProfile();currentTab=t;render();},
   squadView:(v)=>{squadView=v;render();},
   leaderCat:(c)=>{leaderCat=c;render();},
   nextGame:()=>startNextUserGame(),

@@ -128,6 +128,7 @@ function ensure(){
       lastWarn:-99, lastOffer:-99, lastTalk:{}, rt:{}, board:null, fin:null, fired:false, lastChance:false };
     seasonStart(true);
   }
+  if(state.fm.fans==null) state.fm.fans=50;
   if(!state.fm.farmV){ K.TEAM_IDS.forEach(seedFarm); state.fm.farmV=1; }
   if(!state.fm.farmPayV){ const fin=state.fm.fin; if(fin) fin.budget=Math.round(fin.budget+farmOf(USER).reduce((a,p)=>a+(p.sal||0),0)*1.06); state.fm.farmPayV=1; }
 }
@@ -189,6 +190,7 @@ const ACTIONS={
     allPlayers(USER).forEach(p=>{ const k=pers(p).k; addMor(p, (k==='승부욕'||k==='리더형')?3:-3); });
     f.board.conf=clampN(f.board.conf+1,0,100); return '승부욕 강한 선수들은 자극을 받았지만, 일부는 서운해합니다.'; },
   interview(m,a){ return interviewAnswer(a); },
+  press(m,a){ return pressApply(m,a); },
   openClub(){ setTimeout(()=>App.tab('club'),0); return '구단 탭에서 외국인 선수 후보를 확인합니다.'; },
   ok(){ return '확인했습니다.'; }
 };
@@ -203,8 +205,29 @@ function act(id, i){
 const MGR_BG={
   rookie:{label:'신인 감독', d:'코치 경험 없이 바로 지휘봉을 잡았다.', fx:'이사회 신뢰도 50에서 시작', conf:50, mor:0},
   coach: {label:'코치 출신', d:'오랜 코치 경력으로 구단의 신뢰를 받는다.', fx:'이사회 신뢰도 60에서 시작', conf:60, mor:3},
-  legend:{label:'레전드 출신', d:'선수 시절의 명성 덕분에 선수단이 잘 따른다.', fx:'신뢰도 55 · 선수단 사기 +10', conf:55, mor:10}
+  legend:{label:'레전드 출신', d:'선수 시절의 명성 덕분에 선수단이 잘 따른다.', fx:'신뢰도 55 · 선수단 사기 +10', conf:55, mor:10},
+  kbo:   {label:'KBO 전문가', d:'해설·분석가로 KBO 10개 구단을 오래 지켜봤다.', fx:'신뢰도 50 · 상대 팀 분석도 +20%p로 시작', conf:50, mor:0, know:0.2},
+  mlb:   {label:'MLB 전문가', d:'메이저리그 구단 스카우트·코치로 일했다.', fx:'신뢰도 50 · 외국인 후보 6명 · 후보 능력 +3', conf:50, mor:0, fx6:true}
 };
+function mgrBg(){ return MGR_BG[state.user&&state.user.bg]||MGR_BG.coach; }
+// manager portrait: the uploaded photo, or the initial on a club-colored disc
+function mgrAvatar(size, user){
+  const u=user||state.user||{}, z=size||40;
+  if(u.photo) return `<img class="mgr-av" src="${u.photo}" alt="${esc(u.name||'감독')} 사진" style="width:${z}px;height:${z}px">`;
+  const ch=esc(((u.name||'').trim()||'감')[0]);
+  return `<span class="mgr-av" aria-hidden="true" style="width:${z}px;height:${z}px;font-size:${Math.round(z*0.45)}px">${ch}</span>`;
+}
+// shrink an uploaded image to a 160px square JPEG so the save stays small
+function readPhoto(file, done){
+  if(!file||!/^image\//.test(file.type)){ notify('이미지 파일을 골라 주세요.'); return; }
+  const fr=new FileReader();
+  fr.onload=()=>{ const img=new Image(); img.onload=()=>{
+      const z=160, c=document.createElement('canvas'); c.width=c.height=z; const g=c.getContext('2d');
+      const m=Math.min(img.width,img.height); g.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,z,z);
+      done(c.toDataURL('image/jpeg',0.82)); };
+    img.onerror=()=>notify('이미지를 읽지 못했습니다.'); img.src=fr.result; };
+  fr.readAsDataURL(file);
+}
 // readable accent per club (brand colors that are too dark on the dark UI are lifted)
 const TEAM_ACCENT={KIA:'#ea0029',LG:'#c30452','한화':'#fc4e00',SSG:'#ce0e2d','삼성':'#1d6fe0',NC:'#3f6fd1',KT:'#e4002b','롯데':'#d00f31','두산':'#4a5fd6','키움':'#b0123f'};
 // the club seeds the Material 3 palette through data-team (design/material.css); --accent follows its primary role
@@ -221,7 +244,7 @@ function teamPitch(t){
 }
 
 // ---------- new career: manager profile + club selection ----------
-let setup={name:'', bg:'coach', team:null};
+let setup={name:'', bg:'coach', team:null, photo:null};
 function showSetup(){
   ensurePlayers();
   document.getElementById('tabs').hidden=true;
@@ -242,7 +265,7 @@ function renderSetup(){
   const bgOpt=k=>{ const b=MGR_BG[k], sel=setup.bg===k;
     return `<label class="setup-bg${sel?' sel':''}"><input type="radio" name="mgrbg" id="mgrbg-${k}" value="${k}" ${sel?'checked':''} onchange="FM.setupBg('${k}')">
       <span><b>${b.label}</b><br><span class="muted" style="font-size:12px">${b.d}</span><br><span style="font-size:12px;color:var(--accent2)">${b.fx}</span></span></label>`; };
-  const t=setup.team, ready=!!t;
+  const t=setup.team, ready=!!t, me={name:setup.name, photo:setup.photo};
   document.getElementById('view').innerHTML=`
   <style>
     .setup-team{display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-top:4px solid var(--tc);border-radius:10px;padding:12px;cursor:pointer;font:inherit;min-width:0}
@@ -251,44 +274,57 @@ function renderSetup(){
     .setup-bg{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--panel2)}
     .setup-bg.sel{border-color:var(--accent2)}
     .setup-bg input{margin-top:3px}
+    .setup-prof{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start}
+    .setup-photo{display:flex;flex-direction:column;align-items:center;gap:8px}
+    .setup-foot{position:sticky;bottom:0;z-index:5;margin-top:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+    .setup-foot .sum{flex:1 1 240px;min-width:0;display:flex;gap:12px;align-items:center}
+    @media (max-width:560px){ .setup-prof{grid-template-columns:minmax(0,1fr)} .setup-photo{flex-direction:row;flex-wrap:wrap} }
   </style>
   <div class="card" style="margin-top:12px">
     <h3 style="font-size:18px">⚾ 새 커리어 시작 <span class="tag">${state&&state.year||2026} 시즌</span></h3>
-    <div class="hint">감독 프로필을 정하고 지휘할 구단을 고르세요. 구단마다 전력과 이사회 기대치가 다릅니다.</div>
+    <div class="hint">① 감독 프로필을 정하고 ② 지휘할 구단을 고른 뒤 ③ 맨 아래에서 취임하세요. 구단마다 전력과 이사회 기대치가 다릅니다.</div>
   </div>
-  <div class="grid cols2" style="margin-top:14px;align-items:start">
-    <div class="card"><h3>👔 감독 프로필</h3>
-      <label for="mgrname" class="muted" style="font-size:12px">감독 이름</label>
-      <input id="mgrname" maxlength="12" placeholder="예: 김하늘" value="${esc(setup.name)}" oninput="FM.setupName(this.value)" style="width:100%;margin:4px 0 14px;font-size:15px;padding:8px 10px">
-      <div class="muted" style="font-size:12px;margin-bottom:6px">경력</div>
-      <div class="grid" style="gap:8px">${Object.keys(MGR_BG).map(bgOpt).join('')}</div>
-    </div>
-    <div class="card"><h3>🏟 선택한 구단</h3>
-      ${ready? `<div class="row" style="gap:10px"><span class="teamdot" style="width:22px;height:22px;background:${K.ROSTERS[t].color};box-shadow:0 0 0 2px ${TEAM_ACCENT[t]}"></span><b style="font-size:18px">${K.ROSTERS[t].name}</b></div>
-        <div class="muted" style="margin-top:8px">전력 평가 ${ranks[t]}위 · 이사회 목표: <b style="color:var(--txt)">${expectationFor(ranks[t]).label}</b></div>
-        <div class="hint" style="margin-top:6px">${teamPitch(t)}</div>`
-      : '<div class="muted">아래에서 구단을 선택하세요.</div>'}
-      <button class="btn primary" style="margin-top:14px;width:100%;padding:12px;font-size:15px${ready?`;background:${TEAM_ACCENT[t]};border-color:${TEAM_ACCENT[t]}`:''}" ${ready?'':'disabled'} onclick="FM.setupStart()">✍ 감독 취임하기</button>
+  <div class="card" style="margin-top:14px"><h3>① 감독 프로필</h3>
+    <div class="setup-prof">
+      <div class="setup-photo">${mgrAvatar(104,me)}
+        <label class="btn" for="mgrphoto" style="font-size:12px;cursor:pointer">📷 사진 ${setup.photo?'바꾸기':'올리기'}</label>
+        <input id="mgrphoto" type="file" accept="image/*" hidden onchange="FM.setupPhoto(this.files[0])">
+        ${setup.photo?'<button class="btn" style="font-size:12px" onclick="FM.setupPhoto(null)">사진 지우기</button>':'<span class="muted" style="font-size:11px">선택 사항</span>'}
+      </div>
+      <div style="min-width:0">
+        <label for="mgrname" class="muted" style="font-size:12px">감독 이름</label>
+        <input id="mgrname" maxlength="12" placeholder="예: 김하늘" value="${esc(setup.name)}" oninput="FM.setupName(this.value)" style="width:100%;margin:4px 0 14px;font-size:15px;padding:8px 10px">
+        <div class="muted" style="font-size:12px;margin-bottom:6px">경력</div>
+        <div class="grid" style="gap:8px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${Object.keys(MGR_BG).map(bgOpt).join('')}</div>
+      </div>
     </div>
   </div>
-  <div class="card" style="margin-top:14px"><h3>구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
+  <div class="card" style="margin-top:14px"><h3>② 구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">${K.TEAM_IDS.slice().sort((a,b)=>ranks[a]-ranks[b]).map(card).join('')}</div>
+  </div>
+  <div class="card setup-foot">
+    <div class="sum">${mgrAvatar(44,me)}<div style="min-width:0">
+      <b id="setup-sum-name">${esc((setup.name||'').trim()||'무명')} 감독</b> <span class="muted">· ${MGR_BG[setup.bg].label}</span><br>
+      ${ready? `<span class="muted" style="font-size:13px"><span class="teamdot" style="background:${K.ROSTERS[t].color}"></span> ${K.ROSTERS[t].name} · 전력 ${ranks[t]}위 · 목표 ${expectationFor(ranks[t]).label}</span>`
+        : '<span class="muted" style="font-size:13px">위에서 구단을 선택하세요.</span>'}</div></div>
+    <button class="btn primary" style="padding:12px 22px;font-size:15px" ${ready?'':'disabled'} onclick="FM.setupStart()">✍ 감독 취임하기</button>
   </div>`;
 }
 function setupPick(t){ setup.team=t; applyTheme(t); renderSetup(); }
 function setupBg(k){ setup.bg=k; renderSetup(); }
-function setupName(v){ setup.name=v; } // no re-render, so typing keeps focus
+function setupName(v){ setup.name=v; const el=document.getElementById('setup-sum-name'); if(el) el.textContent=((v||'').trim()||'무명')+' 감독'; } // no re-render, so typing keeps focus
+function setupPhoto(file){ if(!file){ setup.photo=null; renderSetup(); return; } readPhoto(file, url=>{ setup.photo=url; renderSetup(); }); }
 function setupStart(){
   if(!setup.team) return;
   const name=(setup.name||'').trim().slice(0,12) || '무명';
   document.getElementById('tabs').hidden=false;
-  beginCareer({name, team:setup.team, bg:setup.bg});
+  beginCareer({name, team:setup.team, bg:setup.bg, photo:setup.photo||null});
 }
 // called by the game once state exists for the new career
 function onCareerStart(){
   ensure();
   seedFAs();
-  send('단장','🔥',`${state.year} 스토브리그가 시작됐습니다`, `개막까지 준비할 시간이 있습니다.\n\n• FA 시장과 외국인 선수 후보는 구단 탭에서\n• 트레이드는 트레이드 탭에서\n• 팀 기본 전술은 라인업 탭에서\n• 전지훈련 방향을 정하면 스프링캠프 → 시범경기 ${SPRING_GAMES}경기 → 정규시즌 개막 순서로 진행됩니다.`, []);
+  send('단장','🔥',`${state.year} 스토브리그가 시작됐습니다`, `개막까지 준비할 시간이 있습니다.\n\n• FA 시장과 외국인 선수 후보는 구단 탭에서\n• 트레이드는 트레이드 탭에서\n• 타순·로테이션은 라인업 탭, 팀 기본 전술은 팀 전술 탭에서\n• 전지훈련 방향을 정하면 스프링캠프 → 시범경기 ${SPRING_GAMES}경기 → 정규시즌 개막 순서로 진행됩니다.`, []);
   const bonus=(MGR_BG[state.user.bg]||MGR_BG.coach).mor;
   if(bonus) allPlayers(USER).forEach(p=>{ p.mor=clampN(K.mor(p)+bonus,5,99); });
 }
@@ -331,6 +367,7 @@ function seasonStart(first){
   if(first) send('구단주','🤝',`${state.user.name} 감독님, ${K.ROSTERS[USER].name}에 오신 것을 환영합니다`,
     `${state.user.name} 감독님의 취임을 진심으로 환영합니다.\n감독님의 경력(${bg.label})을 믿고 팀을 맡깁니다.\n\n` +
     `받은편지함으로 이사회, 코칭스태프, 선수, 다른 구단의 연락이 옵니다. 결정이 필요한 메시지에는 직접 답해 주세요.`, []);
+  if(first) pressInaug();
 }
 function boardReview(){
   const f=fm(), s=boardStatus(), b=f.board;
@@ -349,7 +386,7 @@ function financeGame(home){
   const teamMor=avgMorale(USER);
   let rev=0.25; // media/sponsorship per game
   if(home){
-    const att=clampN(Math.round(10500 + me.pct*14000 + (teamMor-60)*90 + Math.random()*1500),6000,20500);
+    const att=clampN(Math.round(10500 + me.pct*14000 + (teamMor-60)*90 + (fans()-50)*55 + Math.random()*1500),6000,20500);
     f.attTotal+=att; f.homeGames++; rev+=att*1.6/10000; // avg ticket 1.6만 원
   }
   const exp = payroll(USER)/144 + 1.0; // salaries + operations
@@ -462,6 +499,7 @@ function afterGame(res){
     maybeTradeOffer(ug);
     coachReport(ug);
     maybeMedia(ug);
+    maybePress(ug);
     checkForeignForm(ug);
     if(state.phase==='regular'){
       // a Futures hiccup must never undo the 1군 game that was just recorded
@@ -704,7 +742,7 @@ const FX_NAMES=['로페즈','마르테','브리토','오도넬','헤이워드','
 const FX_MAX=4, FX_SWAPS=2;
 function foreignOf(t){ return allPlayers(t).concat(farmOf(t)).filter(p=>p.f); }
 // `used` is shared across one batch of candidates so two of them never get the same name
-function makeForeign(type, used){
+function makeForeign(type, used, boost){
   used=used||allNames(); let n=FX_NAMES.find(x=>!used.has(x)&&Math.random()<0.3)||FX_NAMES.find(x=>!used.has(x));
   for(let i=0;!n||used.has(n);i++) n='외국인'+R(10,99)+(i>50?i:'');
   used.add(n);
@@ -713,6 +751,7 @@ function makeForeign(type, used){
   if(type==='B'){ const pos=['1B','LF','RF','3B','CF','SS','2B'][R(0,6)];
     p={n, pos, age, con:R(66,84), pow:R(70,92), eye:R(60,80), spd:R(48,80), fld:R(58,80), arm:R(60,82), type:'B'}; }
   else { p={n, role:'SP', age, stu:R(70,86), ctl:R(64,82), mov:R(66,80), sta:R(72,88), type:'P'}; }
+  if(boost) ['con','pow','eye','fld','stu','ctl','mov'].forEach(k=>{ if(p[k]) p[k]=Math.min(99,p[k]+boost); });
   Object.assign(p,{f:1, yrs:1, mor:70, cond:100, inj:0, bench:0, pers:hash(n)%PERS.length});
   p.sal=clampN(Math.round((4+Math.max(0,K.ovr(p)-70)*0.7+Math.random()*3)*10)/10, 5, 18);
   return p;
@@ -720,7 +759,7 @@ function makeForeign(type, used){
 function scoutList(){
   const f=fm(), ug=userGamesPlayed();
   if(!f.scout || f.scout.year!==state.year || ug-f.scout.ug>=20) { const used=allNames(); (f.fa||[]).forEach(x=>used.add(x.p.n));
-    f.scout={year:state.year, ug, list:['P','P','B','B'].map(t=>makeForeign(t,used))}; }
+    f.scout={year:state.year, ug, list:(mgrBg().fx6?['P','P','P','B','B','B']:['P','P','B','B']).map(t=>makeForeign(t,used,mgrBg().fx6?3:0))}; }
   return f.scout.list;
 }
 function fxWindowOpen(){ return state.phase==='stove' || (state.phase==='regular' && userGamesPlayed()<108); }
@@ -820,6 +859,7 @@ function takeJob(t){
   f.fired=false; f.lastChance=false; f.board.conf=50; f.restNext=[]; f.promises=[]; f.offers=null;
   send(`${K.ROSTERS[t].name} 구단주`,'🤝',`${state.user.name} 감독님, ${K.ROSTERS[t].name}에 오신 것을 환영합니다`,
     `${K.ROSTERS[old].name}에서의 경험을 살려 우리 팀을 일으켜 주십시오.\n이사회 목표는 다음 시즌 시작 때 전달됩니다.`, []);
+  pressInaug();
   closeModal(); currentTab='dash'; render();
 }
 
@@ -865,7 +905,7 @@ function curTac(scope){
 // whether the roster suits it and whether the players buy in. The engine scales each plan's
 // effect by that execution (core.js paMods); AI clubs execute at 1.
 const TF_LEARN={atk:['aggr','patient'], run:['aggr'], teamBat:['true'], shift:['dp','infieldIn','deep'], bat:['attack','nibble']};
-const TF_START={rookie:30, coach:45, legend:35}, TF_GAIN=1.2, TF_FORGET=0.25, TF_FLOOR=20, TF_CAMP=20, NEW_GAMES=20;
+const TF_START={rookie:30, coach:45, legend:35, kbo:35, mlb:35}, TF_GAIN=1.2, TF_FORGET=0.25, TF_FLOOR=20, TF_CAMP=20, NEW_GAMES=20;
 function tfState(){
   const f=fm(); if(f.tf) return f.tf;
   // a save from before familiarity existed: plans already in use start half-learned
@@ -875,7 +915,7 @@ function tfState(){
 }
 function activePlans(tac){ tac=tac||(state.cfgs[USER].tac||K.DEFAULT_TAC); return Object.keys(TF_LEARN).filter(k=>TF_LEARN[k].indexOf(String(tac[k]))>=0).map(k=>({k,v:String(tac[k])})); }
 function famOf(k,v){ const t=TF_LEARN[k]&&TF_LEARN[k].indexOf(String(v))>=0? tfState()[k] : null; return t? Math.round(t[String(v)]) : 100; }
-function learnRate(tac){ const c=activePlans(tac).length; return 1/(1+0.2*Math.max(0,c-1)); }
+function learnRate(tac){ const c=activePlans(tac).length; return coachLearn()/(1+0.2*Math.max(0,c-1)); }
 // does the roster suit the plan? 0..100 from the relevant ratings (55 -> 0, 90 -> 100)
 function lineupBats(){ return state.cfgs[USER].lineup.map(n=>findPlayer(USER,n)).filter(Boolean); }
 function rotArms(){ return state.cfgs[USER].rotation.map(n=>findPlayer(USER,n)).filter(Boolean); }
@@ -906,7 +946,7 @@ function execTable(){ const b=buyIn(), t={}; for(const k in TF_LEARN){ t[k]={}; 
 function knowState(){ const f=fm();
   if(!f.know||f.know.year!==state.year){ const old=(f.know&&f.know.n)||{}, n={}; for(const t in old) n[t]=Math.floor(old[t]/2); f.know={year:state.year,n}; }
   return f.know; }
-function knowOf(t){ return clampN(0.15+0.085*(knowState().n[t]||0),0,1); }
+function knowOf(t){ return clampN(0.15+(mgrBg().know||0)+0.085*(knowState().n[t]||0),0,1); }
 function knowTable(){ const o={}; K.TEAM_IDS.forEach(t=>{ if(t!==USER) o[t]=knowOf(t); }); return o; }
 function tacticsAfterGame(res,meet){
   const opp=res.home===USER?res.away:res.home;
@@ -1008,7 +1048,7 @@ function stoveTasks(){
     {done:false, opt:true, t:'외국인 선수', d:`${foreignOf(USER).length}/${FX_MAX}명 · 스토브리그엔 교체 횟수 차감 없음`, go:"App.tab('club')"},
     {done:false, opt:true, t:'트레이드', d:'다른 구단과 협상', go:"App.tab('trade')"},
     {done:!!(f.camp&&f.camp.year===state.year&&f.camp.focus), t:'전지훈련 방향', d: f.camp&&f.camp.year===state.year&&f.camp.focus? CAMP[f.camp.focus].label : '선택 필요', go:"FM.campPicker()"},
-    {done:!!state.cfgs[USER].tac, opt:true, t:'팀 기본 전술', d: state.cfgs[USER].tac? '설정됨' : '라인업 탭', go:"App.tab('lineup')"}
+    {done:!!state.cfgs[USER].tac, opt:true, t:'팀 기본 전술', d: state.cfgs[USER].tac? '설정됨' : '팀 전술 탭', go:"App.tab('tactics')"}
   ];
 }
 function preseasonCard(){
@@ -1111,6 +1151,7 @@ function springSimAll(){
 }
 function openSeason(){
   state.phase='regular';
+  if(state.fm) pressMediaDay();
   K.TEAM_IDS.forEach(t=>allPlayers(t).forEach(p=>{ p.cond=100; }));
   send('KBO','🎉',`${state.year} KBO 정규시즌 개막`, `${state.year} 시즌 144경기 대장정이 시작됩니다. ${K.ROSTERS[USER].name}의 개막전 상대는 ${(()=>{ const g=state.schedule.find(g=>g.home===USER||g.away===USER); return g? K.ROSTERS[g.home===USER?g.away:g.home].name : '-'; })()}입니다.`, []);
   render();
@@ -1164,7 +1205,7 @@ function gameReport(res,kind){
     hrs.length? `홈런: ${hrs.join(', ')}` : ''
   ].filter(Boolean).join('\n');
   feedPush({year:state.year, kind, ug:userGamesPlayed(), won, tie, title:`${tie?'⚖️':won?'🟢':'🔴'} ${head}`, body});
-  if(kind!=='spring') maybeInterview(res, kind, {won, tie, us, th, pog, opp});
+  if(kind!=='spring'){ rivalResult(opp, won, tie); maybeInterview(res, kind, {won, tie, us, th, pog, opp, res}); }
 }
 function maybeInterview(res, kind, x){
   const f=fm(), ug=userGamesPlayed();
@@ -1172,22 +1213,36 @@ function maybeInterview(res, kind, x){
   const rr=recentRecord(), slump=!x.won&&rr.l>=4;
   if(!(big||slump) || (kind!=='ps' && ug-(f.lastInterview||-99)<4)) return;
   if(kind!=='ps') f.lastInterview=ug;
-  const q = slump? `연패가 길어지고 있습니다. 오늘 경기 어떻게 보셨습니까?`
+  const r=x.res||{}, on=K.ROSTERS[x.opp]?K.ROSTERS[x.opp].name:x.opp;
+  const q = slump? pick([`연패가 길어지고 있습니다. 오늘 경기 어떻게 보셨습니까?`, `${rr.l}패째입니다. 분위기 반전 카드가 있습니까?`])
+    : kind==='ps'&&x.won? `포스트시즌 귀중한 승리입니다. 다음 경기 각오는?`
+    : kind==='ps'? `포스트시즌에서 일격을 맞았습니다. 반격의 열쇠는?`
+    : x.won&&r.walkoff? `극적인 끝내기 승리입니다! 마지막 순간 덕아웃 분위기는 어땠나요?`
+    : x.won&&x.th===0? `${on} 타선을 완벽히 봉쇄했습니다. 마운드 운영을 평가해 주시죠.`
+    : x.won&&x.us>=10? `타선이 ${x.us}점을 뽑았습니다. 타격감이 절정인데요?`
+    : x.won&&(r.innings||9)>9? `${r.innings}회 연장 혈투 끝의 승리입니다. 소감은?`
     : x.won? `오늘 승리의 원동력은 무엇이라고 보십니까?${x.pog?` 특히 ${x.pog.n} 선수의 활약이 돋보였는데요.`:''}`
+    : r.walkoff? `끝내기로 경기를 내줬습니다. 마지막 승부처를 돌아본다면?`
     : `아쉬운 패배입니다. 패인을 꼽으신다면?`;
   const acts = x.won
     ? [{label:x.pog?`"${x.pog.n}의 활약이 결정적이었다"`:'"선수들이 잘해줬다"', fn:'interview', arg:{kind:'star', n:x.pog&&x.pog.n}},
        {label:'"모두가 함께 만든 승리"', fn:'interview', arg:{kind:'team'}},
-       {label:'"아직 보완할 점이 많다"', fn:'interview', arg:{kind:'humble'}}]
+       {label:'"아직 보완할 점이 많다"', fn:'interview', arg:{kind:'humble'}},
+       {label:`"팬들의 응원이 만든 승리다"`, fn:'interview', arg:{kind:'fans'}}]
     : [{label:'"패배는 감독 책임"', fn:'interview', arg:{kind:'blame_me'}},
        {label:'"선수들을 믿는다, 반등할 것"', fn:'interview', arg:{kind:'back'}},
-       {label:'"이런 경기력으론 안 된다"', fn:'interview', arg:{kind:'call_out'}}];
+       {label:'"이런 경기력으론 안 된다"', fn:'interview', arg:{kind:'call_out'}},
+       {label:`"${on}이(가) 잘했다, 인정한다"`, fn:'interview', arg:{kind:'credit'}}];
   acts.push({label:'인터뷰 사양', fn:'interview', arg:{kind:'decline'}});
   send('구단 홍보팀','🎙',`경기 후 인터뷰 요청 — ${x.won?'승리':'패배'} ${x.us}:${x.th} vs ${x.opp}`, `방송사 인터뷰 요청이 왔습니다.\n\n기자: "${q}"\n\n답변은 선수단 사기와 이사회·팬 여론에 영향을 줍니다.`, acts);
 }
 function interviewAnswer(a){
   const f=fm(), all=allPlayers(USER);
+  const fx={star:1, team:1, humble:0, fans:4, blame_me:1, back:1, call_out:-2, credit:1}[a.kind];
+  addFans(fx==null? -1 : fx);
   switch(a.kind){
+    case 'fans': all.forEach(x=>addMor(x,1)); return '팬들이 감독의 말에 크게 호응했습니다. (팬 여론 +4)';
+    case 'credit': f.board.conf=clampN(f.board.conf+1,0,100); return '상대를 인정하는 품격 있는 답변이라는 평가입니다. (신뢰도 +1)';
     case 'star': { const p=a.n&&findPlayer(USER,a.n); if(p) addMor(p,8); all.forEach(x=>{ if(x!==p) addMor(x,0.5); }); return `${a.n||'선수들'}이(가) 감독의 칭찬에 크게 고무되었습니다.`; }
     case 'team': all.forEach(x=>addMor(x,2.5)); return '선수단 전체가 하나 된 분위기입니다.';
     case 'humble': f.board.conf=clampN(f.board.conf+1,0,100); return '방심하지 않는 자세에 이사회가 좋은 인상을 받았습니다. (신뢰도 +1)';
@@ -1197,6 +1252,229 @@ function interviewAnswer(a){
     default: f.board.conf=clampN(f.board.conf-1,0,100); return '인터뷰를 사양했습니다. 언론과 이사회 반응이 조금 차갑습니다. (신뢰도 -1)';
   }
 }
+// ---------- 인터뷰 · 언론 ----------
+// Every press moment is an inbox question with 3~4 answers. An answer's fx moves morale (whole
+// squad or a group or one player), board confidence, fan support, and can leave a pledge (the
+// season's predicted finish, reviewed at season end) or a declared rival (results vs them move
+// the fans). Answered questions are quoted in the feed under 언론.
+const CITY={KIA:'광주','삼성':'대구',LG:'서울','두산':'서울','키움':'서울',SSG:'인천',KT:'수원','한화':'대전','롯데':'부산',NC:'창원'};
+function fans(){ const f=fm(); if(f.fans==null) f.fans=50; return f.fans; }
+function addFans(d){ const f=fm(); f.fans=clampN(Math.round((fans()+d)*10)/10,0,100); }
+function fansLabel(v){ return v>=80?'열광':v>=62?'뜨거움':v>=40?'보통':v>=22?'싸늘함':'등 돌림'; }
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function pressSend(from, icon, subject, q, opts, note){
+  send(from, icon, subject, `기자: "${q}"\n\n${note||'답변은 선수단 사기, 이사회 인상, 팬 여론에 영향을 줍니다.'}`,
+    opts.map(o=>({label:o.label, fn:'press', arg:{fx:o.fx||{}, say:o.say||'', q, from}})));
+}
+function pressApply(m,a){
+  const f=fm(), fx=a.fx||{}, all=allPlayers(USER), out=[];
+  const grp={all, bat:all.filter(p=>p.type==='B'), pit:all.filter(p=>p.type==='P'), young:all.filter(p=>p.age<=25),
+    vet:all.filter(p=>p.age>=32), fast:all.filter(p=>p.type==='B'&&p.spd>=68), farm:farmOf(USER)};
+  if(fx.mor) for(const g in fx.mor){ (grp[g]||[]).forEach(p=>addMor(p,fx.mor[g])); out.push(`${{all:'선수단',bat:'타자들',pit:'투수진',young:'젊은 선수들',vet:'베테랑',fast:'발 빠른 선수들',farm:'2군 선수들'}[g]} 사기 ${fx.mor[g]>0?'+':''}${fx.mor[g]}`); }
+  if(fx.star){ const p=findPlayer(USER,fx.star.n)||farmOf(USER).find(x=>x.n===fx.star.n); if(p){ addMor(p,fx.star.d); out.push(`${fx.star.n} 사기 ${fx.star.d>0?'+':''}${fx.star.d}`); } }
+  if(fx.conf){ f.board.conf=clampN(f.board.conf+fx.conf,0,100); out.push(`이사회 신뢰도 ${fx.conf>0?'+':''}${fx.conf}`); }
+  if(fx.fans){ addFans(fx.fans); out.push(`팬 여론 ${fx.fans>0?'+':''}${fx.fans}`); }
+  if(fx.pledge){ f.pledge={year:state.year, rank:fx.pledge, label:fx.pledge===1?'정규시즌 1위':fx.pledge+'위 이내'}; out.push(`공약: ${f.pledge.label} (시즌 종료 후 평가)`); }
+  if(fx.rival){ f.rival={year:state.year, t:fx.rival, w:0, l:0}; out.push(`${K.ROSTERS[fx.rival].name}을(를) 라이벌로 지목 — 맞대결 결과가 팬 여론을 움직입니다`); }
+  if(fx.know){ const k=knowState(); k.n[fx.know]=(k.n[fx.know]||0)+2; out.push(`${K.ROSTERS[fx.know].name} 분석도 상승`); }
+  const said=(m.actions.find(x=>x.arg===a)||{}).label||'';
+  feedPush({year:state.year, kind:'press', ug:userGamesPlayed(), title:`🎙 ${m.subject}`,
+    body:`${a.from||m.from}\n\n기자: "${a.q||''}"\n${state.user.name} 감독: ${said}${a.say?'\n\n'+a.say:''}`});
+  return (a.say? a.say+' ' : '') + (out.length? `(${out.join(' · ')})` : '');
+}
+// 1) 취임 기자회견: career start and every new club
+function pressInaug(){
+  const club=K.ROSTERS[USER].name;
+  pressSend('구단 홍보팀','🎙',`취임 기자회견 ② — 어떤 야구를 하실 겁니까?`, `${club}에서 보여주고 싶은 야구는 어떤 모습입니까?`, [
+    {label:'"뛰는 야구, 공격적인 야구를 하겠다"', fx:{mor:{fast:5}, fans:3}, say:'팬들이 화끈한 야구를 기대합니다.'},
+    {label:'"지키는 야구, 마운드가 중심이다"', fx:{mor:{pit:4}}, say:'투수진이 감독의 신뢰를 반깁니다.'},
+    {label:'"데이터와 육성으로 강팀을 만들겠다"', fx:{mor:{young:4, farm:5}, conf:1}, say:'젊은 선수들과 2군이 기회를 기대합니다.'}]);
+  pressSend('구단 홍보팀','🎙',`취임 기자회견 ① — ${club} 감독으로서 첫 목표`, `${state.user.name} 감독님, 취임을 축하드립니다. 첫 시즌 목표를 말씀해 주시죠.`, [
+    {label:'"우승에 도전하겠다"', fx:{fans:8, conf:1, pledge:1}, say:'과감한 출사표에 팬들이 들썩입니다. 다만 결과로 증명해야 합니다.'},
+    {label:'"가을야구가 첫 번째 목표다"', fx:{fans:4, pledge:5}, say:'현실적인 목표라는 평가입니다.'},
+    {label:'"성적보다 팀의 체질을 바꾸겠다"', fx:{fans:-3, mor:{young:5}}, say:'리빌딩 선언에 일부 팬들은 아쉬워합니다.'}],
+    '첫 인상이 중요합니다. 시즌 목표를 공약하면 시즌이 끝난 뒤 평가받습니다.');
+}
+// 2) 개막 미디어데이: when the regular season opens
+function pressMediaDay(){
+  const st=K.TEAM_IDS.filter(t=>t!==USER).sort((a,b)=>teamStrength(b)-teamStrength(a));
+  const stars=allPlayers(USER).slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).slice(0,3);
+  const yr=state.year;
+  pressSend('KBO 미디어데이','🎤',`${yr} 미디어데이 ③ — 꼭 잡고 싶은 팀`, `9개 구단 중 반드시 이기고 싶은 팀을 꼽는다면?`,
+    st.slice(0,3).map(t=>({label:`"${K.ROSTERS[t].name}만큼은 꼭 잡겠다"`, fx:{rival:t, fans:2}, say:`${K.ROSTERS[t].name} 감독도 웃으며 응수했습니다.`}))
+      .concat([{label:'"모든 팀이 어렵다, 한 경기씩 하겠다"', fx:{conf:1}, say:'무난한 답변이었습니다.'}]),
+    '라이벌을 지목하면 맞대결 승패가 팬 여론을 크게 움직입니다.');
+  pressSend('KBO 미디어데이','🎤',`${yr} 미디어데이 ② — 올 시즌 키 플레이어`, `올 시즌 ${K.ROSTERS[USER].name}의 키 플레이어를 한 명 꼽아 주시죠.`,
+    stars.map(p=>({label:`"${p.n}이 해줘야 한다"`, fx:{star:{n:p.n,d:8}, fans:1}, say:`${p.n}이(가) 책임감을 느끼고 있습니다.`}))
+      .concat([{label:'"특정 선수보다 팀 전체다"', fx:{mor:{all:2}}, say:'선수단이 고르게 고무되었습니다.'}]));
+  pressSend('KBO 미디어데이','🎤',`${yr} 미디어데이 ① — 예상 순위`, `${yr} 시즌 개막을 앞두고 각 팀 감독님께 묻습니다. 올 시즌 몇 위를 예상하십니까?`, [
+    {label:'"우리가 우승 후보다"', fx:{fans:6, pledge:1, mor:{all:2}}, say:'자신감 넘치는 출사표가 화제가 됐습니다.'},
+    {label:'"가을야구는 반드시 간다"', fx:{fans:3, pledge:5}, say:'팬들이 기대를 걸고 있습니다.'},
+    {label:'"말을 아끼고 결과로 보여주겠다"', fx:{conf:1}, say:'신중한 답변이었습니다.'}],
+    '여기서 말한 순위는 시즌 종료 후 이사회와 팬이 다시 꺼내 봅니다.');
+}
+// 3) 경기 전 · 5) 구단 자체 · 6) 지역 매체 — spread over the season
+function maybePress(ug){
+  const f=fm(); if(state.phase!=='regular') return;
+  if(ug>=3 && ug-(f.lastPre||-99)>=13 && Math.random()<0.35){ f.lastPre=ug; pressPregame(); return; }
+  if(ug>=8 && ug-(f.lastOwn||-99)>=22 && Math.random()<0.3){ f.lastOwn=ug; pressClubChannel(); return; }
+  if(ug>=12 && ug-(f.lastLocal||-99)>=26 && Math.random()<0.3){ f.lastLocal=ug; pressLocal(); }
+}
+function pressPregame(){
+  const g=nextUserGame(); if(!g) return;
+  const opp=g.home===USER?g.away:g.home, on=K.ROSTERS[opp].name;
+  const sp= typeof projectedSP==='function'? projectedSP(USER) : null;
+  const theirs= typeof projectedSP==='function'? projectedSP(opp) : null;
+  const q = sp&&Math.random()<0.5
+    ? [`다음 경기 선발 ${sp} 선수에게 기대하는 점은?`, [
+        {label:`"${sp}에게 긴 이닝을 맡기겠다"`, fx:{star:{n:sp,d:6}}, say:`${sp}이(가) 의욕을 보입니다.`},
+        {label:'"부담 없이 자기 공만 던지면 된다"', fx:{star:{n:sp,d:3}, mor:{pit:1}}, say:'투수진 분위기가 편안합니다.'},
+        {label:'"불펜까지 총력전으로 간다"', fx:{mor:{pit:2}, fans:1}, say:'불펜 투수들이 각오를 다집니다.'}]]
+    : [`${on}${theirs?` 선발 ${theirs}`:''} 공략법이 있습니까?`, [
+        {label:'"초구부터 적극적으로 치겠다"', fx:{mor:{bat:2}, fans:1}, say:'타자들이 공격적으로 나설 준비를 합니다.'},
+        {label:'"끈질기게 투구수를 늘리겠다"', fx:{know:opp}, say:'전력분석팀이 상대 투수 자료를 더 준비합니다.'},
+        {label:`"${on}은(는) 좋은 팀이다, 존중한다"`, fx:{conf:1}, say:'점잖은 답변이었습니다.'},
+        {label:'"전략은 비밀이다"', fx:{}, say:'기자들이 아쉬워했습니다.'}]];
+  pressSend('방송사 기자','🎙',`경기 전 인터뷰 — ${g.home===USER?'vs':'@'} ${on}`, q[0], q[1], '경기 전 덕아웃 인터뷰입니다. 3경기 안에 답하지 않으면 넘어갑니다.');
+}
+function pressClubChannel(){
+  const all=allPlayers(USER), club=K.ROSTERS[USER].name;
+  const mood=all.slice().sort((a,b)=>(pers(b).k==='리더형')-(pers(a).k==='리더형')||K.mor(b)-K.mor(a)).slice(0,3);
+  const young=all.filter(p=>p.age<=24).sort((a,b)=>K.ovr(b)-K.ovr(a)).slice(0,3);
+  const bank=[
+    [`(${club} 공식 채널) 팬분들께 한마디 부탁드립니다!`, [
+      {label:'"직관 와주시는 팬들 덕분에 버틴다"', fx:{fans:4}, say:'영상 댓글이 감사 인사로 가득합니다.'},
+      {label:'"더 좋은 경기로 보답하겠다"', fx:{fans:2, mor:{all:1}}, say:'담백한 답변에 응원이 이어집니다.'},
+      {label:'"홈 응원 문화는 우리가 최고다"', fx:{fans:3}, say:'팬들이 자부심을 느낍니다.'}]],
+    [`(${club} 공식 채널) 덕아웃 분위기 메이커는 누구인가요?`,
+      mood.map(p=>({label:`"단연 ${p.n}이다"`, fx:{star:{n:p.n,d:5}, fans:1}, say:`${p.n} 영상 조회수가 폭발했습니다.`}))],
+    [`(${club} 공식 채널) 감독님만의 경기 전 루틴이 있다면?`, [
+      {label:'"이기는 날엔 같은 넥타이를 맨다"', fx:{fans:2}, say:'팬들이 넥타이 색을 추리하기 시작했습니다.'},
+      {label:'"전력분석 자료를 세 번 읽는다"', fx:{fans:1, conf:1}, say:'성실한 모습이 좋은 인상을 줬습니다.'},
+      {label:'"선수들과 캐치볼을 한다"', fx:{fans:2, mor:{all:1}}, say:'선수들이 웃음을 터뜨렸습니다.'}]]];
+  if(young.length) bank.push([`(${club} 공식 채널) 요즘 눈여겨보는 젊은 선수는?`,
+    young.map(p=>({label:`"${p.n}, 앞으로 더 클 선수다"`, fx:{star:{n:p.n,d:7}, mor:{young:1}}, say:`${p.n}이(가) 영상을 보고 감독실에 인사를 왔습니다.`}))]);
+  const [q,opts]=pick(bank);
+  pressSend('구단 미디어팀','📹',`구단 공식 채널 인터뷰`, q, opts, '구단 유튜브·SNS에 올라가는 인터뷰입니다. 주로 팬 여론에 영향을 줍니다.');
+}
+function pressLocal(){
+  const city=CITY[USER]||'연고지', club=K.ROSTERS[USER].name, farm=farmOf(USER).slice().sort((a,b)=>(b.pot||0)-(a.pot||0)).slice(0,2);
+  const st=standings(), rank=st.findIndex(x=>x.t===USER)+1;
+  const bank=[
+    [`${city} 팬들의 기대가 큽니다. 2군 유망주들에게도 기회가 갈까요?`, [
+      {label:'"2군에서 잘하면 언제든 부른다"', fx:{mor:{farm:6}, fans:2}, say:'퓨처스 선수들이 기사를 돌려 봤다고 합니다.'},
+      {label:'"지금은 성적이 우선이다"', fx:{conf:1, fans:-1}, say:'현실적인 답변이라는 평가입니다.'}].concat(farm.map(p=>(
+      {label:`"${p.n}을(를) 지켜보고 있다"`, fx:{star:{n:p.n,d:8}, fans:1}, say:`${p.n}의 이름이 지역 신문 1면에 실렸습니다.`})))],
+    [`현재 ${rank}위입니다. ${city} 시민들에게 한마디 해 주시죠.`, rank<=5? [
+      {label:'"지금 순위에 만족하지 않는다"', fx:{mor:{all:1}, conf:1}, say:'방심하지 않는 자세가 좋게 비쳤습니다.'},
+      {label:'"올가을 야구장에서 만나자"', fx:{fans:4}, say:'지역 커뮤니티가 들썩입니다.'}] : [
+      {label:'"반드시 반등하겠다, 믿어 달라"', fx:{fans:2, mor:{all:1}}, say:'팬들이 조금 더 기다려 주기로 합니다.'},
+      {label:'"부진은 전적으로 내 책임이다"', fx:{conf:1, fans:1}, say:'책임지는 모습에 여론이 누그러졌습니다.'},
+      {label:'"선수들도 더 분발해야 한다"', fx:{mor:{all:-2}, fans:-1}, say:'선수단 분위기가 조금 무거워졌습니다.'}]],
+    [`${city} 리틀야구 꿈나무들에게 해 주고 싶은 말은?`, [
+      {label:'"야구는 즐겁게 하는 게 먼저다"', fx:{fans:3}, say:'지역 야구계에서 호평이 이어졌습니다.'},
+      {label:'"언젠가 이 구장에서 만나자"', fx:{fans:3, mor:{young:1}}, say:'기사에 꿈나무들의 사진이 함께 실렸습니다.'}]]];
+  const [q,opts]=pick(bank);
+  pressSend(`${city} 지역 매체`,'📰',`지역 매체 인터뷰 — ${city}의 ${club}`, q, opts, '연고지 신문·방송 인터뷰입니다. 팬 여론과 유망주 사기에 영향을 줍니다.');
+}
+// season end: the pledge from the inaugural press conference or media day
+function pledgeReview(){
+  const f=fm(), p=f.pledge; if(!p||p.year!==state.year) return;
+  const rank=standings().findIndex(x=>x.t===USER)+1, met=rank<=p.rank;
+  const dc= met? (p.rank===1?6:3) : (p.rank===1?-4:-3), df= met? (p.rank===1?12:6) : (p.rank===1?-10:-6);
+  f.board.conf=clampN(f.board.conf+dc,0,100); addFans(df);
+  send('스포츠 기자','📰',`공약 점검: "${p.label}" — ${met?'지켰다':'못 지켰다'}`,
+    `${state.user.name} 감독은 시즌 전 "${p.label}"을(를) 공언했습니다. 최종 순위는 ${rank}위입니다.\n\n` +
+    (met? '말한 대로 해냈다는 평가입니다.' : '말이 앞섰다는 비판이 나옵니다.') + `\n이사회 신뢰도 ${dc>0?'+':''}${dc} · 팬 여론 ${df>0?'+':''}${df}`, []);
+  f.pledge=null;
+}
+function rivalResult(opp, won, tie){
+  const f=fm(), r=f.rival; if(!r||r.year!==state.year||r.t!==opp||tie) return;
+  if(won){ r.w++; addFans(1.5); } else { r.l++; addFans(-1.5); }
+}
+// ---------- 코칭스태프 ----------
+// Six 1군 posts. Each coach has a 1~20 quality (a game value, not a judgment of the real person).
+// 수석 speeds up tactical familiarity; 투수·배터리 drive pitcher growth; 타격·수비·주루 drive
+// batter growth. Staff are hired from a pool of free-agent coaches; replacing a coach pays out
+// half his salary plus the new coach's first-year salary (the standing staff is in the operating budget).
+// COACH_REAL: names confirmed in public reports for the 2026 season (role as reported; check the
+// club's official announcement before relying on it). Every other post starts with a fictional
+// coach marked 가상, until the club's official list is filled in here.
+const COACH_ROLES=[['head','수석코치'],['pit','투수코치'],['bat','타격코치'],['fld','수비코치'],['run','주루코치'],['bat2','배터리코치']];
+const COACH_REAL={
+  'LG':{bat:'송지만', fld:'김일경'},          // 2026.7.27 보직 개편 (OSEN)
+  '두산':{bat:'이진영'},                      // 2025.11 1·2군 타격 총괄 선임
+  '키움':{bat:'이용규'}                       // 2026.5.21 1군 타격 코치 이동
+};
+const CO_FAM=['김','이','박','최','정','강','조','윤','장','임','한','오','서','신','권','황','안','송','류','홍'];
+const CO_GIV=['도윤','서준','현우','지훈','건우','우진','민재','태윤','성민','재원','동하','상훈','영재','기현','승호','정민','태호','준혁','진우','경수'];
+function coachName(used){ for(let i=0;i<400;i++){ const n=pick(CO_FAM)+pick(CO_GIV); if(!used.has(n)){ used.add(n); return n; } } return '코치'+R(100,999); }
+function coachQ(seed,lo,hi){ return lo + hash(seed)%(hi-lo+1); }
+function coachSal(q){ return Math.round((0.6+Math.max(0,q-8)*0.22)*10)/10; }
+function makeCoach(role, used, real, team){
+  const n= real || coachName(used);
+  const q= real? coachQ(n+role,11,15) : R(7,17);
+  return {n, role, q, sal:coachSal(q), real:!!real, team:team||null};
+}
+function staffOf(t){
+  const f=fm(); f.staff=f.staff||{};
+  if(!f.staff[t]){ const used=new Set(), s={};
+    for(const o in f.staff) for(const r in f.staff[o]) used.add(f.staff[o][r].n); // names stay unique league-wide
+    for(const o in COACH_REAL) for(const r in COACH_REAL[o]) used.add(COACH_REAL[o][r]);
+    COACH_ROLES.forEach(([r])=>{ s[r]=makeCoach(r, used, (COACH_REAL[t]||{})[r], t); });
+    f.staff[t]=s; }
+  return f.staff[t];
+}
+function coachPool(){
+  const f=fm();
+  if(!f.coachPool||f.coachPool.year!==state.year){ const used=new Set();
+    K.TEAM_IDS.forEach(t=>{ const s=staffOf(t); for(const r in s) used.add(s[r].n); });
+    const list=[]; COACH_ROLES.forEach(([r])=>{ for(let i=0;i<4;i++) list.push(makeCoach(r,used)); });
+    f.coachPool={year:state.year, list}; }
+  return f.coachPool.list;
+}
+function coachQOf(role){ const c=staffOf(USER)[role]; return c? c.q : 10; }
+function coachMult(q){ return 1+(q-12)*0.04; }   // q 7 -> 0.80, 12 -> 1.00, 17 -> 1.20
+function coachGrow(p, farm){
+  const m = p.type==='P'? coachMult(coachQOf('pit'))*0.75+coachMult(coachQOf('bat2'))*0.25
+    : coachMult(coachQOf('bat'))*0.6+coachMult(coachQOf('fld'))*0.25+coachMult(coachQOf('run'))*0.15;
+  return farm? 1+(m-1)*0.5 : m;  // the 1군 staff only partly reach the farm
+}
+function coachLearn(){ return 1+(coachQOf('head')-12)*0.03; }
+function coachStars(q){ const n=Math.max(1,Math.min(5,Math.round(q/4))); return '★'.repeat(n)+'☆'.repeat(5-n); }
+function staffPayroll(t){ const s=staffOf(t); return Math.round(Object.values(s).reduce((a,c)=>a+c.sal,0)*10)/10; }
+function staffCard(){
+  const s=staffOf(USER), roleL=Object.fromEntries(COACH_ROLES);
+  const fx={head:'전술 숙련 속도', pit:'투수 성장', bat:'타자 성장(타격)', fld:'타자 성장(수비)', run:'타자 성장(주루)', bat2:'투수 성장(배터리)'};
+  const rows=COACH_ROLES.map(([r])=>{ const c=s[r];
+    return `<tr><td>${roleL[r]}</td><td class="name"><b>${esc(c.n)}</b> ${c.real?'<span class="pill pos" title="2026 시즌 공개 보도 기준">실존</span>':'<span class="pill" style="background:var(--panel2);color:var(--dim)">가상</span>'}</td>
+      <td title="${c.q}/20">${coachStars(c.q)}</td><td>${fx[r]} ${(()=>{ const v=Math.round((r==='head'?coachLearn()-1:coachMult(c.q)-1)*100); return (v>=0?'+':'')+v+'%'; })()}</td>
+      <td>${c.sal}억</td><td><button class="btn" style="font-size:12px" onclick="FM.coachPicker('${r}')">교체</button></td></tr>`; }).join('');
+  return `<div class="card" style="margin-top:14px"><h3>🧢 코칭스태프 <span class="tag">연봉 합계 ${staffPayroll(USER)}억</span></h3>
+    <div style="overflow-x:auto"><table><thead><tr><th>보직</th><th class="name">코치</th><th>능력</th><th>효과</th><th>연봉</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="hint" style="margin-top:8px">실존: 2026 시즌 공개 보도로 확인된 코치(보직은 보도 기준). 가상: 구단 공식 명단을 아직 넣지 않은 자리입니다. 코치 능력치는 게임용 수치입니다.</div></div>`;
+}
+function coachPicker(role){
+  const cur=staffOf(USER)[role], roleL=Object.fromEntries(COACH_ROLES)[role];
+  const cands=coachPool().filter(c=>c.role===role);
+  const pay=Math.round(cur.sal*0.5*10)/10;
+  modal(`<span class="closeX" onclick="App.closeModal()">×</span><h2>🧢 ${roleL} 교체</h2>
+    <div class="muted">현재: <b>${esc(cur.n)}</b> ${coachStars(cur.q)} · 연봉 ${cur.sal}억 — 교체 시 위약금 ${pay}억 + 새 코치 첫해 연봉 지급</div>
+    <table style="margin-top:12px"><thead><tr><th class="name">후보 (FA 코치)</th><th>능력</th><th>연봉</th><th></th></tr></thead><tbody>
+    ${cands.map((c,i)=>`<tr><td class="name">${esc(c.n)} <span class="pill" style="background:var(--panel2);color:var(--dim)">가상</span></td><td title="${c.q}/20">${coachStars(c.q)}</td><td>${c.sal}억</td>
+      <td><button class="btn primary" style="font-size:12px" onclick="FM.hireCoach('${role}','${q(c.n)}')">영입</button></td></tr>`).join('')||'<tr><td colspan="4" class="muted">이번 시즌 남은 후보가 없습니다.</td></tr>'}
+    </tbody></table><div class="hint" style="margin-top:8px">후보 명단은 매 시즌 새로 꾸려집니다.</div>`);
+}
+function hireCoach(role, n){
+  const f=fm(), pool=coachPool(), i=pool.findIndex(c=>c.role===role&&c.n===n); if(i<0) return;
+  const s=staffOf(USER), old=s[role], c=pool[i], cost=Math.round((old.sal*0.5+c.sal)*10)/10;
+  if(f.fin.balance-cost < -10){ notify(`잔고가 부족합니다. 필요 금액 ${cost}억 (잔고 ${f.fin.balance.toFixed(1)}억)`); return; }
+  f.fin.balance=Math.round((f.fin.balance-cost)*10)/10; f.fin.exp=(f.fin.exp||0)+cost;
+  pool.splice(i,1); c.team=USER; s[role]=c;
+  if(!old.real) pool.push(Object.assign({},old,{team:null}));
+  send('단장','🧢',`${Object.fromEntries(COACH_ROLES)[role]} 교체: ${old.n} → ${c.n}`, `${c.n} 코치가 ${Object.fromEntries(COACH_ROLES)[role]}로 합류했습니다.\n지출: ${cost}억 원 (위약금 ${Math.round(old.sal*0.5*10)/10}억 + 첫해 연봉 ${c.sal}억)`, []);
+  closeModal(); render();
+}
 let feedFilter='all';
 function setFeedFilter(v){ feedFilter=v; render(); }
 function renderFeed(){
@@ -1205,9 +1483,9 @@ function renderFeed(){
   if(feedFilter!=='all') list=list.filter(x=>x.kind===feedFilter);
   const ft=(id,l)=>`<button class="${feedFilter===id?'active':''}" onclick="FM.setFeedFilter('${id}')">${l}</button>`;
   return `<div class="card"><h3>📰 피드 <span class="tag">경기 리포트 · 최근 160건</span></h3>
-    <div class="tabsm">${ft('all','전체')}${ft('regular','정규시즌')}${ft('ps','포스트시즌')}${ft('spring','시범경기')}</div>
+    <div class="tabsm">${ft('all','전체')}${ft('regular','정규시즌')}${ft('ps','포스트시즌')}${ft('spring','시범경기')}${ft('press','언론')}</div>
     ${list.length? list.slice(0,60).map(x=>`<details style="border-bottom:1px solid var(--line);padding:8px 2px"${x===list[0]?' open':''}>
-      <summary style="cursor:pointer"><b>${esc(x.title)}</b> <span class="muted" style="font-size:12px">· ${x.year} ${x.kind==='spring'?'시범경기':x.kind==='ps'?'포스트시즌':x.ug+'경기'}</span></summary>
+      <summary style="cursor:pointer"><b>${esc(x.title)}</b> <span class="muted" style="font-size:12px">· ${x.year} ${x.kind==='spring'?'시범경기':x.kind==='ps'?'포스트시즌':x.kind==='press'?'언론 · '+x.ug+'경기':x.ug+'경기'}</span></summary>
       <div style="white-space:pre-wrap;line-height:1.65;margin-top:6px;font-size:13.5px;font-variant-numeric:tabular-nums">${esc(x.body)}</div></details>`).join('')
       : '<div class="muted">경기를 치르면 리포트가 쌓입니다.</div>'}</div>`;
 }
@@ -1324,6 +1602,7 @@ function onSeasonEnd(){
   let d = s.met? 15 : -(5+s.gap*3);
   if(champ) d+=25;
   b.conf=clampN(b.conf+d,0,100);
+  pledgeReview();
   send('구단 이사회','🏛',`${state.year} 시즌 최종 평가: ${s.met?'목표 달성':'목표 미달'}`,
     `최종 ${s.rank}위 · 승률 ${fmtAvg(s.pct)} (목표: ${b.expect.label})${champ?'\n🏆 한국시리즈 우승!':''}\n` +
     `재정: 잔고 ${f.fin.balance.toFixed(1)}억 원 · 시즌 수입 ${f.fin.rev.toFixed(1)}억 / 지출 ${f.fin.exp.toFixed(1)}억\n\n이사회 신뢰도: ${b.conf} (${d>=0?'+':''}${d})`, []);
@@ -1557,7 +1836,7 @@ function dashTasks(){
   const tw=tradeWindow(); if(state.phase==='regular'&&tw.open&&tw.daysLeft!=null&&tw.daysLeft<=14) out.push({ic:'trade', t:`트레이드 마감 D-${tw.daysLeft}`, d:`단장 · ${DEADLINE[0]}월 ${DEADLINE[1]}일까지 · 마감이 가까워 제안이 늘어납니다`, a:'트레이드', go:"App.tab('trade')"});
   if(state.phase==='stove' && !camp) out.push({ic:'camp', t:'스프링캠프 방향 선택', d:'수석코치 · '+Object.values(CAMP).map(x=>x.label).join(' / '), a:'훈련 선택', go:"FM.campPicker()"});
   // real decisions only: skip plain acknowledgements, and let press/interview requests lapse after 3 games
-  const now=userGamesPlayed(), PRESS=['media','interview'];
+  const now=userGamesPlayed(), PRESS=['media','interview','press'];
   const open=f.inbox.filter(m=>!m.done&&m.actions.length&&!m.actions.every(a=>a.fn==='ok')
     &&!(m.actions.every(a=>PRESS.includes(a.fn))&&(m.year!==state.year||now-m.ug>3)));
   const rankOf=m=>m.actions.some(a=>PRESS.includes(a.fn))? 1 : 0;
@@ -1571,7 +1850,7 @@ function dashTasks(){
   const tired=allPlayers(USER).filter(p=>!K.isInjured(p)&&K.cond(p)<60&&c.lineup.includes(p.n));
   if(tired.length && !f.autoRest) out.push({ic:'lineup', t:`지친 주전 ${tired.length}명`, d:'수석코치 · '+tired.map(p=>p.n).join(', ')+' · 휴식 권장', a:'라인업 확인', go:"App.tab('lineup')"});
   if(state.phase==='stove'){
-    if(!c.tac) out.push({ic:'settings', t:'팀 기본 전술 정하기', d:'라인업 탭 · 공격·수비·배터리 기본값', a:'전술 설정', go:"App.tab('lineup')"});
+    if(!c.tac) out.push({ic:'settings', t:'팀 기본 전술 정하기', d:'팀 전술 탭 · 공격·수비·배터리 기본값', a:'전술 설정', go:"App.tab('tactics')"});
     out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 외국인 ${foreignOf(USER).length}/${FX_MAX}명 · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
   }
   if(!out.length && inj.length) out.push({ic:'injury', t:`부상자 ${inj.length}명 회복 중`, d:'의무팀 · '+inj.map(p=>`${p.n} (${p.inj})`).join(', '), a:'선수단 보기', go:"App.tab('squad')"});
@@ -1623,6 +1902,16 @@ function dashCards0(){
 }
 
 // ---------- UI: lineup tab card (rest policy) ----------
+// 팀 전술 tab: the team plan, how well the squad knows it, and the opponent file
+function renderTacticsTab(){
+  ensure();
+  const pm = state.pendingGame!=null && typeof pendingMatch==='function' ? pendingMatch() : null;
+  const banner = pm? `<div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between;gap:8px">
+      <div><b>⚾ 경기 대기 중</b> — 경기별 전술은 경기 전 "라인업·전략" 화면에서 따로 바꿀 수 있습니다.</div>
+      <button class="btn primary" onclick="App.startMatch()">경기 준비 화면</button></div></div>` : '';
+  return banner + `<div class="hint" style="margin-bottom:10px">여기서 정한 전술이 매 경기의 기본값입니다. 같은 전술을 오래 쓸수록 선수단 숙련도가 올라 효과가 커집니다.</div>`
+    + tacticsCard('team');
+}
 function lineupCard(){
   ensure();
   const f=fm();
@@ -1647,7 +1936,10 @@ function renderClub(){
     <div class="card"><h3>🏛 이사회 <span class="tag">${state.year} 시즌</span></h3>
       <div class="kpi">
         <div class="k"><div class="v" style="color:${confCol}">${b.conf}</div><div class="l">이사회 신뢰도 · ${confLabel(b.conf)}</div></div>
-        <div class="k"><div class="v">${s.rank}위</div><div class="l">현재 순위 (전력 평가 ${b.strengthRank}위)</div></div></div>
+        <div class="k"><div class="v">${s.rank}위</div><div class="l">현재 순위 (전력 평가 ${b.strengthRank}위)</div></div>
+        <div class="k"><div class="v">${Math.round(fans())}</div><div class="l">팬 여론 · ${fansLabel(fans())}</div></div></div>
+      ${f.pledge&&f.pledge.year===state.year?`<div class="hint" style="margin-top:8px">🎤 공약: <b>${esc(f.pledge.label)}</b> — 시즌 종료 후 평가</div>`:''}
+      ${f.rival&&f.rival.year===state.year?`<div class="hint">⚔ 라이벌 ${K.ROSTERS[f.rival.t].name}: ${f.rival.w}승 ${f.rival.l}패</div>`:''}
       <div style="margin-top:12px">시즌 목표: <b>${esc(b.expect.label)}</b> ${s.met?'<span class="win">✅ 달성 중</span>':'<span style="color:var(--bad)">⚠️ 미달</span>'}</div>
       <div class="progress"><i style="width:${b.conf}%;background:${confCol}"></i></div>
       <div class="hint" style="margin-top:8px">12경기마다 이사회 평가가 받은편지함으로 옵니다. 시즌 종료 시 신뢰도가 15 미만이면 경질됩니다.</div>
@@ -1705,6 +1997,28 @@ function posStars(p){
   }).join(' ');
 }
 function attrRow(label,v){ const a=attr20(v); return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:var(--panel2);border-radius:6px;margin-bottom:5px"><span>${label}</span><b style="color:${attrColor(a)};font-size:16px">${a}</b></div>`; }
+// the profile is its own full-screen page over the current tab (dialogs still open above it)
+function profilePage(team, name, html){
+  if(typeof closeModal==='function') closeModal();
+  let o=document.getElementById('profpage'); const key=team+'|'+name;
+  if(!o){ o=document.createElement('div'); o.id='profpage'; o.className='matchpage profpage';
+    o.setAttribute('role','dialog'); o.setAttribute('aria-modal','true'); o.setAttribute('aria-label','선수 프로필'); document.body.appendChild(o); }
+  const keep=o.dataset.key===key, sc=o.scrollTop; o.dataset.key=key;
+  o.innerHTML=`<div class="mp-wrap"><div class="mp-bar">
+      <button class="btn" onclick="FM.closeProfile()" aria-label="이전 화면으로">← 돌아가기</button>
+      <h2>선수 프로필</h2><small>${teamDot(team)} ${K.ROSTERS[team].name}</small></div>
+    <div class="card prof-body">${html}</div><div style="height:calc(24px + env(safe-area-inset-bottom,0px))"></div></div>`;
+  o.scrollTop= keep? sc : 0;
+}
+function closeProfile(){ const o=document.getElementById('profpage'); if(o&&o.remove) o.remove(); }
+// keep an open profile in step with the game after any change (promotion, trade, release)
+function refreshProfile(){
+  const o=document.getElementById('profpage'); if(!o||!o.dataset||!o.dataset.key||!profKey) return;
+  const t=findTeamOf(profKey[1]); if(!t){ closeProfile(); return; }
+  showProfile(t,profKey[1]);
+}
+if(typeof document!=='undefined'&&document.addEventListener) document.addEventListener('keydown',e=>{
+  if(e.key==='Escape' && !document.querySelector('.modal-bg') && document.getElementById('profpage')) closeProfile(); });
 function showProfile(team,name){
   ensure();
   team = team && K.ROSTERS[team] && findPlayer(team,name) ? team : findTeamOf(name);
@@ -1733,7 +2047,7 @@ function showProfile(team,name){
   const actions = mine&&farm? `<div class="row" style="margin-top:14px;gap:6px">
       <button class="btn primary" ${block?`disabled title="${esc(block)}"`:''} onclick="FM.promote('${q(name)}')">1군 등록</button>
       <button class="btn" onclick="FM.talk('${q(name)}','praise')">👏 칭찬하기</button>
-      <button class="btn" onclick="App.closeModal();App.tab('train')">훈련 설정</button></div>
+      <button class="btn" onclick="FM.closeProfile();App.tab('train')">훈련 설정</button></div>
       ${block?`<div class="hint">${esc(block)}</div>`:''}`
     : mine? `<div class="row" style="margin-top:14px;gap:6px">
       <button class="btn" onclick="FM.talk('${q(name)}','praise')">👏 칭찬하기</button>
@@ -1742,7 +2056,7 @@ function showProfile(team,name){
       <button class="btn" onclick="FM.toggleList('${q(name)}')">${p.listed?'📋 트레이드 리스트 해제':'📋 트레이드 리스트 등록'}</button>
       <button class="btn" onclick="FM.demote('${q(name)}')">2군으로</button>
       <button class="btn" onclick="FM.releasePlayer('${q(name)}')">📤 방출</button></div>` : '';
-  modal(`<span class="closeX" onclick="App.closeModal()">×</span>
+  profilePage(team, name, `
     <div class="row" style="align-items:center;gap:16px;flex-wrap:wrap">
       <div style="width:64px;height:64px;border-radius:50%;background:conic-gradient(${ratColor(o)} ${o}%, var(--panel2) 0);display:flex;align-items:center;justify-content:center">
         <div style="width:52px;height:52px;border-radius:50%;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:${ratColor(o)}">${o}</div></div>
@@ -2096,7 +2410,8 @@ function growChance(t,p){
   const ageF=p.age<=21?0.28 : p.age<=24?0.22 : p.age<=27?0.14 : p.age<=30?0.07 : 0.03;
   const potF=gap<=0? 0 : Math.min(1.2, 0.35+gap/12);
   const play=isFarm(t,p)? 1.15 : (p.bench||0)>=5? 0.7 : 1;
-  return clampN(ageF*potF*I.g*play, 0, 0.9);
+  const staff= t===USER? coachGrow(p, isFarm(t,p)) : 1;
+  return clampN(ageF*potF*I.g*play*staff, 0, 0.9);
 }
 function growLabel(c){ return c>=0.27?['높음','good'] : c>=0.13?['보통','team'] : c>=0.05?['낮음','warn'] : ['정체','bad']; }
 function trainingTick(){
@@ -2184,9 +2499,9 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, showSetup, setupPick, setupBg, setupName, setupStart, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, staffCard, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
-  showProfile, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
+  showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,
   springNext, springPlayNext, springRecord, springSimAll, openSeason, SPRING_GAMES, gameReport, renderFeed, setFeedFilter, logGame, profileTab,
   onRegularSeasonEnd, icon, badge, farmOf, isFarm, entryCount, promote, demote, farmView, renderTraining, setTrain, setTrainAll, setTrFilter, farmGame, trainingTick, starHTML, futures, ENTRY_MAX, dashTasks, dashBrief, psSeriesMessage, psSeriesResult, afterPsGame, takeJob, signFA, fxPick, fxSign, attr20 };

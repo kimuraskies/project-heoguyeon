@@ -151,3 +151,11 @@ footer{color:var(--md-on-surface-variant)}
   .modal{border-radius:24px;padding:20px}
 }
 @media (prefers-reduced-motion:reduce){ .btn,nav.tabs button{transition:none} }
+
+/* manager portrait (photo upload or initial) */
+.mgr-av{display:inline-grid;place-items:center;flex:none;border-radius:50%;object-fit:cover;background:var(--md-primary-container,var(--panel2));color:var(--md-on-primary-container,var(--txt));font-weight:700;box-shadow:0 0 0 2px var(--md-outline-variant,var(--line))}
+.setup-foot{background:var(--md-surface-container-high,var(--panel));box-shadow:0 -4px 16px rgba(0,0,0,.25)}
+/* player profile page: sits above the tab and match pages, under dialogs */
+.profpage{z-index:45}
+.profpage .prof-body{padding:20px}
+.profpage .prof-body h2{font-size:24px}
