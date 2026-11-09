@@ -55,14 +55,12 @@ function resultHTML(res,kind,info,next){
     sps? `<li><span>선발</span><b>${esc(sp)}</b><em>${ipStr(sps.OUT)}이닝 ${sps.ER}자책 ${sps.SO}탈삼진</em></li>` : '',
     hrs.length? `<li><span>홈런</span><b>${esc(hrs.join(', '))}</b></li>` : ''
   ].join('');
-  const fb=window.Feedback&&Feedback.firstAsk? Feedback.firstAsk() : '';
   return `<div class="mp-wrap result-wrap">
     <p class="eyebrow">${esc(label)} · ${home?'홈':'원정'} · 경기 결과</p>
     <h1 class="result-title ${tie?'':won?'win':'loss'}">${tie?'무승부':won?'승리':'패배'}</h1>
     <p class="result-score"><b>${esc(K.ROSTERS[USER].name)}</b> <strong>${us} : ${th}</strong> <b>${esc(K.ROSTERS[opp].name)}</b></p>
     <div class="result-line"><table class="stat-table"><thead><tr><th></th>${head.join('')}<th class="result-r">R</th></tr></thead><tbody>${row(res.away)}${row(res.home)}</tbody></table></div>
     <ul class="result-facts">${facts}</ul>
-    ${fb}
     <section class="result-next"><div><small>다음 할 일</small><b>${esc(info.title)}</b><p class="muted">${info.sub||''}</p></div>
       <div class="result-btns"><button class="btn" onclick="Match.closeResult()">대시보드로</button>${next}</div></section>
   </div>`;
