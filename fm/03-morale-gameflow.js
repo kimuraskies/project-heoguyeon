@@ -52,6 +52,7 @@ function callUp(t,type,pos){
     (off? `\n엔트리 ${ENTRY_MAX}명을 지키려고 부상 중인 ${off.n}을(를) 말소했습니다.` : ''), []); }
   return p;
 }
+function userPlan(){ const pm=state.pendingGame!=null? pendingMatch() : null; if(!pm) return null; return planOf(pm.home===USER?pm.away:pm.home); }
 function prepareCfg(team, cfg){
   ensure();
   const r=K.ROSTERS[team], f=fm();
@@ -62,7 +63,7 @@ function prepareCfg(team, cfg){
   const opts={ restBelow: (!isUser||f.autoRest)? 70 : 0, forceRest: isUser? f.restNext : [] };
   // relievers who joined after the bullpen was set (rookies, call-ups, trades) go to the back of it
   const extraRP=r.pitchers.filter(p=>p.role!=='SP' && p.n!==cfg.closer && (cfg.bullpen||[]).indexOf(p.n)<0).map(p=>p.n);
-  const extra=Object.assign({edge:coachEdge(team)}, isUser? {tacFam:execTable(), scoutKnow:knowTable()} : {tacFam:aiExecTable(team), scoutKnow:aiKnowTable(team)});
+  const extra=Object.assign({edge:coachEdge(team)}, isUser? {tacFam:execTable(), scoutKnow:knowTable(), splits:true, plan:userPlan()} : {tacFam:aiExecTable(team), scoutKnow:aiKnowTable(team)});
   return K.restAdjust(team, Object.assign({}, cfg, extra, {rotation: state.cfgs[team].rotation, bullpen:(cfg.bullpen||[]).concat(extraRP)}), opts);
 }
 // what prepareCfg will change for the user's next game, for the preview screen

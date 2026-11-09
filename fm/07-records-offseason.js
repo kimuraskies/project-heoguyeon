@@ -3,7 +3,7 @@ function logGame(res){
   state.logs=state.logs||{};
   [res.home,res.away].forEach(t=>{
     const opp=t===res.home?res.away:res.home, home=t===res.home, n0=(state.season[t].W+state.season[t].L+state.season[t].T)+1;
-    const push=(n,e)=>{ const k=t+'|'+n, a=state.logs[k]||(state.logs[k]=[]); a.push(e); if(a.length>10) a.shift(); };
+    const push=(n,e)=>{ const k=t+'|'+n, a=state.logs[k]||(state.logs[k]=[]); a.push(e); if(a.length>(t===USER?30:10)) a.shift(); };
     for(const n in res.box[t].bat){ const s=res.box[t].bat[n]; if(s.PA>0) push(n,{g:n0, opp, home, b:[s.PA,s.AB,s.H,s._2B,s._3B,s.HR,s.RBI,s.R,s.BB,s.SO,s.SB]}); }
     for(const n in res.box[t].pit){ const s=res.box[t].pit[n]; if(s.BF>0) push(n,{g:n0, opp, home, p:[s.OUT,s.H,s.ER,s.BB,s.SO,s.HR,s.NP||0,s.W?'W':s.L?'L':s.SV?'S':s.HD?'H':'',s.GS]}); }
   });

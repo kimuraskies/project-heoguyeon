@@ -1,17 +1,20 @@
 // ---------- tactics (team defaults on the lineup tab, per-game on the preview) ----------
-const TAC_NAMES={atk:'타격 성향', run:'주루', bunt:'희생번트', teamBat:'팀배팅', shift:'수비 시프트', bat:'배터리 볼배합', ibb:'고의4구', hook:'투수 교체'};
+const TAC_NAMES={atk:'타격 성향', dir:'타구 방향', run:'도루 성향', adv:'추가 진루', bunt:'희생번트', teamBat:'팀배팅', shift:'수비 위치', bat:'볼배합', pick:'견제', ibb:'고의4구', hook:'투수 교체'};
 const TAC_HELP={
   atk:{normal:'상황에 맞게', aggr:'볼넷↓ 삼진↓ 장타↑ — 제구 좋은 투수 상대로', patient:'볼넷↑ 투구수↑ 삼진↑ — 선발을 일찍 끌어내린다'},
   run:{normal:'발 빠른 주자만 도루', aggr:'도루 시도↑ 병살↓, 성공률은 조금↓', hold:'도루를 거의 하지 않는다'},
   bunt:{normal:'7회 이후 1점 차 이내, 약한 타자만', often:'무사 1·2루에서 하위 타선은 번트', never:'강공만'},
   teamBat:{false:'타자에게 맡긴다', true:'무사 2루에서 진루타 우선 (장타↓ 진루↑)'},
   shift:{normal:'정상 위치', dp:'1루 주자 있을 때 병살↑, 안타 약간↑', infieldIn:'3루 주자 홈 차단, 안타는↑', deep:'2루타↓, 짧은 안타↑'},
-  bat:{normal:'포수 리드에 맡긴다', attack:'볼넷↓ 투구수↓, 피홈런↑', nibble:'피홈런↓ 삼진↑, 볼넷·투구수↑'},
+  bat:{normal:'포수 리드에 맡긴다', attack:'볼넷↓ 투구수↓, 피홈런↑', nibble:'피홈런↓ 삼진↑, 볼넷·투구수↑', inside:'삼진↑ 땅볼↑, 피홈런 조금↑', outside:'피홈런↓, 볼넷·안타 조금↑', breaking:'삼진↑ 피홈런↓, 볼넷↑'},
+  dir:{normal:'타자에게 맡긴다', pull:'장타↑, 안타 조금↓', oppo:'삼진↓ 안타↑, 장타↓'},
+  adv:{normal:'안전한 범위에서', aggr:'1루→3루, 태그업 시도↑, 주루사 위험', hold:'무리하지 않는다'},
+  pick:{normal:'상황에 맞게', often:'상대 도루 시도↓ 성공률↓', rare:'타자에 집중, 상대 도루 성공률↑'},
   ibb:{false:'거르지 않는다', true:'7회 이후 접전, 1루가 비면 강타자를 거른다'},
-  hook:{normal:'투구수 기준 교체', quick:'선발을 일찍 내리고 불펜 가동 (5실점 → 4실점 기준)', long:'선발에게 더 길게 맡긴다'}
+  hook:{normal:'투구수 기준 교체', quick:'선발을 일찍 내리고 불펜 가동 (5실점 → 4실점 기준)', long:'선발에게 더 길게 맡긴다', platoon:'7회 이후 접전에서 타자와 같은 손 불펜 투입', opener:'선발을 2이닝 안팎으로 끊고 불펜으로 이어 간다'}
 };
-const TAC_OPTS={atk:['normal','aggr','patient'], run:['normal','aggr','hold'], bunt:['normal','often','never'], teamBat:[false,true],
-  shift:['normal','dp','infieldIn','deep'], bat:['normal','attack','nibble'], ibb:[false,true], hook:['normal','quick','long']};
+const TAC_OPTS={atk:['normal','aggr','patient'], dir:['normal','pull','oppo'], run:['normal','aggr','hold'], adv:['normal','aggr','hold'], bunt:['normal','often','never'], teamBat:[false,true],
+  shift:['normal','dp','infieldIn','deep'], bat:['normal','attack','nibble','inside','outside','breaking'], pick:['normal','often','rare'], ibb:[false,true], hook:['normal','quick','long','platoon','opener']};
 function tacName(k){ return TAC_NAMES[k]||k; }
 function tacLabel(k,v){
   if(k==='teamBat') return String(v)==='true'?'진루타 우선':'자율';
@@ -25,7 +28,8 @@ function aiTactics(t){
   const pen=r.pitchers.filter(p=>p.role!=='SP').map(K.ovr).sort((a,b)=>b-a).slice(0,4);
   const penAvg=pen.reduce((a,b)=>a+b,0)/Math.max(1,pen.length);
   return {atk:avg('eye')>=74?'patient':avg('pow')>=76?'aggr':'normal', run:avg('spd')>=74?'aggr':avg('spd')<=64?'hold':'normal',
-    bunt:avg('pow')<=68?'often':'normal', teamBat:avg('con')>=74, shift:'normal', bat:'normal', ibb:true, hook:penAvg>=72?'quick':'normal'};
+    bunt:avg('pow')<=68?'often':'normal', teamBat:avg('con')>=74, shift:'normal', bat:'normal', ibb:true, hook:penAvg>=72?'quick':'normal',
+    dir:avg('pow')>=76?'pull':avg('con')>=76?'oppo':'normal', adv:avg('spd')>=74?'aggr':'normal', pick:'normal'};
 }
 function curTac(scope){
   const c=state.cfgs[USER];
@@ -39,10 +43,11 @@ function curTac(scope){
 // once, and fades slowly when unused. How well a plan is carried out in a game also depends on
 // whether the roster suits it and whether the players buy in. The engine scales each plan's
 // effect by that execution (core.js paMods); AI clubs execute at 1.
-const TF_LEARN={atk:['aggr','patient'], run:['aggr'], teamBat:['true'], shift:['dp','infieldIn','deep'], bat:['attack','nibble']};
+const TF_LEARN={atk:['aggr','patient'], run:['aggr'], teamBat:['true'], shift:['dp','infieldIn','deep'], bat:['attack','nibble','inside','outside','breaking'], dir:['pull','oppo'], adv:['aggr'], pick:['often']};
 const TF_START={rookie:30, coach:45, legend:35, kbo:35, mlb:35}, TF_GAIN=1.2, TF_FORGET=0.25, TF_FLOOR=20, TF_CAMP=20, NEW_GAMES=20;
 function tfState(){
-  const f=fm(); if(f.tf) return f.tf;
+  const f=fm();
+  if(f.tf){ for(const k in TF_LEARN){ f.tf[k]=f.tf[k]||{}; TF_LEARN[k].forEach(v=>{ if(f.tf[k][v]==null) f.tf[k][v]=TF_START[state.user&&state.user.bg]||35; }); } return f.tf; }
   // a save from before familiarity existed: plans already in use start half-learned
   const start=TF_START[state.user&&state.user.bg]||35, inUse=new Set(activePlans().map(x=>x.k+':'+x.v)), played=userGamesPlayed()>0;
   f.tf={}; for(const k in TF_LEARN){ f.tf[k]={}; TF_LEARN[k].forEach(v=>f.tf[k][v]= played&&inUse.has(k+':'+v)? 70 : start); }
@@ -159,8 +164,7 @@ function tacticsCard(scope){
   tip+=effectPanel(scope);
   return `<div class="card" style="margin-top:14px${scope==='match'?';background:var(--panel2)':''}"><h3>🎯 ${scope==='match'?'이번 경기 작전':'팀 기본 전술'} <span class="tag">${scope==='match'?'경기 중에도 🎯 작전 버튼으로 변경':'경기 프리뷰에서 경기별로 바꿀 수 있습니다'}</span></h3>
     <div class="grid cols2" style="gap:4px 18px">
-      <div><div style="font-weight:700;margin:2px 0 4px">⚔️ 공격 · 주루</div>${['atk','run','bunt','teamBat'].map(row).join('')}</div>
-      <div><div style="font-weight:700;margin:2px 0 4px">🛡 수비 · 배터리</div>${['shift','bat','ibb','hook'].map(row).join('')}</div>
+      ${[['bat','타격코치',['atk','dir','bunt','teamBat']],['run','주루코치',['run','adv']],['bat2','배터리코치',['bat','pick','ibb']],['pit','투수코치',['hook']],['fld','수비코치',['shift']]].map(([r,l,ks])=>{ const c=staffOf(USER)[r]; return `<div class="tac-coach"><div class="tac-coach-h"><b>${l}</b><small>${esc(c.n)} · 전술 ${coachA(r,'tac')}</small></div>${ks.map(row).join('')}</div>`; }).join('')}
     </div>${tip}</div>`;
 }
 

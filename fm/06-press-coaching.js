@@ -39,6 +39,7 @@ function gameReport(res,kind){
   if(kind!=='spring'){ rivalResult(opp, won, tie); maybeInterview(res, kind, {won, tie, us, th, pog, opp, res}); }
 }
 // the page after a watched game. next: the button to whatever comes after, built by the caller
+function signLine(res){ const l=res.tlog&&res.tlog[USER]; if(!l) return ''; let n=0,m=0; Object.keys(l).forEach(k=>{ n+=l[k][0]; m+=l[k][1]; }); return n? `<p class="hint">이번 경기 작전 ${n}회 시도, ${m}회 성공</p>` : ''; }
 function resultHTML(res,kind,info,next){
   ensure();
   const home=res.home===USER, opp=home?res.away:res.home, us=home?res.homeRuns:res.awayRuns, th=home?res.awayRuns:res.homeRuns;

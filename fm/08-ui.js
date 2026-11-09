@@ -344,8 +344,8 @@ function showProfile(team,name){
       <div class="k"><div class="v" style="font-size:18px">${avgRt}</div><div class="l">평균 평점</div></div>
       <div class="k"><div class="v" style="font-size:18px">${starHTML(p)}</div><div class="l">잠재력</div></div></div>
     ${mine? `<div class="hint" style="margin:-4px 0 12px">훈련: <b>${TR_FOCUS[p.type][tr.f].l}</b> · 강도 ${TR_INT[tr.i].l} · 성장 가능성 ${growLabel(growChance(team,p))[0]} · ${state.year} 성장 +${(p.grow||[]).filter(g=>g[0]===state.year).length}${fl? ' · '+fl : ''}</div>` : ''}
-    <div class="tabsm" style="margin-bottom:12px">${[['overview','개요'],['season',state.year+' 시즌'],['career','통산 기록'],['log','최근 경기']].map(([k,l])=>`<button class="${profTab===k?'active':''}" onclick="FM.profileTab('${k}')">${l}</button>`).join('')}</div>
-    ${profTab==='season'? seasonPanel(team,p) : profTab==='career'? careerPanel(team,p) : profTab==='log'? logPanel(team,p) : `
+    <div class="tabsm" style="margin-bottom:12px">${[['overview','개요'],['season',state.year+' 시즌'],['analysis','분석'],['career','통산 기록'],['log','최근 경기']].map(([k,l])=>`<button class="${profTab===k?'active':''}" onclick="FM.profileTab('${k}')">${l}</button>`).join('')}</div>
+    ${profTab==='season'? seasonPanel(team,p) : profTab==='analysis'? analysisPanel(team,p) : profTab==='career'? careerPanel(team,p) : profTab==='log'? logPanel(team,p) : `
     <div class="grid" style="grid-template-columns:1fr auto;gap:14px;align-items:start" id="profgrid">
       <div>${attrs}<div class="hint">능력치 1~20 (FM 스케일) · 16+ 최상급, 11~15 준수, 6~10 평범, 5 이하 약점</div></div>
       <div style="text-align:center">${rad}</div></div>

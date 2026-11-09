@@ -385,14 +385,24 @@ function positionIssues(teamId, lineup, positions){
 
 // ---- tactics ----
 // atk: 타격 성향, run: 주루, bunt: 희생번트, teamBat: 팀배팅(진루타), shift: 수비 시프트, bat: 배터리 볼배합, ibb: 고의4구, hook: 투수 교체 타이밍
-var DEFAULT_TAC={atk:"normal", run:"normal", bunt:"normal", teamBat:false, shift:"normal", bat:"normal", ibb:false, hook:"normal"};
+var DEFAULT_TAC={atk:"normal", run:"normal", bunt:"normal", teamBat:false, shift:"normal", bat:"normal", ibb:false, hook:"normal", dir:"normal", adv:"normal", pick:"normal"};
+// one-off signs for the next plate appearance. side o = batting team, d = fielding team
+var SIGNS={
+  bunt:{side:'o',l:'희생번트'}, safety:{side:'o',l:'세이프티번트'}, buster:{side:'o',l:'버스터'}, ssq:{side:'o',l:'세이프티 스퀴즈'}, sq:{side:'o',l:'수어사이드 스퀴즈'},
+  hitrun:{side:'o',l:'히트앤런'}, runhit:{side:'o',l:'런앤히트'},
+  steal:{side:'o',l:'2루 도루'}, delay:{side:'o',l:'딜레이드 스틸'}, steal3:{side:'o',l:'3루 도루'}, dsteal:{side:'o',l:'더블스틸'}, shome:{side:'o',l:'홈스틸'},
+  ibb:{side:'d',l:'고의4구'}, pickoff:{side:'d',l:'견제'}, pitchout:{side:'d',l:'피치아웃'}, buntd:{side:'d',l:'번트 수비'}, multi:{side:'d',l:'멀티이닝'}
+};
 var TAC_LABELS={
   atk:{normal:"보통", aggr:"초구부터 적극 타격", patient:"공 많이 보기"},
   run:{normal:"보통", aggr:"적극 주루·도루", hold:"주루 자제"},
   bunt:{normal:"접전 후반만", often:"적극 희생번트", never:"번트 없음"},
   shift:{normal:"정상 수비", dp:"병살 시프트", infieldIn:"전진 수비", deep:"외야 깊게"},
-  bat:{normal:"보통", attack:"정면 승부", nibble:"유인구 위주"},
-  hook:{normal:"보통", quick:"빠른 교체", long:"길게 맡김"}
+  bat:{normal:"보통", attack:"정면 승부", nibble:"유인구 위주", inside:"몸쪽 승부", outside:"바깥쪽 승부", breaking:"변화구 위주"},
+  hook:{normal:"보통", quick:"빠른 교체", long:"길게 맡김", platoon:"좌우 맞춤 교체", opener:"오프너"},
+  dir:{normal:"보통", pull:"당겨치기", oppo:"밀어치기"},
+  adv:{normal:"보통", aggr:"한 베이스 더", hold:"안전 주루"},
+  pick:{normal:"보통", often:"견제 자주", rare:"견제 줄임"}
 };
 function tacOf(cfg){ var t={}, k; for(k in DEFAULT_TAC) t[k]=DEFAULT_TAC[k]; if(cfg&&cfg.tac) for(k in cfg.tac) if(cfg.tac[k]!=null) t[k]=cfg.tac[k]; return t; }
 // throws and bats by name; generated players (draft picks, new imports) get a stable made-up side
@@ -400,6 +410,25 @@ function handsOf(n){
   var h=(typeof HANDS!=='undefined')&&HANDS[n]; if(h) return {t:h[0],b:h[1]};
   var s=0,i; for(i=0;i<n.length;i++) s+=n.charCodeAt(i);
   var m=s%10; return {t:(s*2)%10<3?'좌':'우', b:m<3?'좌':m<4?'양':'우'};
+}
+// pre-game plans against named opponents. plan.vs[name] = {ap:'attack'|'nibble'|'walk', zone:'in'|'out'} for hitters we
+// face, plan.pit[name] = {ap:'first'|'patient', look:'fast'|'break'} for pitchers. Each call only pays off
+// where it fits the player, and only as far as the scouting report reaches (know, 0..1).
+function planMods(m,offPlan,defPlan,batName,pitName,bat,pit,offKnow,defKnow){
+  var d=defPlan&&defPlan.vs&&defPlan.vs[batName], o=offPlan&&offPlan.pit&&offPlan.pit[pitName], k;
+  if(d){ k=defKnow||0;
+    if(d.ap==='attack'){ var a=(70-bat.eye)/100+(70-bat.pow)/100; m.K+=clamp(a,-0.02,0.02)*k; m.BB-=0.008*k; }
+    else if(d.ap==='nibble'){ var n=(70-bat.eye)/60; m.K+=clamp(n,-0.02,0.02)*k; m.BB+=clamp(-n,-0.012,0.012)*k+0.004*k; m.HR-=0.002*k; }
+    if(d.zone==='in'){ m.HR+=clamp((bat.pow-72)/1000,-0.006,0.006)*k; m.BIP-=clamp((72-bat.pow)/1500,-0.006,0.006)*k; }
+    else if(d.zone==='out'){ m.BIP+=clamp((bat.con-72)/1500,-0.006,0.006)*k; m.HR-=0.001*k; }
+  }
+  if(o){ k=offKnow||0;
+    if(o.ap==='first'){ var c=(pit.ctl-70)/70; m.BIP+=clamp(c,-0.01,0.01)*k; m.BB-=0.006*k; }
+    else if(o.ap==='patient'){ var w=(70-pit.ctl)/70; m.BB+=clamp(w,-0.01,0.012)*k; m.K+=0.003*k; }
+    if(o.look==='fast'){ m.K-=clamp((70-pit.stu)/500+0.002,-0.006,0.008)*k; }
+    else if(o.look==='break'){ m.K-=clamp((pit.mov-70)/500,-0.008,0.006)*k; }
+  }
+  return m;
 }
 // same-side matchups favor the pitcher a little, opposite-side the hitter
 function platoon(m,batName,pitName){
@@ -420,6 +449,11 @@ function paMods(offTac, defTac, bases, outs, exO, exD){
   if(offTac.teamBat && bases[1] && !bases[2] && outs===0){ e=exO("teamBat"); m.K-=0.02*e; m.HR-=0.006; m.BIP-=0.006; }
   if(defTac.bat==="attack"){ e=exD("bat"); m.BB-=0.012*e; m.K-=0.004*e; m.HR+=0.003; m.BIP+=0.004; m.HR+=0.003*(1-e); }
   else if(defTac.bat==="nibble"){ e=exD("bat"); m.BB+=0.014; m.K+=0.008*e; m.HR-=0.003*e; m.BIP-=0.004*e; m.BB+=0.008*(1-e); }
+  if(offTac.dir==="pull"){ e=exO("dir"); m.HR+=0.002*e; m.BIP-=0.006*e; m.K+=0.002; }
+  else if(offTac.dir==="oppo"){ e=exO("dir"); m.K-=0.004*e; m.HR-=0.002; m.BIP+=0.004*e; }
+  if(defTac.bat==="inside"){ e=exD("bat"); m.K+=0.005*e; m.BIP-=0.003*e; m.HR+=0.0015; }
+  else if(defTac.bat==="outside"){ e=exD("bat"); m.HR-=0.002*e; m.BB+=0.004; m.BIP+=0.002; }
+  else if(defTac.bat==="breaking"){ e=exD("bat"); m.K+=0.008*e; m.BB+=0.008; m.HR-=0.001*e; }
   if(defTac.shift==="infieldIn" && bases[2] && outs<2) m.BIP+=0.03;
   else if(defTac.shift==="dp" && bases[0] && outs<2) m.BIP+=0.008;
   else if(defTac.shift==="deep"){ e=exD("shift"); m.X2-=0.05*e; m.BIP+=0.012; }
@@ -724,7 +758,9 @@ function InteractiveGame(cfgH, cfgA, opts){
   this.tac=both(function(c){return tacOf(c);});  // live tactics, changeable mid-game
   this.fam=both(function(c){return c.tacFam||null;}); // {tactic:{value:execution 0..1}}; null = fully drilled
   this.know={}; this.know[this.h]=(cfgH.scoutKnow&&cfgH.scoutKnow[this.a])||0; this.know[this.a]=(cfgA.scoutKnow&&cfgA.scoutKnow[this.h])||0;
-  this.cmd=both(function(){return null;});        // one-off order for the next plate appearance: 'bunt' | 'steal' | 'ibb'
+  this.cmd=both(function(){return null;});        // one-off order for the next plate appearance (SIGNS)
+  this.tlog=both(function(){return {};});         // sign -> [tries, successes]
+  this.multi=both(function(){return null;});      // reliever told to go more than one inning
   this.pitcher=both(function(c){return c.spName;}); this.pUsed=both(function(c){return [c.spName];});
   this.pBF=both(function(){return 0;}); this.pRuns=both(function(){return 0;});
   this.ptot=both(function(){return 0;}); this.pstr=both(function(){return 0;}); this.pball=both(function(){return 0;});
@@ -751,7 +787,57 @@ IP.defense=function(t){ return teamDefense(t, this.lineup[t], this.pos[t]); };
 IP.setTac=function(t,k,v){ this.tac[t][k]=v; };
 // how well team t executes its current setting for tactic k (1 = fully drilled)
 IP.ex=function(t,k){ var f=this.fam[t]; if(!f||!f[k]) return 1; var v=f[k][String(this.tac[t][k])]; return v==null? 1 : v; };
-IP.orderCmd=function(t,c){ this.cmd[t]=c; };
+IP.orderCmd=function(t,c){ if(!this.signOK(t,c)) return false; this.cmd[t]=c; return true; };
+// is this sign possible right now, with these runners and outs?
+IP.signOK=function(t,s){ var b=this.bases,o=this.outs,g=SIGNS[s]; if(!g) return false;
+  switch(s){
+    case 'bunt': case 'buster': case 'buntd': return !!(b[0]||b[1])&&o<2;
+    case 'ssq': case 'sq': return !!b[2]&&o<2;
+    case 'hitrun': case 'runhit': case 'steal': case 'delay': return !!b[0]&&!b[1];
+    case 'steal3': return !!b[1]&&!b[2];
+    case 'dsteal': return !!b[0]&&!!b[1]&&!b[2];
+    case 'shome': return !!b[2];
+    case 'pickoff': case 'pitchout': return !!(b[0]||b[1]);
+    default: return true;
+  } };
+IP._log=function(t,s,ok){ var l=this.tlog[t]; if(!l[s]) l[s]=[0,0]; l[s][0]++; if(ok) l[s][1]++; };
+// clubs (and a manager who hasn't called anything) pick their spots
+IP._autoSign=function(off,def,bat){
+  if(this.cfg[off].autoSign===false) return null;
+  var b=this.bases,r=rnd(),diff=this.score[off]-this.score[def],q;
+  if(this.inning>=7&&Math.abs(diff)>=4) return null;
+  if(b[0]&&!b[1]&&this.outs===0&&batValue(bat)<66&&Math.abs(diff)<=2&&r<0.16&&this.tac[off].bunt!=="never") return 'bunt';
+  if(b[0]&&!b[1]&&this.outs<2&&bat.con>=70&&r<0.035) return 'hitrun';
+  if(b[1]&&!b[2]&&this.outs<2){ q=getB(off,b[1].n); if(q&&q.spd>=80&&r<0.03) return 'steal3'; }
+  if(b[0]&&b[1]&&!b[2]){ q=getB(off,b[1].n); if(q&&q.spd>=72&&r<0.02) return 'dsteal'; }
+  if(b[2]&&this.outs<2&&this.inning>=6&&Math.abs(diff)<=1&&batValue(bat)<70&&r<0.12) return 'ssq';
+  if(!b[0]&&!b[1]&&!b[2]&&bat.spd>=82&&r<0.012) return 'safety';
+  return null;
+};
+IP._autoDef=function(off,def){
+  if(this.cfg[def].autoSign===false) return null;
+  var b=this.bases,r=rnd(),q=b[0]&&getB(off,b[0].n); if(!q||b[1]) return null;
+  var pk=this.tac[def].pick, pr=pk==="often"?0.09:pk==="rare"?0.015:0.05;
+  if(q.spd>=76&&r<pr&&this._pickBF!==this.order[off]) return 'pickoff';
+  if(q.spd>=82&&r<pr+0.012) return 'pitchout';
+  return null;
+};
+// the throw that tries to beat a stealing runner: speed, the catcher, the coaches, the call
+IP._stealOdds=function(off,def,p,dcall){
+  var c=this.catcher(def), arm=c? c.arm-posFit(c,'C')*0.5 : 60, pk=this.tac[def].pick;
+  return 0.66 + (p.spd-75)*0.009 - (arm-70)*0.007 + this.edge(off,'run') - this.edge(def,'arm')
+    - (dcall==='pitchout'?0.30:0) - (pk==="often"?0.02:pk==="rare"?-0.02:0);
+};
+IP._signSteal=function(off,def,v,dcall){
+  var b=this.bases, r=v==='steal3'||v==='dsteal'?b[1]:v==='shome'?b[2]:b[0]; if(!r) return null;
+  var p=getB(off,r.n); if(!p) return null;
+  var o=this._stealOdds(off,def,p,dcall);
+  if(v==='delay') o+= p.spd<75? 0.03 : -0.02;
+  if(v==='steal3') o-=0.06; if(v==='dsteal') o-=0.03;
+  if(v==='shome') o=0.18+(p.spd-75)*0.006-(dcall==='pitchout'?0.15:0);
+  var ok=rnd()<clamp(o,0.05,0.93); this._log(off,v,ok);
+  return {runner:r.n, oc:ok?'SB':'CS', variant:v};
+};
 IP.edge=function(t,k){ var e=this.cfg[t].edge; return (e&&e[k])||0; };
 IP.catcher=function(t){ var i=this.pos[t].indexOf('C'); return i>=0? getB(t,this.lineup[t][i]) : null; };
 IP.bench=function(t){var lu=this.lineup[t], gone=this.removed[t];return ROSTERS[t].batters.filter(function(b){return lu.indexOf(b.n)<0 && gone.indexOf(b.n)<0 && !isInjured(b);});};
@@ -761,6 +847,12 @@ IP.subPitcher=function(t,name){ if(this.pUsed[t].indexOf(name)>=0)return false; 
   this._pending=null;
   this.pitcher[t]=name; this.pUsed[t].push(name); this.pBF[t]=0; this.pRuns[t]=0; this.ptot[t]=0; this.pstr[t]=0; this.pball[t]=0;
   this.pOuts[t]=0; this.pInn[t]=this.inning; this.entryLead[t][name]=this.score[t]-this.score[this.opp(t)]; this._ensurePit(t,name); return true;};
+// a faster runner takes over the base and the spot in the order
+IP.pinchRun=function(t,base,name){ var lu=this.lineup[t], r=this.bases[base]; if(!r||lu.indexOf(name)>=0||this.removed[t].indexOf(name)>=0||!getB(t,name)) return false;
+  var i=lu.indexOf(r.n); if(i<0) return false; this._pending=null; this.removed[t].push(lu[i]); lu[i]=name; this.bases[base]={n:name,p:r.p,ue:r.ue}; return true; };
+// a better glove replaces a lineup player at his position
+IP.defSub=function(t,slot,name){ var lu=this.lineup[t]; if(lu.indexOf(name)>=0||this.removed[t].indexOf(name)>=0||!getB(t,name)) return false;
+  this._pending=null; this.removed[t].push(lu[slot]); lu[slot]=name; return true; };
 IP.pinchHit=function(t,name){ var lu=this.lineup[t]; if(lu.indexOf(name)>=0||this.removed[t].indexOf(name)>=0)return false; var p=getB(t,name); if(!p)return false;
   this._pending=null;
   var i=this.order[t]%lu.length; this.removed[t].push(lu[i]); lu[i]=name; return true;}; // the pinch hitter takes over the position too
@@ -785,23 +877,34 @@ IP._autoManage=function(){
   var isSP=p.role==='SP' && this.pitcher[def]===this.sp[def];
   var change=false;
   if(isSP){
-    var hk=this.tac[def].hook, runCap=hk==="quick"?4:hk==="long"?6:5;
+    var hk=this.tac[def].hook, runCap=hk==="quick"||hk==="opener"?4:hk==="long"?6:5;
     change = this.ptot[def]>=pitchLimit(p,hk) || this.pRuns[def]>=runCap || this.pBF[def]>=20+Math.round(p.sta*0.15)+(hk==="long"?3:hk==="quick"?-3:0);
+    if(hk==="opener"&&this.pBF[def]>=10&&this.pOuts[def]>=6) change=true;
   } else {
     // a reliever gets about an inning: swap him at the start of a new inning once he has his three outs
     var newInning = this.outs===0 && !this.bases[0] && !this.bases[1] && !this.bases[2] && this.inning>this.pInn[def];
     change = (newInning && this.pOuts[def]>=3 && this.pitcher[def]!==cfg.closer) || this.pBF[def]>=8 || this.ptot[def]>=35 || this.pRuns[def]>=3;
     if(this.pitcher[def]===cfg.closer && this.inning>=9 && lead>=1 && this.pRuns[def]<2 && this.ptot[def]<35) change=false; // let the closer finish
+    if(this.multi[def]===this.pitcher[def] && this.pBF[def]<14 && this.pRuns[def]<3) change=false;
   }
   if(change){
     var next=nextReliever(def,cfg.bullpen,this.bpIdx[def],this.pUsed[def]);
-    if(next){ this.bpIdx[def]=next.idx; this.subPitcher(def,next.name); }
+    if(next){
+      // a matchup call: late in a close game, take the first reliever on the same side as the hitter
+      if(this.tac[def].hook==="platoon"&&this.inning>=7&&Math.abs(lead)<=2){
+        var due=this.dueBatterName(), side=handsOf(due).b, used=this.pUsed[def];
+        var alt=(cfg.bullpen||[]).filter(function(n){ return used.indexOf(n)<0 && n!==cfg.closer && getP(def,n) && !isInjured(getP(def,n)) && handsOf(n).t===side; })[0];
+        if(alt){ this.subPitcher(def,alt); return; }
+      }
+      this.bpIdx[def]=next.idx; this.subPitcher(def,next.name);
+    }
   }
 };
 IP._endHalf=function(){
   var off=this.offId();
   this.line[off].push(this.runsThisHalf); this.runsThisHalf=0;
   this.bases=[null,null,null]; this.outs=0; this.errOuts=0;
+  this.cmd[this.h]=null; this.cmd[this.a]=null;
   if(this.half==='top'){
     if(this.inning>=9 && this.score[this.h]>this.score[this.a]){ this._finish(this.h); return; }
     this.half='bottom';
@@ -850,18 +953,18 @@ IP._stealTry=function(off,def,forced){
     var diff=this.score[off]-this.score[def];
     if(this.inning>=7 && Math.abs(diff)>=4) return null;
     var run=this.tac[off].run;
-    var tryP = clamp((p.spd-60)*0.011, 0.01, 0.24) * (run==="aggr"?1+0.8*this.ex(off,"run"):run==="hold"?0.25:1);
+    var tryP = 0.9*clamp((p.spd-60)*0.011, 0.01, 0.24) * (run==="aggr"?1+0.8*this.ex(off,"run"):run==="hold"?0.25:1) * (this.tac[def].pick==="often"?0.8:1);
     if(rnd()>=tryP) return null;
   }
-  var c=this.catcher(def), arm=c? c.arm-posFit(c,'C')*0.5 : 60;
-  var ok = rnd() < clamp(0.66 + (p.spd-75)*0.009 - (arm-70)*0.007 - (this.tac[off].run==="aggr"?0.04+0.06*(1-this.ex(off,"run")):0) + this.edge(off,'run') - this.edge(def,'arm'), 0.4, 0.93);
-  return {runner:r.n, oc: ok?'SB':'CS'};
+  var ok = rnd() < clamp(this._stealOdds(off,def,p,this.cmd[def]) - (this.tac[off].run==="aggr"?0.04+0.06*(1-this.ex(off,"run")):0), 0.08, 0.93);
+  this._log(off,'steal',ok);
+  return {runner:r.n, oc: ok?'SB':'CS', variant:'steal'};
 };
 // sacrifice bunt: runner on first or second, nobody out (one out on the dugout's sign), weak bat or a tight late game
 IP._buntCall=function(off,def,bat,slot){
   var b=this.bases, forced=this.cmd[off]==='bunt';
-  if(!(b[0]||b[1]) || this.outs>=2 || (!forced && this.outs>0)) return false;
   if(forced) return true;
+  if(!(b[0]||b[1]) || this.outs>0) return false;
   var mode=this.tac[off].bunt; if(mode==="never") return false;
   var diff=this.score[off]-this.score[def], close=diff<=1&&diff>=-2;
   if(mode==="often") return close && (batValue(bat)<72 || slot>=7) && rnd()<0.6;
@@ -871,6 +974,8 @@ IP._buntCall=function(off,def,bat,slot){
 IP._ibbCall=function(off,def,bat){
   var b=this.bases;
   if(this.cmd[def]==='ibb') return true;
+  var pl=this.cfg[def].plan, one=pl&&pl.vs&&pl.vs[bat.n];
+  if(one&&one.ap==='walk'&&!b[0]&&(b[1]||b[2])&&this.inning>=6&&Math.abs(this.score[def]-this.score[off])<=2) return true;
   if(!this.tac[def].ibb || b[0] || !(b[1]||b[2])) return false;
   var diff=this.score[def]-this.score[off];
   return this.inning>=7 && Math.abs(diff)<=2 && batValue(bat)>=78;
@@ -887,39 +992,78 @@ IP.prepareAB=function(){
     this._pending={kind:'ibb',off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:'IBB',pitches:[{type:'고의4구',velo:0,res:'IBB',x:0.5,y:0.5}],slot:slot};
     return this._pending;
   }
-  if(this._buntCall(off,def,bat,slot)){
-    this.cmd[off]=null;
-    var r=rnd(), boc = r < clamp(0.74+(bat.con-70)*0.004,0.55,0.9) ? 'SAC' : r < 0.95 ? 'FC' : 'BUNT1B';
-    var bp=[]; if(rnd()<0.35) bp.push(makePitch(pit,rnd()<0.5?'B':'F')); bp.push(makePitch(pit,'IP'));
-    this._pending={kind:'bunt',off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:boc,pitches:bp,slot:slot};
+  var self=this, sign=this.cmd[off], dcall=this.cmd[def];
+  if(sign && !this.signOK(off,sign)){ this.cmd[off]=null; sign=null; }   // the runners changed since the call
+  if(dcall && !this.signOK(def,dcall)){ this.cmd[def]=null; dcall=null; }
+  var manual=!!sign;
+  if(!sign) sign=this._autoSign(off,def,bat);
+  if(!dcall) dcall=this._autoDef(off,def);
+  if(dcall==='multi'){ this.multi[def]=this.pitcher[def]; this.cmd[def]=null; dcall=null; }
+  if(dcall==='pickoff'){
+    this.cmd[def]=null; this._pickBF=this.order[off];
+    var pb=this.bases[0]?0:1, pr=this.bases[pb], pq=getB(off,pr.n);
+    var po=pq&&rnd()<clamp(0.05-(pq.spd-70)*0.001+this.edge(def,'arm'),0.01,0.12); this._log(def,'pickoff',po);
+    this._pending={kind:'steal',variant:'pick',from:pb,off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:po?'PO':'PF',runner:pr.n,pitches:[{type:'견제',velo:0,res:'B',x:0.5,y:0.5}],slot:slot};
     return this._pending;
   }
-  var forcedSteal=this.cmd[off]==='steal'; if(forcedSteal) this.cmd[off]=null;
-  var st=this._stealTry(off,def,forcedSteal);
-  if(st){
-    this._pending={kind:'steal',off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:st.oc,runner:st.runner,
-      pitches:[makePitch(pit, rnd()<0.6?'B':'S')],slot:slot};
-    return this._pending;
+  var bd=dcall==='buntd'?0.12:0;
+  function bp(){ var a=[]; if(rnd()<0.35) a.push(makePitch(pit,rnd()<0.5?'B':'F')); a.push(makePitch(pit,'IP')); return a; }
+  function buntPA(boc){ self.cmd[off]=null; if(dcall){ self.cmd[def]=null; }
+    self._pending={kind:'bunt',off:off,def:def,batName:batName,bat:bat,pitName:self.pitcher[def],oc:boc,pitches:bp(),slot:slot}; return self._pending; }
+  var be=this.edge(off,'bat');
+  if(sign==='safety'){ var sOk=rnd()<clamp(0.28+(bat.spd-70)*0.007+(bat.con-70)*0.003+be-bd,0.1,0.55); this._log(off,'safety',sOk);
+    return buntPA(sOk?'BUNT1B':(this.bases[0]||this.bases[1])&&this.outs<2?'SAC':'BOUT'); }
+  if(sign==='ssq'||sign==='sq'){ var qOk=rnd()<clamp((sign==='sq'?0.76:0.62)+(bat.con-70)*0.004+be-bd,0.35,0.9); this._log(off,sign,qOk);
+    return buntPA(qOk?'SQOK':sign==='sq'?'SQFAIL':'SQHOLD'); }
+  if(sign==null||sign==='bunt'){
+    if(this._buntCall(off,def,bat,slot)){
+      var r=rnd(), bOk=r<clamp(0.74+(bat.con-70)*0.004+be-bd,0.5,0.9); this._log(off,'bunt',bOk);
+      return buntPA(bOk?'SAC': r<0.95?'FC':'BUNT1B');
+    }
+  }
+  var v=sign, hr=(v==='hitrun'||v==='runhit')?v:null;
+  // a pitchout on a hit-and-run: the batter can't reach it, the runner is hung out
+  if(hr&&dcall==='pitchout'){ v='steal'; hr=null; }
+  if(v==='steal'||v==='delay'||v==='steal3'||v==='dsteal'||v==='shome'){
+    this.cmd[off]=null; this.cmd[def]=null;
+    var fs=this._signSteal(off,def,v,dcall);
+    if(fs){ this._pending={kind:'steal',variant:fs.variant,off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:fs.oc,runner:fs.runner,pitches:[makePitch(pit,dcall==='pitchout'||rnd()<0.6?'B':'S')],slot:slot}; return this._pending; }
+  } else if(!sign){
+    var st=this._stealTry(off,def,false);
+    if(st){ this.cmd[def]=null; this._pending={kind:'steal',variant:'steal',off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:st.oc,runner:st.runner,pitches:[makePitch(pit, rnd()<0.6?'B':'S')],slot:slot}; return this._pending; }
   }
   var fatigue=Math.max(0,(this.pBF[def]-(pit.role==='SP'?18:4))*0.7);
-  var oc=simPA(bat,pit,fatigue,this.defense(def),platoon(scoutMods(paMods(this.tac[off],this.tac[def],this.bases,this.outs,this.ex.bind(this,off),this.ex.bind(this,def)),this.know[off],this.know[def]),batName,this.pitcher[def]));
+  var mods=platoon(scoutMods(paMods(this.tac[off],this.tac[def],this.bases,this.outs,this.ex.bind(this,off),this.ex.bind(this,def)),this.know[off],this.know[def]),batName,this.pitcher[def]);
+  mods=planMods(mods,this.cfg[off].plan,this.cfg[def].plan,batName,this.pitcher[def],bat,pit,this.know[off],this.know[def]);
+  if(hr==='hitrun'){ mods.K-=0.012; mods.BIP+=0.012; mods.HR-=0.002; }
+  else if(hr==='runhit'){ mods.K-=0.004; }
+  else if(sign==='buster'){ mods.K-=0.01; mods.BIP+=0.016+(dcall==='buntd'?0.02:0); mods.HR-=0.003; }
+  if(dcall==='pitchout'){ mods.BB+=0.03; mods.K-=0.015; }
+  var oc=simPA(bat,pit,fatigue,this.defense(def),mods);
   var pitches=genPitchSeq(bat,pit,oc,(this.tac[off].atk==="patient"?0.35:0)+(this.tac[def].bat==="nibble"?0.35:0));
-  this._pending={off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:oc,pitches:pitches,slot:slot};
+  if(dcall==='pitchout'&&oc!=='BB') pitches.unshift(makePitch(pit,'B'));
+  if(sign&&(hr||sign==='buster')) this._log(off,sign,oc!=='K');
+  this.cmd[off]=null; this.cmd[def]=null;
+  this._pending={off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:oc,pitches:pitches,slot:slot,hr:hr};
   return this._pending;
 };
 IP.commitAB=function(){
   var p=this._pending; if(!p) return null; this._pending=null;
   var self=this, off=p.off, def=p.def, oc=p.oc, bat=p.bat, batName=p.batName;
   var strk=0,bll=0; p.pitches.forEach(function(x){ if(x.res==='B'||x.res==='HBP')bll++; else strk++; });
-  var thrown = p.kind==='ibb'? 0 : p.pitches.length; if(p.kind==='ibb'){ strk=0; bll=0; }
+  var thrown = (p.kind==='ibb'||p.variant==='pick')? 0 : p.pitches.length; if(p.kind==='ibb'||p.variant==='pick'){ strk=0; bll=0; }
   this.ptot[def]+=thrown; this.pstr[def]+=strk; this.pball[def]+=bll;
   var ps=this._ensurePit(def,p.pitName); ps.NP+=thrown;
   var ev={inning:this.inning,half:this.half,batter:batName,pitcher:p.pitName,off:off,def:def,oc:oc,runs:0,desc:'',pitches:p.pitches};
   if(p.kind==='steal'){
-    var rs=this._ensureBat(off,p.runner); ev.runner=p.runner; ev.steal=true;
-    if(oc==='SB'){ rs.SB++; this.bases[1]=this.bases[0]; this.bases[0]=null; ev.desc=p.runner+' 2루 도루 성공'; }
-    else { rs.CS++; this.bases[0]=null; this._out(def); ev.desc=p.runner+' 도루 실패'; }
-    if(this.outs>=3) this._endHalf();
+    var rs=this._ensureBat(off,p.runner), B=this.bases, vr=p.variant||'steal'; ev.runner=p.runner; ev.steal=true; ev.variant=vr;
+    if(vr==='pick'){ if(oc==='PO'){ B[p.from]=null; this._out(def); ev.desc=p.runner+' 견제사'; } else ev.desc='견제구, 주자 귀루'; }
+    else if(vr==='steal3'){ if(oc==='SB'){ rs.SB++; B[2]=B[1]; B[1]=null; ev.desc=p.runner+' 3루 도루 성공'; } else { rs.CS++; B[1]=null; this._out(def); ev.desc=p.runner+' 3루 도루 실패'; } }
+    else if(vr==='dsteal'){ var tr=B[0]; if(oc==='SB'){ rs.SB++; if(tr) this._ensureBat(off,tr.n).SB++; B[2]=B[1]; B[1]=tr; B[0]=null; ev.desc='더블스틸 성공'; } else { rs.CS++; B[1]=tr; B[0]=null; this._out(def); ev.desc='더블스틸 실패, 선행 주자 아웃'; } }
+    else if(vr==='shome'){ var hm=B[2]; B[2]=null; if(oc==='SB'){ rs.SB++; this._run(off,def,hm,false); ev.runs=1; ev.desc=p.runner+' 홈스틸 성공!'; } else { rs.CS++; this._out(def); ev.desc=p.runner+' 홈에서 태그 아웃'; } }
+    else { if(oc==='SB'){ rs.SB++; B[1]=B[0]; B[0]=null; ev.desc=p.runner+(vr==='delay'?' 딜레이드 스틸 성공':' 2루 도루 성공'); } else { rs.CS++; B[0]=null; this._out(def); ev.desc=p.runner+' 도루 실패'; } }
+    if(this.half==='bottom'&&this.inning>=9&&this.score[this.h]>this.score[this.a]){ this.line[this.h].push(this.runsThisHalf); this.runsThisHalf=0; ev.walkoff=true; this.walkoff=true; this._finish(this.h); }
+    else if(this.outs>=3) this._endHalf();
     ev.score={}; ev.score[this.h]=this.score[this.h]; ev.score[this.a]=this.score[this.a];
     return ev;
   }
@@ -928,6 +1072,12 @@ IP.commitAB=function(){
   var bs=this._ensureBat(off,batName);
   bs.PA++; ps.BF++;
   var me={n:batName, p:p.pitName};
+  // situational splits, only for the club the player runs (they would bloat the save for all ten)
+  var splitB=null, splitP=null, B0=this.bases;
+  if(this.cfg[off].splits||this.cfg[def].splits){ var pt=handsOf(p.pitName).t, bt=handsOf(batName).b; if(bt==='양') bt=pt==='좌'?'우':'좌';
+    var dd=this.score[off]-this.score[def];
+    if(this.cfg[off].splits) splitB=[pt==='좌'?'vL':'vR', (B0[1]||B0[2])?'RP':null, (this.inning>=7&&Math.abs(dd)<=1)?'LC':null];
+    if(this.cfg[def].splits) splitP=[bt==='좌'?'bL':'bR']; }
   if(p.kind==='ibb'){
     bs.BB++; ps.BB++; bs.IBB=(bs.IBB||0)+1;
     var resI=applyOutcome(this,'BB',me); if(resI.runs){ bs.RBI+=resI.runs; resI.scorers.forEach(function(r){ self._run(off,def,r,false); }); ev.runs=resI.runs; }
@@ -944,10 +1094,14 @@ IP.commitAB=function(){
       bs.AB++; this._out(def);
       if(b[1]&&b[0]){ b[1]=b[0]; } else if(b[1]){ b[1]=null; }
       b[0]=me; ev.desc='번트 실패 (선행 주자 아웃)';
-    } else { // bunt single
+    } else if(oc==='BUNT1B'){ // bunt single
       bs.AB++; bs.H++; ps.H++; this.hits[off]++;
       var resB=applyOutcome(this,'BB',me); if(resB.runs){ bs.RBI+=resB.runs; resB.scorers.forEach(function(r){ self._run(off,def,r,false); }); ev.runs=resB.runs; }
       ev.desc='번트 안타';
+    } else if(oc==='BOUT'){ bs.AB++; this._out(def); ev.desc='번트 아웃';
+    } else if(oc==='SQOK'){ var sr=b[2]; b[2]=b[1]; b[1]=b[0]; b[0]=null; bs.SH=(bs.SH||0)+1; bs.RBI++; this._out(def); this._run(off,def,sr,false); ev.runs=1; ev.desc='스퀴즈 성공 (1타점)';
+    } else if(oc==='SQHOLD'){ bs.AB++; this._out(def); ev.desc='스퀴즈 실패, 주자는 3루에';
+    } else if(oc==='SQFAIL'){ bs.AB++; this._out(def); b[2]=null; if(b[0]){ if(b[1]) b[2]=b[1]; b[1]=b[0]; } b[0]=me; ev.desc='스퀴즈 실패, 홈에서 주자 아웃';
     }
   }
   if(p.kind==='ibb'||p.kind==='bunt'){
@@ -963,25 +1117,35 @@ IP.commitAB=function(){
     var dp=clamp(0.12 + (dfn-70)*0.002 - (bat.spd-70)*0.002 + (this.tac[def].shift==="dp"?0.05*this.ex(def,"shift"):0) - (this.tac[off].run==="aggr"?0.02*this.ex(off,"run"):0), 0.04, 0.26);
     var err=clamp(0.03 - (dfn-70)*0.0009, 0.012, 0.05);
     if(rnd()<err){ oc='E'; ev.oc='E'; }
-    else if(this.bases[0]&&this.outs<2&&rnd()<dp){ this.bases[0]=null; this._out(def,2); bs.AB++; ev.oc='GIDP'; ev.desc='병살타'; bs.GDP++; oc='DONE'; }
+    else if(this.bases[0]&&this.outs<2&&(p.hr?rnd()<0.07:rnd()<dp)){ this.bases[0]=null; this._out(def,2); bs.AB++; ev.oc='GIDP'; ev.desc=p.hr?'직선타, 주자까지 더블 아웃':'병살타'; bs.GDP++; oc='DONE'; }
   }
   if(oc==='DONE'){}
-  else if(oc==='K'){ bs.AB++; bs.SO++; ps.SO++; this._out(def); ev.desc='삼진 아웃'; }
+  else if(oc==='K'){ bs.AB++; bs.SO++; ps.SO++; this._out(def); ev.desc='삼진 아웃';
+    if(p.hr&&this.outs<3&&this.bases[0]&&!this.bases[1]){ var hrn=this.bases[0], hq=getB(off,hrn.n);
+      if(hq&&rnd()<clamp(this._stealOdds(off,def,hq,null)+(p.hr==='runhit'?0.06:0),0.1,0.93)){ this._ensureBat(off,hrn.n).SB++; this.bases[1]=hrn; this.bases[0]=null; ev.desc='삼진, 주자는 2루 세이프'; }
+      else { this._ensureBat(off,hrn.n).CS++; this.bases[0]=null; this._out(def); ev.desc='삼진, 주자도 2루에서 아웃'; } } }
   else if(oc==='E'){ bs.AB++; me.ue=true; this.errOuts=(this.errOuts||0)+1; credit(applyOutcome(this,'E',me),false,true); ev.desc='실책 출루'+(ev.runs?' ('+ev.runs+'점)':''); }
   else if(oc==='OUT'){
-    if(this.bases[2]&&this.outs<2&&rnd()<(this.tac[def].shift==="infieldIn"?0.14+0.16*(1-this.ex(def,"shift")):0.30)){ var runner=this.bases[2]; this.bases[2]=null; bs.RBI++; bs.SF++; this._out(def); this._run(off,def,runner,false); ev.oc='SF'; ev.runs=1; ev.desc='희생플라이 (1타점)'; }
+    if(this.bases[2]&&this.outs<2&&rnd()<(this.tac[def].shift==="infieldIn"?0.14+0.16*(1-this.ex(def,"shift")):0.30+(this.tac[off].adv==="aggr"?0.06*this.ex(off,"adv"):this.tac[off].adv==="hold"?-0.06:0))){ var runner=this.bases[2]; this.bases[2]=null; bs.RBI++; bs.SF++; this._out(def); this._run(off,def,runner,false); ev.oc='SF'; ev.runs=1; ev.desc='희생플라이 (1타점)'; }
     else {
       bs.AB++; this._out(def); ev.desc='범타 아웃';
+      if(p.hr&&this.outs<3&&this.bases[0]&&!this.bases[1]){ this.bases[1]=this.bases[0]; this.bases[0]=null; ev.adv=true; ev.desc='범타, 주자는 2루로'; }
       // productive out: a runner on second moves up to third
       if(this.outs<3 && this.bases[1] && !this.bases[2] && rnd()<(this.tac[off].teamBat?0.35+0.35*this.ex(off,"teamBat"):0.35)){ this.bases[2]=this.bases[1]; this.bases[1]=null; ev.adv=true; }
     }
   }
   else if(oc==='BB'){ bs.BB++; ps.BB++; credit(applyOutcome(this,'BB',me),true); ev.desc='볼넷'+rbiTxt(); }
   else if(oc==='HBP'){ bs.HBP++; credit(applyOutcome(this,'HBP',me),true); ev.desc='몸에 맞는 공'+rbiTxt(); }
-  else if(oc==='1B'){ bs.AB++; bs.H++; ps.H++; this.hits[off]++; credit(applyOutcome(this,'1B',me),true); ev.desc='안타'+rbiTxt(); }
+  else if(oc==='1B'){ var r1=this.bases[0]; bs.AB++; bs.H++; ps.H++; this.hits[off]++; credit(applyOutcome(this,'1B',me),true); ev.desc='안타'+rbiTxt();
+    // first to third: a hit-and-run always tries it, an aggressive club sometimes
+    if(r1&&this.bases[1]===r1&&!this.bases[2]&&this.outs<3){ var tq=getB(off,r1.n), go=p.hr?1:this.tac[off].adv==="aggr"?0.2*this.ex(off,"adv"):0;
+      if(go&&rnd()<go){ if(tq&&rnd()<0.82+(tq.spd-70)*0.006){ this.bases[2]=r1; this.bases[1]=null; ev.desc+=', 주자 3루까지'; } else if(!p.hr){ this.bases[1]=null; this._out(def); ev.desc+=', 3루에서 주자 아웃'; } } } }
   else if(oc==='2B'){ bs.AB++; bs.H++; bs._2B++; ps.H++; this.hits[off]++; credit(applyOutcome(this,'2B',me),true); ev.desc='2루타'+rbiTxt(); }
   else if(oc==='3B'){ bs.AB++; bs.H++; bs._3B++; ps.H++; this.hits[off]++; credit(applyOutcome(this,'3B',me),true); ev.desc='3루타'+rbiTxt(); }
   else if(oc==='HR'){ bs.AB++; bs.H++; bs.HR++; ps.HR++; ps.H++; this.hits[off]++; credit(applyOutcome(this,'HR',me),true); ev.desc=(ev.runs>1?ev.runs+'점 ':'')+'홈런!'; }
+  if(splitB||splitP){ var fc=ev.oc, hi=['1B','2B','3B','HR'].indexOf(fc), noAB=fc==='BB'||fc==='HBP'||fc==='SF';
+    var addS=function(o,keys){ keys.forEach(function(k){ if(!k) return; o[k+'_PA']=(o[k+'_PA']||0)+1; if(!noAB) o[k+'_AB']=(o[k+'_AB']||0)+1; if(hi>=0){ o[k+'_H']=(o[k+'_H']||0)+1; o[k+'_TB']=(o[k+'_TB']||0)+hi+1; } if(fc==='BB') o[k+'_BB']=(o[k+'_BB']||0)+1; if(fc==='K') o[k+'_SO']=(o[k+'_SO']||0)+1; }); };
+    if(splitB) addS(bs,splitB); if(splitP) addS(ps,splitP); }
   // walk-off or half end
   if(this.half==='bottom'&&this.inning>=9&&this.score[this.h]>this.score[this.a]){
     this.line[this.h].push(this.runsThisHalf); this.runsThisHalf=0; ev.walkoff=true; this.walkoff=true; this._finish(this.h);
@@ -994,7 +1158,7 @@ IP.result=function(){
   return {home:this.h,away:this.a,homeRuns:this.score[this.h],awayRuns:this.score[this.a],
     homeHits:this.hits[this.h],awayHits:this.hits[this.a],box:this.box,
     winner:this.score[this.h]>this.score[this.a]?this.h:(this.score[this.a]>this.score[this.h]?this.a:null),
-    homeSP:this.sp[this.h],awaySP:this.sp[this.a],decisions:this.decisions,
+    homeSP:this.sp[this.h],awaySP:this.sp[this.a],decisions:this.decisions,tlog:this.tlog,
     homePitchers:this.pUsed[this.h],awayPitchers:this.pUsed[this.a],
     line:this.line, innings:this.inning, walkoff:!!this.walkoff, lineup:this.lineup, positions:this.pos};
 };
@@ -1008,7 +1172,7 @@ global.KBO = {
   newBatStat:newBatStat, newPitStat:newPitStat,
   getB:getB, getP:getP, InteractiveGame:InteractiveGame,
   cond:cond, mor:mor, isInjured:isInjured, applyFatigue:applyFatigue, restAdjust:restAdjust,
-  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf, handsOf:handsOf,
+  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf, handsOf:handsOf, SIGNS:SIGNS, planMods:planMods,
   POS_LIST:POS_LIST, posFit:posFit, fieldVal:fieldVal, teamDefense:teamDefense, autoPositions:autoPositions, positionIssues:positionIssues
 };
 

@@ -8,7 +8,7 @@ const COACH_SPEC={head:['전술 통합','선수단 관리'],pit:['구위 향상'
   fld:['내야 수비','외야 수비','포지션 전환'],run:['도루','작전 주루'],bat2:['도루 저지','볼배합'],cond:['부상 예방','재활'],ana:['상대 분석','데이터'],fut:['유망주 육성','콜업 판단']};
 const STAFF_GROUPS=[['1군',['head','pit','pen','bat','fld','run','bat2']],['지원',['cond','ana']],['2군',['fut']]];
 // which coach answers for which team tactic
-const TAC_COACH={atk:'bat',teamBat:'bat',bunt:'bat',run:'run',shift:'fld',bat:'bat2',ibb:'bat2',hook:'pit'};
+const TAC_COACH={atk:'bat',dir:'bat',teamBat:'bat',bunt:'bat',run:'run',adv:'run',shift:'fld',bat:'bat2',pick:'bat2',ibb:'bat2',hook:'pit'};
 function coachInit(c){
   if(c.a) return c;
   const h=x=>hash(c.n+c.role+x), a={};
@@ -30,7 +30,7 @@ function aiExecTable(t){ const o={}; for(const k in TF_LEARN){ o[k]={}; TF_LEARN
 function aiKnowTable(t){ const base=clampN(0.25+(coachA('ana','ana',t)-10)*0.015,0,1), o={}; K.TEAM_IDS.forEach(x=>{ if(x!==t) o[x]=base; }); return o; }
 // wear between games: the conditioning coach cuts injuries, the bullpen coach speeds relievers back
 function coachWear(t){ return {inj:1-(coachA('cond','man',t)-10.5)*0.015, pen:(coachA('pen','man',t)-10.5)*0.2}; }
-function coachEdge(t){ return {run:(coachA('run','tac',t)-10.5)*0.002, arm:(coachA('bat2','tac',t)-10.5)*0.002}; }
+function coachEdge(t){ return {run:(coachA('run','tac',t)-10.5)*0.002, arm:(coachA('bat2','tac',t)-10.5)*0.002, bat:(coachA('bat','tac',t)-10.5)*0.002}; }
 
 // advice arrives in the inbox; taking it pleases the coach, ignoring it costs goodwill
 function coachMood(role,d,ok){ const c=staffOf(USER)[role]; if(!c) return; coachInit(c); c.sat=clampN(c.sat+d,0,100); if(ok) c.okN++; else c.noN++; }
