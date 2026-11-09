@@ -561,7 +561,7 @@ function prepareCfg(team, cfg){
   const opts={ restBelow: (!isUser||f.autoRest)? 70 : 0, forceRest: isUser? f.restNext : [] };
   // relievers who joined after the bullpen was set (rookies, call-ups, trades) go to the back of it
   const extraRP=r.pitchers.filter(p=>p.role!=='SP' && p.n!==cfg.closer && (cfg.bullpen||[]).indexOf(p.n)<0).map(p=>p.n);
-  const extra=isUser? {tacFam:execTable(), scoutKnow:knowTable()} : {};
+  const extra=Object.assign({edge:coachEdge(team)}, isUser? {tacFam:execTable(), scoutKnow:knowTable()} : {tacFam:aiExecTable(team), scoutKnow:aiKnowTable(team)});
   return K.restAdjust(team, Object.assign({}, cfg, extra, {rotation: state.cfgs[team].rotation, bullpen:(cfg.bullpen||[]).concat(extraRP)}), opts);
 }
 // what prepareCfg will change for the user's next game, for the preview screen
@@ -583,7 +583,7 @@ function afterGame(res){
   const f=fm();
   [res.home,res.away].forEach(t=>{
     const wasInj = t===USER? allPlayers(t).filter(p=>K.isInjured(p)).map(p=>p.n) : [];
-    const hurt=K.applyFatigue(t,res.box);
+    const hurt=K.applyFatigue(t,res.box,coachWear(t));
     moraleAfterGame(t,res);
     recordRatings(t,res);
     if(t!==USER) return;
@@ -602,6 +602,7 @@ function afterGame(res){
     checkStreak();
     maybeTradeOffer(ug);
     coachReport(ug);
+    coachDesk(ug);
     maybeMedia(ug);
     maybePress(ug);
     checkForeignForm(ug);
@@ -1044,13 +1045,13 @@ function buyInParts(){ const ps=lineupBats().concat(rotArms());
   return {mor:Math.round(avgOf(ps,p=>K.mor(p))), conf:(fm().board&&fm().board.conf)||60, fresh:ps.filter(p=>(p.newG||0)>0).length}; }
 // execution in a game: familiarity first, then roster fit (50 = neutral) and buy-in (67 = neutral)
 function execOf(k,v,b){ b=b==null?buyIn():b;
-  return clampN((0.3+0.7*famOf(k,v)/100)*(0.9+0.2*fitOf(k,v)/100)*(0.9+0.15*b/100),0.2,1.05); }
+  return clampN((0.3+0.7*famOf(k,v)/100)*(0.9+0.2*fitOf(k,v)/100)*(0.9+0.15*b/100)*coachTacMult(USER,k),0.2,1.05); }
 function execTable(){ const b=buyIn(), t={}; for(const k in TF_LEARN){ t[k]={}; TF_LEARN[k].forEach(v=>t[k][v]=execOf(k,v,b)); } return t; }
 // what the analysts know about a club: grows with every meeting this season, half carries over
 function knowState(){ const f=fm();
   if(!f.know||f.know.year!==state.year){ const old=(f.know&&f.know.n)||{}, n={}; for(const t in old) n[t]=Math.floor(old[t]/2); f.know={year:state.year,n}; }
   return f.know; }
-function knowOf(t){ return clampN(0.15+(mgrBg().know||0)+0.085*(knowState().n[t]||0),0,1); }
+function knowOf(t){ return clampN(0.15+(mgrBg().know||0)+(coachA('ana','ana')-10)*0.01+0.085*(knowState().n[t]||0),0,1); }
 function knowTable(){ const o={}; K.TEAM_IDS.forEach(t=>{ if(t!==USER) o[t]=knowOf(t); }); return o; }
 function tacticsAfterGame(res,meet){
   const opp=res.home===USER?res.away:res.home;
@@ -1556,7 +1557,7 @@ function rivalResult(opp, won, tie){
 // COACH_REAL: names confirmed in public reports for the 2026 season (role as reported; check the
 // club's official announcement before relying on it). Every other post starts with a fictional
 // coach marked 가상, until the club's official list is filled in here.
-const COACH_ROLES=[['head','수석코치'],['pit','투수코치'],['bat','타격코치'],['fld','수비코치'],['run','주루코치'],['bat2','배터리코치']];
+const COACH_ROLES=[['head','수석코치'],['pit','투수코치'],['pen','불펜코치'],['bat','타격코치'],['fld','수비코치'],['run','주루코치'],['bat2','배터리코치'],['cond','컨디셔닝코치'],['ana','전력분석팀장'],['fut','퓨처스 감독']];
 const COACH_REAL={
   'LG':{bat:'송지만', fld:'김일경'},          // 2026.7.27 보직 개편 (OSEN)
   '두산':{bat:'이진영'},                      // 2025.11 1·2군 타격 총괄 선임
@@ -1570,7 +1571,7 @@ function coachSal(q){ return Math.round((0.6+Math.max(0,q-8)*0.22)*10)/10; }
 function makeCoach(role, used, real, team){
   const n= real || coachName(used);
   const q= real? coachQ(n+role,11,15) : R(7,17);
-  return {n, role, q, sal:coachSal(q), real:!!real, team:team||null};
+  return coachInit({n, role, q, sal:coachSal(q), real:!!real, team:team||null});
 }
 function staffOf(t){
   const f=fm(); f.staff=f.staff||{};
@@ -1579,37 +1580,32 @@ function staffOf(t){
     for(const o in COACH_REAL) for(const r in COACH_REAL[o]) used.add(COACH_REAL[o][r]);
     COACH_ROLES.forEach(([r])=>{ s[r]=makeCoach(r, used, (COACH_REAL[t]||{})[r], t); });
     f.staff[t]=s; }
-  return f.staff[t];
+  const cur=f.staff[t]; // a save from before the staff grew to ten posts
+  if(!cur[COACH_ROLES[COACH_ROLES.length-1][0]]){ const used=new Set(); for(const o in f.staff) for(const r in f.staff[o]) used.add(f.staff[o][r].n);
+    COACH_ROLES.forEach(([r])=>{ if(!cur[r]) cur[r]=makeCoach(r,used,(COACH_REAL[t]||{})[r],t); }); }
+  return cur;
 }
 function coachPool(){
   const f=fm();
   if(!f.coachPool||f.coachPool.year!==state.year){ const used=new Set();
     K.TEAM_IDS.forEach(t=>{ const s=staffOf(t); for(const r in s) used.add(s[r].n); });
-    const list=[]; COACH_ROLES.forEach(([r])=>{ for(let i=0;i<4;i++) list.push(makeCoach(r,used)); });
+    const list=[]; COACH_ROLES.forEach(([r])=>{ for(let i=0;i<3;i++) list.push(makeCoach(r,used)); });
     f.coachPool={year:state.year, list}; }
   return f.coachPool.list;
 }
-function coachQOf(role){ const c=staffOf(USER)[role]; return c? c.q : 10; }
-function coachMult(q){ return 1+(q-12)*0.04; }   // q 7 -> 0.80, 12 -> 1.00, 17 -> 1.20
+function coachQOf(role){ const c=staffOf(USER)[role]; return c? c.q+coachFit(c)*2 : 10; }
+function coachMult(q){ return 1+clampN(q-12,-5,5)*0.02; }   // one coach moves things by at most 10%
 function coachGrow(p, farm){
   const m = p.type==='P'? coachMult(coachQOf('pit'))*0.75+coachMult(coachQOf('bat2'))*0.25
     : coachMult(coachQOf('bat'))*0.6+coachMult(coachQOf('fld'))*0.25+coachMult(coachQOf('run'))*0.15;
-  return farm? 1+(m-1)*0.5 : m;  // the 1군 staff only partly reach the farm
+  if(farm) return coachMult(coachQOf('fut'));  // the Futures staff runs the farm
+  const c=staffOf(USER)[p.type==='P'?'pit':'bat'];
+  return m*(c&&c.style==='육성형'&&p.age<=25?1.03:1);
 }
 function coachLearn(){ return 1+(coachQOf('head')-12)*0.03; }
 function coachStars(q){ const n=Math.max(1,Math.min(5,Math.round(q/4))); return '★'.repeat(n)+'☆'.repeat(5-n); }
 function staffPayroll(t){ const s=staffOf(t); return Math.round(Object.values(s).reduce((a,c)=>a+c.sal,0)*10)/10; }
-function staffCard(){
-  const s=staffOf(USER), roleL=Object.fromEntries(COACH_ROLES);
-  const fx={head:'전술 숙련 속도', pit:'투수 성장', bat:'타자 성장(타격)', fld:'타자 성장(수비)', run:'타자 성장(주루)', bat2:'투수 성장(배터리)'};
-  const rows=COACH_ROLES.map(([r])=>{ const c=s[r];
-    return `<tr><td>${roleL[r]}</td><td class="name"><b>${esc(c.n)}</b> ${c.real?'<span class="pill pos" title="2026 시즌 공개 보도 기준">실존</span>':'<span class="pill" style="background:var(--panel2);color:var(--dim)">가상</span>'}</td>
-      <td title="${c.q}/20">${coachStars(c.q)}</td><td>${fx[r]} ${(()=>{ const v=Math.round((r==='head'?coachLearn()-1:coachMult(c.q)-1)*100); return (v>=0?'+':'')+v+'%'; })()}</td>
-      <td>${c.sal}억</td><td><button class="btn" style="font-size:12px" onclick="FM.coachPicker('${r}')">교체</button></td></tr>`; }).join('');
-  return `<div class="card" style="margin-top:14px"><h3>🧢 코칭스태프 <span class="tag">연봉 합계 ${staffPayroll(USER)}억</span></h3>
-    <div style="overflow-x:auto"><table><thead><tr><th>보직</th><th class="name">코치</th><th>능력</th><th>효과</th><th>연봉</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="hint" style="margin-top:8px">실존: 2026 시즌 공개 보도로 확인된 코치(보직은 보도 기준). 가상: 구단 공식 명단을 아직 넣지 않은 자리입니다. 코치 능력치는 게임용 수치입니다.</div></div>`;
-}
+
 function coachPicker(role){
   const cur=staffOf(USER)[role], roleL=Object.fromEntries(COACH_ROLES)[role];
   const cands=coachPool().filter(c=>c.role===role);
@@ -1624,7 +1620,10 @@ function coachPicker(role){
 function hireCoach(role, n){
   const f=fm(), pool=coachPool(), i=pool.findIndex(c=>c.role===role&&c.n===n); if(i<0) return;
   const s=staffOf(USER), old=s[role], c=pool[i], cost=Math.round((old.sal*0.5+c.sal)*10)/10;
+  const inSeason=state.phase==='regular';
+  if(inSeason&&f.staffSwapYear===state.year){ notify('시즌 중 코치 교체는 한 번만 할 수 있습니다.'); return; }
   if(f.fin.balance-cost < -10){ notify(`잔고가 부족합니다. 필요 금액 ${cost}억 (잔고 ${f.fin.balance.toFixed(1)}억)`); return; }
+  if(inSeason) f.staffSwapYear=state.year;
   f.fin.balance=Math.round((f.fin.balance-cost)*10)/10; f.fin.exp=(f.fin.exp||0)+cost;
   pool.splice(i,1); c.team=USER; s[role]=c;
   if(!old.real) pool.push(Object.assign({},old,{team:null}));
@@ -1651,6 +1650,90 @@ function feedCard(){
     ${list.length? list.map(x=>`<div style="border-bottom:1px solid var(--line);padding:6px 0;cursor:pointer" onclick="App.tab('feed')"><b>${esc(x.title)}</b><div class="muted" style="font-size:12px;margin-top:2px">${esc(x.body.split('\n').find(l=>l.startsWith('⭐'))||x.body.split('\n')[1]||'')}</div></div>`).join('') : '<div class="muted">아직 경기 리포트가 없습니다.</div>'}</div>`;
 }
 
+// ---------- coaching staff: profiles, tactics by coach, advice and satisfaction (docs/coaching-staff-plan.md) ----------
+// A coach keeps his overall q; five attributes, a style and a specialty hang off it. Older saves
+// get them on first read (coachInit), derived from the name so they never change between loads.
+const COACH_ATTR=[['lead','지도력'],['tac','전술'],['ana','분석'],['mot','동기부여'],['man','관리']];
+const ROLE_MAIN={head:'tac',pit:'lead',pen:'man',bat:'lead',fld:'lead',run:'tac',bat2:'ana',cond:'man',ana:'ana',fut:'lead'};
+const COACH_STYLES=['육성형','성적형','데이터형','올드스쿨'];
+const COACH_SPEC={head:['전술 통합','선수단 관리'],pit:['구위 향상','제구 교정','변화구'],pen:['연투 관리','마무리 육성'],bat:['컨택','장타력','선구안'],
+  fld:['내야 수비','외야 수비','포지션 전환'],run:['도루','작전 주루'],bat2:['도루 저지','볼배합'],cond:['부상 예방','재활'],ana:['상대 분석','데이터'],fut:['유망주 육성','콜업 판단']};
+const STAFF_GROUPS=[['1군',['head','pit','pen','bat','fld','run','bat2']],['지원',['cond','ana']],['2군',['fut']]];
+// which coach answers for which team tactic
+const TAC_COACH={atk:'bat',teamBat:'bat',bunt:'bat',run:'run',shift:'fld',bat:'bat2',ibb:'bat2',hook:'pit'};
+function coachInit(c){
+  if(c.a) return c;
+  const h=x=>hash(c.n+c.role+x), a={};
+  COACH_ATTR.forEach(([k])=>{ a[k]=clampN(c.q+h(k)%7-3,1,20); });
+  a[ROLE_MAIN[c.role]||'lead']=c.q;
+  const sp=COACH_SPEC[c.role]||['전반'];
+  c.a=a; c.style=COACH_STYLES[h('style')%4]; c.spec=sp[h('spec')%sp.length]; c.age=c.age||45+h('age')%18;
+  c.yrs=c.yrs||1+h('yrs')%3; c.sat=c.sat==null?60:c.sat; c.okN=c.okN||0; c.noN=c.noN||0;
+  return c;
+}
+function coachA(role,key,t){ const c=staffOf(t||USER)[role]; return c? coachInit(c).a[key] : 10; }
+const BG_STYLE={mlb:'데이터형',coach:'성적형',legend:'올드스쿨',rookie:'육성형',kbo:'성적형'};
+const STYLE_CLASH={'데이터형':'올드스쿨','올드스쿨':'데이터형','육성형':'성적형','성적형':'육성형'};
+// how well a coach suits this manager: +1 same outlook, -1 opposed, 0 otherwise
+function coachFit(c){ const b=BG_STYLE[state.user&&state.user.bg]; if(!b) return 0; coachInit(c); return c.style===b?1:c.style===STYLE_CLASH[b]?-1:0; }
+// the coach in charge scales how well his tactics are carried out: 0.9 at 1, 1.1 at 20
+function coachTacMult(t,k){ const r=TAC_COACH[k]; return r? 0.9+0.2*(coachA(r,'tac',t)-1)/19 : 1; }
+function aiExecTable(t){ const o={}; for(const k in TF_LEARN){ o[k]={}; TF_LEARN[k].forEach(v=>o[k][v]=clampN(coachTacMult(t,k),0.2,1.05)); } return o; }
+function aiKnowTable(t){ const base=clampN(0.25+(coachA('ana','ana',t)-10)*0.015,0,1), o={}; K.TEAM_IDS.forEach(x=>{ if(x!==t) o[x]=base; }); return o; }
+// wear between games: the conditioning coach cuts injuries, the bullpen coach speeds relievers back
+function coachWear(t){ return {inj:1-(coachA('cond','man',t)-10.5)*0.015, pen:(coachA('pen','man',t)-10.5)*0.2}; }
+function coachEdge(t){ return {run:(coachA('run','tac',t)-10.5)*0.002, arm:(coachA('bat2','tac',t)-10.5)*0.002}; }
+
+// advice arrives in the inbox; taking it pleases the coach, ignoring it costs goodwill
+function coachMood(role,d,ok){ const c=staffOf(USER)[role]; if(!c) return; coachInit(c); c.sat=clampN(c.sat+d,0,100); if(ok) c.okN++; else c.noN++; }
+ACTIONS.coachYes=(m,a)=>{ coachMood(a.role,4,true); const f=fm();
+  if(a.rest) a.rest.forEach(n=>{ if(f.restNext.indexOf(n)<0) f.restNext.push(n); });
+  if(a.mor) allPlayers(USER).forEach(p=>{ p.mor=clampN(p.mor+a.mor,5,99); });
+  return a.done||'건의를 받아들였습니다.'; };
+ACTIONS.coachNo=(m,a)=>{ coachMood(a.role,-5,false); return '건의를 보류했습니다.'; };
+function coachSay(role,icon,subject,body,yes,done,extra){
+  const c=staffOf(USER)[role]; if(!c) return;
+  send(`${c.n} ${Object.fromEntries(COACH_ROLES)[role]}`,icon,subject,body,[
+    {label:yes,fn:'coachYes',arg:Object.assign({role,done},extra||{})},{label:'보류',fn:'coachNo',arg:{role}}]);
+}
+function styleLine(role){ const c=staffOf(USER)[role]; if(!c) return ''; coachInit(c);
+  return {'육성형':'어린 선수들에게 기회가 될 겁니다.','성적형':'지금 순위를 생각해야 합니다.','데이터형':'숫자가 그렇게 말하고 있습니다.','올드스쿨':'선수는 몸으로 말합니다.'}[c.style]; }
+function coachDesk(ug){
+  if(state.phase!=='regular'||!ug) return;
+  const f=fm(), s=state.season[USER];
+  if(ug%14===3){ const tired=state.cfgs[USER].rotation.map(n=>findPlayer(USER,n)).filter(p=>p&&K.cond(p)<70).map(p=>p.n);
+    if(tired.length) coachSay('pit','⚾','선발 로테이션 피로 보고',`${tired.join(', ')} 선수의 피로가 쌓였습니다. 다음 경기는 휴식을 건의합니다. ${styleLine('pit')}`,'휴식 부여','휴식을 지시했습니다.',{rest:tired.slice(0,1)}); }
+  if(ug%14===7){ const low=state.cfgs[USER].lineup.map(n=>({n,b:s.bat[n]})).filter(x=>x.b&&x.b.AB>=40).sort((a,b)=>a.b.H/a.b.AB-b.b.H/b.b.AB)[0];
+    if(low&&low.b.H/low.b.AB<0.235) coachSay('bat','🏏',`${low.n} 슬럼프 처방`,`시즌 타율 ${fmtAvg(low.b.H/low.b.AB)}입니다. 하루 쉬면서 타격폼을 점검하길 건의합니다. ${styleLine('bat')}`,'하루 휴식','휴식과 특타를 지시했습니다.',{rest:[low.n]}); }
+  if(ug%14===11){ const risk=allPlayers(USER).filter(p=>!K.isInjured(p)&&K.cond(p)<50).map(p=>p.n).slice(0,3);
+    if(risk.length) coachSay('cond','🩺','부상 위험 선수 보고',`${risk.join(', ')} 선수는 지금 부상 위험이 높습니다.`,'휴식 권고 수용','위험 선수에게 휴식을 줍니다.',{rest:risk}); }
+  const g=(f.recent||[]); if((f.lossRun||0)>=3&&f.lossRun%3===0) coachSay('head','🧭','연패 분위기 보고',`${f.lossRun}연패로 더그아웃이 가라앉았습니다. 팀 미팅을 건의합니다.`,'팀 미팅 소집','미팅으로 분위기를 다잡았습니다.',{mor:1+Math.round(coachA('head','mot')/8)});
+}
+// contracts and goodwill are settled when the season ends
+function coachSeasonEnd(){
+  const s=staffOf(USER), lines=[];
+  COACH_ROLES.forEach(([r,label])=>{ const c=coachInit(s[r]); c.yrs--;
+    const quit=c.sat<30&&c.noN>c.okN, retire=c.age>=66, expired=c.yrs<=0&&c.sat<45;
+    if(quit||retire||expired){ const used=new Set(); K.TEAM_IDS.forEach(t=>Object.values(staffOf(t)).forEach(x=>used.add(x.n)));
+      const n=coachInit(makeCoach(r,used,null,USER)); s[r]=n;
+      lines.push(`${label} ${c.n}: ${quit?'건의가 받아들여지지 않아 사의를 표명했습니다':retire?'은퇴합니다':'계약이 끝나 팀을 떠납니다'} → 후임 ${n.n}`); return; }
+    if(c.yrs<=0){ c.yrs=2; lines.push(`${label} ${c.n}: 2년 재계약`); }
+    c.age++; c.okN=0; c.noN=0; c.sat=clampN(c.sat*0.5+30,0,100);
+  });
+  if(lines.length) send('단장','🧢',`${state.year} 코칭스태프 변동`,lines.join('\n'),[]);
+}
+const bar=(v,max)=>`<div class="st-bar" role="img" aria-label="${v}/${max}"><i style="width:${Math.round(v*100/max)}%"></i></div>`;
+function staffBoard(){
+  const s=staffOf(USER), roleL=Object.fromEntries(COACH_ROLES);
+  const card=r=>{ const c=coachInit(s[r]), fit=coachFit(c);
+    return `<article class="st-card"><header><span class="st-av">${esc(c.n[0])}</span><div><b>${esc(c.n)}</b><small>${roleL[r]} · ${c.age}세 · ${c.real?'실존':'가상'}</small></div></header>
+      <div class="st-tags"><span class="chip">${c.style}</span><span class="chip">${c.spec}</span>${fit>0?'<span class="chip good">궁합 좋음</span>':fit<0?'<span class="chip warn">궁합 나쁨</span>':''}</div>
+      <div class="st-attr">${COACH_ATTR.map(([k,l])=>`<span>${l}</span>${bar(c.a[k],20)}<b>${c.a[k]}</b>`).join('')}</div>
+      <footer><small>만족도 ${Math.round(c.sat)} · 계약 ${c.yrs}년 · ${c.sal}억</small><button class="btn" onclick="FM.coachPicker('${r}')">교체</button></footer></article>`; };
+  return `<div class="card" style="margin-top:14px"><h3>코칭스태프 <span class="tag">연봉 합계 ${staffPayroll(USER)}억</span></h3>
+    ${STAFF_GROUPS.map(([g,rs])=>`<h4 class="st-group">${g}</h4><div class="st-grid">${rs.map(card).join('')}</div>`).join('')}
+    <div class="hint" style="margin-top:8px">담당 코치의 전술 능력이 그 분야 작전의 수행도에 ±10% 영향을 줍니다. 건의를 계속 보류하면 만족도가 떨어져 시즌 후 떠날 수 있습니다. 코치 능력치는 게임용 수치입니다.</div></div>`;
+}
 // ---------- player records: game logs, season archive, career ----------
 function logGame(res){
   state.logs=state.logs||{};
@@ -1759,6 +1842,7 @@ function onSeasonEnd(){
   if(champ) d+=25;
   b.conf=clampN(b.conf+d,0,100);
   pledgeReview();
+  coachSeasonEnd();
   send('구단 이사회','🏛',`${state.year} 시즌 최종 평가: ${s.met?'목표 달성':'목표 미달'}`,
     `최종 ${s.rank}위 · 승률 ${fmtAvg(s.pct)} (목표: ${b.expect.label})${champ?'\n🏆 한국시리즈 우승!':''}\n` +
     `재정: 잔고 ${f.fin.balance.toFixed(1)}억 원 · 시즌 수입 ${f.fin.rev.toFixed(1)}억 / 지출 ${f.fin.exp.toFixed(1)}억\n\n이사회 신뢰도: ${b.conf} (${d>=0?'+':''}${d})`, []);
@@ -2703,7 +2787,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, staffCard, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ staffCard:staffBoard, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,

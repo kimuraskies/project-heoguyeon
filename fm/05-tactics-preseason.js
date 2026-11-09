@@ -75,13 +75,13 @@ function buyInParts(){ const ps=lineupBats().concat(rotArms());
   return {mor:Math.round(avgOf(ps,p=>K.mor(p))), conf:(fm().board&&fm().board.conf)||60, fresh:ps.filter(p=>(p.newG||0)>0).length}; }
 // execution in a game: familiarity first, then roster fit (50 = neutral) and buy-in (67 = neutral)
 function execOf(k,v,b){ b=b==null?buyIn():b;
-  return clampN((0.3+0.7*famOf(k,v)/100)*(0.9+0.2*fitOf(k,v)/100)*(0.9+0.15*b/100),0.2,1.05); }
+  return clampN((0.3+0.7*famOf(k,v)/100)*(0.9+0.2*fitOf(k,v)/100)*(0.9+0.15*b/100)*coachTacMult(USER,k),0.2,1.05); }
 function execTable(){ const b=buyIn(), t={}; for(const k in TF_LEARN){ t[k]={}; TF_LEARN[k].forEach(v=>t[k][v]=execOf(k,v,b)); } return t; }
 // what the analysts know about a club: grows with every meeting this season, half carries over
 function knowState(){ const f=fm();
   if(!f.know||f.know.year!==state.year){ const old=(f.know&&f.know.n)||{}, n={}; for(const t in old) n[t]=Math.floor(old[t]/2); f.know={year:state.year,n}; }
   return f.know; }
-function knowOf(t){ return clampN(0.15+(mgrBg().know||0)+0.085*(knowState().n[t]||0),0,1); }
+function knowOf(t){ return clampN(0.15+(mgrBg().know||0)+(coachA('ana','ana')-10)*0.01+0.085*(knowState().n[t]||0),0,1); }
 function knowTable(){ const o={}; K.TEAM_IDS.forEach(t=>{ if(t!==USER) o[t]=knowOf(t); }); return o; }
 function tacticsAfterGame(res,meet){
   const opp=res.home===USER?res.away:res.home;

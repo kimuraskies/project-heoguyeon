@@ -258,7 +258,7 @@ function rivalResult(opp, won, tie){
 // COACH_REAL: names confirmed in public reports for the 2026 season (role as reported; check the
 // club's official announcement before relying on it). Every other post starts with a fictional
 // coach marked 가상, until the club's official list is filled in here.
-const COACH_ROLES=[['head','수석코치'],['pit','투수코치'],['bat','타격코치'],['fld','수비코치'],['run','주루코치'],['bat2','배터리코치']];
+const COACH_ROLES=[['head','수석코치'],['pit','투수코치'],['pen','불펜코치'],['bat','타격코치'],['fld','수비코치'],['run','주루코치'],['bat2','배터리코치'],['cond','컨디셔닝코치'],['ana','전력분석팀장'],['fut','퓨처스 감독']];
 const COACH_REAL={
   'LG':{bat:'송지만', fld:'김일경'},          // 2026.7.27 보직 개편 (OSEN)
   '두산':{bat:'이진영'},                      // 2025.11 1·2군 타격 총괄 선임
@@ -272,7 +272,7 @@ function coachSal(q){ return Math.round((0.6+Math.max(0,q-8)*0.22)*10)/10; }
 function makeCoach(role, used, real, team){
   const n= real || coachName(used);
   const q= real? coachQ(n+role,11,15) : R(7,17);
-  return {n, role, q, sal:coachSal(q), real:!!real, team:team||null};
+  return coachInit({n, role, q, sal:coachSal(q), real:!!real, team:team||null});
 }
 function staffOf(t){
   const f=fm(); f.staff=f.staff||{};
@@ -281,37 +281,32 @@ function staffOf(t){
     for(const o in COACH_REAL) for(const r in COACH_REAL[o]) used.add(COACH_REAL[o][r]);
     COACH_ROLES.forEach(([r])=>{ s[r]=makeCoach(r, used, (COACH_REAL[t]||{})[r], t); });
     f.staff[t]=s; }
-  return f.staff[t];
+  const cur=f.staff[t]; // a save from before the staff grew to ten posts
+  if(!cur[COACH_ROLES[COACH_ROLES.length-1][0]]){ const used=new Set(); for(const o in f.staff) for(const r in f.staff[o]) used.add(f.staff[o][r].n);
+    COACH_ROLES.forEach(([r])=>{ if(!cur[r]) cur[r]=makeCoach(r,used,(COACH_REAL[t]||{})[r],t); }); }
+  return cur;
 }
 function coachPool(){
   const f=fm();
   if(!f.coachPool||f.coachPool.year!==state.year){ const used=new Set();
     K.TEAM_IDS.forEach(t=>{ const s=staffOf(t); for(const r in s) used.add(s[r].n); });
-    const list=[]; COACH_ROLES.forEach(([r])=>{ for(let i=0;i<4;i++) list.push(makeCoach(r,used)); });
+    const list=[]; COACH_ROLES.forEach(([r])=>{ for(let i=0;i<3;i++) list.push(makeCoach(r,used)); });
     f.coachPool={year:state.year, list}; }
   return f.coachPool.list;
 }
-function coachQOf(role){ const c=staffOf(USER)[role]; return c? c.q : 10; }
-function coachMult(q){ return 1+(q-12)*0.04; }   // q 7 -> 0.80, 12 -> 1.00, 17 -> 1.20
+function coachQOf(role){ const c=staffOf(USER)[role]; return c? c.q+coachFit(c)*2 : 10; }
+function coachMult(q){ return 1+clampN(q-12,-5,5)*0.02; }   // one coach moves things by at most 10%
 function coachGrow(p, farm){
   const m = p.type==='P'? coachMult(coachQOf('pit'))*0.75+coachMult(coachQOf('bat2'))*0.25
     : coachMult(coachQOf('bat'))*0.6+coachMult(coachQOf('fld'))*0.25+coachMult(coachQOf('run'))*0.15;
-  return farm? 1+(m-1)*0.5 : m;  // the 1군 staff only partly reach the farm
+  if(farm) return coachMult(coachQOf('fut'));  // the Futures staff runs the farm
+  const c=staffOf(USER)[p.type==='P'?'pit':'bat'];
+  return m*(c&&c.style==='육성형'&&p.age<=25?1.03:1);
 }
 function coachLearn(){ return 1+(coachQOf('head')-12)*0.03; }
 function coachStars(q){ const n=Math.max(1,Math.min(5,Math.round(q/4))); return '★'.repeat(n)+'☆'.repeat(5-n); }
 function staffPayroll(t){ const s=staffOf(t); return Math.round(Object.values(s).reduce((a,c)=>a+c.sal,0)*10)/10; }
-function staffCard(){
-  const s=staffOf(USER), roleL=Object.fromEntries(COACH_ROLES);
-  const fx={head:'전술 숙련 속도', pit:'투수 성장', bat:'타자 성장(타격)', fld:'타자 성장(수비)', run:'타자 성장(주루)', bat2:'투수 성장(배터리)'};
-  const rows=COACH_ROLES.map(([r])=>{ const c=s[r];
-    return `<tr><td>${roleL[r]}</td><td class="name"><b>${esc(c.n)}</b> ${c.real?'<span class="pill pos" title="2026 시즌 공개 보도 기준">실존</span>':'<span class="pill" style="background:var(--panel2);color:var(--dim)">가상</span>'}</td>
-      <td title="${c.q}/20">${coachStars(c.q)}</td><td>${fx[r]} ${(()=>{ const v=Math.round((r==='head'?coachLearn()-1:coachMult(c.q)-1)*100); return (v>=0?'+':'')+v+'%'; })()}</td>
-      <td>${c.sal}억</td><td><button class="btn" style="font-size:12px" onclick="FM.coachPicker('${r}')">교체</button></td></tr>`; }).join('');
-  return `<div class="card" style="margin-top:14px"><h3>🧢 코칭스태프 <span class="tag">연봉 합계 ${staffPayroll(USER)}억</span></h3>
-    <div style="overflow-x:auto"><table><thead><tr><th>보직</th><th class="name">코치</th><th>능력</th><th>효과</th><th>연봉</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="hint" style="margin-top:8px">실존: 2026 시즌 공개 보도로 확인된 코치(보직은 보도 기준). 가상: 구단 공식 명단을 아직 넣지 않은 자리입니다. 코치 능력치는 게임용 수치입니다.</div></div>`;
-}
+
 function coachPicker(role){
   const cur=staffOf(USER)[role], roleL=Object.fromEntries(COACH_ROLES)[role];
   const cands=coachPool().filter(c=>c.role===role);
@@ -326,7 +321,10 @@ function coachPicker(role){
 function hireCoach(role, n){
   const f=fm(), pool=coachPool(), i=pool.findIndex(c=>c.role===role&&c.n===n); if(i<0) return;
   const s=staffOf(USER), old=s[role], c=pool[i], cost=Math.round((old.sal*0.5+c.sal)*10)/10;
+  const inSeason=state.phase==='regular';
+  if(inSeason&&f.staffSwapYear===state.year){ notify('시즌 중 코치 교체는 한 번만 할 수 있습니다.'); return; }
   if(f.fin.balance-cost < -10){ notify(`잔고가 부족합니다. 필요 금액 ${cost}억 (잔고 ${f.fin.balance.toFixed(1)}억)`); return; }
+  if(inSeason) f.staffSwapYear=state.year;
   f.fin.balance=Math.round((f.fin.balance-cost)*10)/10; f.fin.exp=(f.fin.exp||0)+cost;
   pool.splice(i,1); c.team=USER; s[role]=c;
   if(!old.real) pool.push(Object.assign({},old,{team:null}));

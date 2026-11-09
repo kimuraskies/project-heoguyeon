@@ -649,8 +649,8 @@ function showMatchResult(res,kind){
 
 // ----- pitch-scene helpers -----
 function jno(name){ let s=0; for(let i=0;i<name.length;i++)s=(s*31+name.charCodeAt(i))%97; return s+1; }
-function handB(name){ let s=0; for(let i=0;i<name.length;i++)s+=name.charCodeAt(i); const m=s%10; return m<3?'좌':(m<4?'양':'우'); }
-function handP(name){ let s=0; for(let i=0;i<name.length;i++)s+=name.charCodeAt(i)*2; return (s%10<3)?'좌':'우'; }
+function handB(name){ return K.handsOf(name).b; }
+function handP(name){ return K.handsOf(name).t; }
 function countOf(pitches){ let b=0,s=0; pitches.forEach(p=>{ if(p.res==='B')b++; else if(p.res==='F'){ if(s<2)s++; } else if(p.res==='S'||p.res==='SW')s++; }); return {b:Math.min(b,4),s:Math.min(s,3)}; }
 const PITCHCOLOR={B:'#6b7785',S:'#e0556a',SW:'#f0a020',F:'#7fd0ff',IP:'#36c275',HBP:'#c060e0',IBB:'#9aa8b8'};
 const PITCHLABEL={B:'볼',S:'스트라이크',SW:'헛스윙',F:'파울',IP:'타격',HBP:'사구',IBB:'고의4구'};

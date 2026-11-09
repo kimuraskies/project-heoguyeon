@@ -303,6 +303,7 @@ var ROSTERS = {
 };
 var LEAGUE = {"K":0.1948,"BB":0.0938,"HBP":0.0148,"HR":0.0241,"BIP":0.3122,"X2":0.1897,"X3":0.017}; // 2026 league rates the sim reproduces at all-70 ratings
 var FOREIGN = ["카스트로","데일","네일","올러","시라카와","오스틴","톨허스트","웰스","카라스코","페라자","왕옌청","화이트","에르난데스","에레디아","타케다","베니지아노","아빌라","디아즈","후라도","오러클린","페덱","블레인","토다","테일러","라일리","힐리어드","사우어","로건","스기모토","보쉴리","대니엘","레이예스","로드리게스","비슬리","이이무라","카메론","세베리노","잭로그","벤자민","타카다","데이비슨","히우라","알칸타라","유토"]; // paid in dollars = foreign-player quota
+var HANDS = {"천성호":"우좌","강현우":"우우","윤준혁":"우우","손호영":"우우","이주형":"우좌","박지훈":"우우","오명진":"우좌","박주홍":"좌좌","김지찬":"우좌","황성빈":"우좌","홍종표":"우좌","박민":"우우","최인호":"우좌","박정현":"우우","전의산":"우좌","최지훈":"우좌","류효승":"우우","김한별":"우우","한재환":"우우","박시원":"우우","권동진":"우좌","유준규":"우좌","이영빈":"우좌","안재석":"우좌","김휘집":"우우","이창용":"우우","김현준":"좌좌","손성빈":"우우","나승엽":"우좌","장규현":"우좌","조형우":"우우","고명준":"우우","김주원":"우양","오장한":"우좌","오태양":"우우","안현민":"우우","최원영":"우우","문정빈":"우우","이주헌":"우우","박수종":"우우","박찬혁":"우우","이재현":"우우","김영웅":"우좌","김동혁":"좌좌","김세민":"우우","조세진":"우우","한태양":"우우","윤동희":"우우","김도영":"우우","한승연":"우우","박상준":"좌좌","윤도현":"우우","허인서":"우우","유민":"우우","권광민":"좌좌","임근우":"우우","류현인":"우좌","손민석":"우좌","오스틴":"우우","윤준호":"우우","박성빈":"우우","김건희":"우우","김동헌":"우우","김재상":"우좌","류승민":"좌좌","김민석":"우좌","문현빈":"우좌","에레디아":"좌우","김정민":"좌좌","김민준":"우우","손용준":"우우","김현종":"우우","임종성":"우우","박채울":"우우","원성준":"우좌","송지후":"우우","디아즈":"좌좌","레이예스":"우양","이호준":"우좌","페라자":"우양","황영묵":"우좌","정준재":"우좌","데이비슨":"우우","박준순":"우우","염승원":"우좌","양현종":"좌좌","권혁빈":"우우","어준서":"우좌","여동욱":"우우","전태현":"우좌","김상준":"우좌","심재훈":"우우","함수호":"좌좌","김동현":"우좌","박건우":"우우","박찬형":"우좌","박재엽":"우우","박재현":"우좌","한지윤":"우우","최윤석":"우우","홍대인":"우좌","정현창":"우좌","이강민":"우우","힐리어드":"좌좌","세베리노":"우양","카메론":"우우","박한결":"우좌","히우라":"우우","브룩스":"좌좌","김지석":"우좌","최재영":"우우","아데를린":"우우","카스트로":"우좌","데일":"우우","김민규":"우우","오재원":"우좌","오시후":"좌좌","안재연":"우좌","마드리스":"우좌","김요셉":"우좌","신재인":"우우","고준휘":"좌좌","블레인":"우우","오태곤":"우우","유강남":"우우","고종욱":"우좌","김헌곤":"우우","류지혁":"우좌","박세혁":"우좌","김재현":"우우","구자욱":"우좌","박해민":"우좌","하주석":"우좌","박승욱":"우좌","김민식":"우좌","최항":"우좌","한유섬":"우좌","박민우":"우좌","노진혁":"우좌","김성욱":"우우","나성범":"좌좌","강승호":"우우","장승현":"우우","김인태":"좌좌","이우성":"우우","한승택":"우우","권희동":"우우","김민혁":"우좌","심우준":"우우","안중열":"우우","한석현":"좌좌","장준원":"우우","양석환":"우우","배정대":"우우","임지열":"우우","임병욱":"우좌","박계범":"우우","오윤석":"우우","박찬호":"우우","김태진":"우좌","김태훈":"우우","신민재":"우좌","전병우":"우우","황대인":"우우","김호령":"우우","이도윤":"우좌","김웅빈":"우좌","홍창기":"우좌","김기연":"우우","조수행":"우좌","홍성호":"우좌","주효상":"우좌","이성규":"우우","최원준":"우좌","김규성":"우좌","이진영":"우우","신범수":"우좌","김태연":"우우","장진혁":"우좌","안상현":"우우","도태훈":"우좌","이유찬":"우우","김성윤":"좌좌","박정우":"좌좌","이정훈":"우좌","이정범":"좌좌","박성한":"우좌","천재환":"우우","강백호":"우좌","조대현":"우우","이재원":"우우","송찬의":"우우","문성주":"좌좌","전민재":"우우","추재현":"좌좌","이호연":"우좌","장두성":"우좌","한동희":"우우","한준수":"우좌","이원석":"우우","정은원":"우좌","최준우":"우좌","오영수":"우좌","김형준":"우우","구본혁":"우우","문보경":"우좌","김대한":"우우","주성원":"우우","양우현":"우좌","이해승":"우우","박승규":"우우","김도환":"우우","신윤후":"우우","고승민":"우좌","오선우":"좌좌","변우혁":"우우","노시환":"우우","채현우":"우우","최정원":"우좌","서호철":"우우","최형우":"우좌","강민호":"우우","최정":"우우","양의지":"우우","최주환":"우좌","김현수":"우좌","손아섭":"우좌","김민성":"우우","김태군":"우우","이형종":"우우","서건창":"우좌","김재환":"우좌","최재훈":"우우","전준우":"우우","장성우":"우우","김선빈":"우우","오선진":"우우","오지환":"우좌","채은성":"우우","정수빈":"좌좌","허경민":"우우","박동원":"우우","김상수":"우우","이지영":"우우","안치홍":"우우","소형준":"우우","이강준":"우우","유영찬":"우좌","김윤식":"좌좌","플렉센":"우우","이승민":"좌좌","최준용":"우우","홍민기":"좌좌","장재혁":"우우","최용준":"우우","정해영":"우우","강재민":"우우","한승주":"우우","박시후":"좌좌","오원석":"좌좌","김태경":"우우","한차현":"우우","김영현":"우우","송승기":"좌좌","김진수":"우우","김동주":"우우","최승용":"좌좌","김성진":"우좌","이승현":"우우","이재희":"우좌","김진욱":"좌좌","우강훈":"우우","이의리":"좌좌","이준기":"우우","배동현":"우좌","김건우":"좌좌","장지훈":"우우","조병현":"우우","이용준":"우우","한재승":"우우","벤자민":"좌좌","박영현":"우우","조원태":"좌좌","윤태호":"우우","이병헌":"좌좌","최지강":"우좌","윤석원":"좌좌","이민석":"우우","최지민":"좌좌","황동하":"우우","문동주":"우우","박준영03":"우우","전영준":"우우","김도현":"우우","이기순":"좌좌","임지민":"우우","이준혁":"우우","김정운":"우우","김동규":"우우","최준호":"우우","박윤성":"우우","후라도":"우우","김기준":"우우","이진하":"우우","곽도규":"좌좌","박재규":"우우","김서현":"우우","이로운":"우우","신영우":"우우","목지훈":"우우","김택연":"우우","김윤하":"우우","전준표":"우우","김연주":"우우","박준우":"우우","정현수":"좌좌","성영탁":"우우","네일":"우우","원종혁":"우우","김도빈":"우우","황준서":"좌좌","조동욱":"좌좌","시라카와":"우우","최우석":"우우","손주환":"우우","원종해":"우우","김준원":"우우","톨허스트":"우우","치리노스":"우우","김영우":"우우","양재훈":"우우","김한중":"우우","잭로그":"좌좌","홍민규":"우좌","최민석":"우우","이준우":"우우","정현우":"좌좌","로젠버그":"좌좌","웰스":"좌좌","김서준":"우좌","정세영":"좌좌","임진묵":"우우","박정훈":"좌좌","김백산":"우우","배찬승":"좌좌","이영재":"좌좌","김태균":"우우","김태형":"우우","올러":"우우","정우주":"우우","권민규":"좌좌","화이트":"우우","라일리":"우우","로건":"좌우","대니엘":"우우","스기모토":"우우","사우어":"우우","보쉴리":"우우","카라스코":"우우","리오스":"우우","양우진":"우우","케네디":"좌좌","타카다":"좌좌","최주형":"좌좌","타무라":"우좌","서준오":"우우","최현우":"우우","박준현":"우우","와일스":"우우","박지성":"우우","정다훈":"우우","유토":"우좌","보스":"우우","미야지":"우우","페덱":"우우","장찬희":"우우","오러클린":"좌좌","사토시":"우우","이이무라":"우우","비슬리":"우우","로드리게스":"우우","박정민":"우좌","김한결":"우우","쿄야마":"우우","이준서":"우우","지현":"우우","박준영02":"우우","에르난데스":"우우","왕옌청":"좌좌","쿠싱":"우우","강건우":"좌좌","짐머맨":"좌좌","긴지로":"좌좌","아빌라":"우우","신상연":"우우","타케다":"우우","베니지아노":"좌좌","해치":"우우","토다":"우우","버하겐":"우우","클레빈저":"우우","테일러":"우우","최요한":"좌좌","이재학":"우우","이태양":"우좌","임찬규":"우우","이우찬":"좌좌","홍건희":"우우","한승혁":"우좌","서진용":"우우","김원중":"우좌","임기영":"우우","문승원":"우우","이형범":"우우","배재준":"우우","함덕주":"좌좌","조상우":"우우","이재익":"좌좌","박진형":"우우","구승민":"우우","김종수":"우우","장현식":"우우","임정호":"좌좌","고영표":"우우","박세웅":"우우","하영민":"우우","김유영":"좌좌","이건욱":"우우","배재환":"우우","김민수":"우우","주권":"우우","김재윤":"우우","백승현":"우우","이상규":"우우","최원태":"우우","배제성":"우좌","김강현":"우좌","이민우":"우우","박정수":"우좌","주현상":"우우","김범수":"좌좌","구창모":"좌좌","류진욱":"우우","김선기":"우우","박세진":"좌좌","이영하":"우우","전상현":"우우","정동윤":"우좌","최성영":"좌좌","이정현":"우우","오석주":"우우","고우석":"우우","손주영":"좌좌","박치국":"우우","김재웅":"좌좌","문용익":"우우","최지광":"우우","나균안":"우우","윤성빈":"우우","박상원":"우우","김성민":"좌좌","김진호":"우우","최이준":"우우","김민":"우우","한두솔":"좌좌","성동현":"우우","곽빈":"우우","정철원":"우우","박신지":"우우","현도훈":"우좌","안우진":"우우","양창섭":"우우","이승헌":"우우","하준영":"좌좌","김정우":"우우","최민준":"우우","김영규":"좌좌","신민혁":"우우","김시훈":"우우","손동현":"우우","알칸타라":"우우","전용주":"좌좌","이상동":"우우","이정용":"우우","이상영":"좌좌","이교훈":"좌좌","윤산흠":"우우","조영건":"우우","원태인":"우우","장유호":"우우","백승건":"좌좌","송명기":"우좌","전사민":"우우","박지한":"좌좌","우규민":"우우","노경은":"우우","김진성":"우우","원종현":"우우","김건국":"우우","류현진":"좌우","이용찬":"우우","김강률":"우우","백정현":"좌좌"}; // throws + bats from the KBO profile
 
 var TEAM_IDS = Object.keys(ROSTERS);
 
@@ -394,6 +395,18 @@ var TAC_LABELS={
   hook:{normal:"보통", quick:"빠른 교체", long:"길게 맡김"}
 };
 function tacOf(cfg){ var t={}, k; for(k in DEFAULT_TAC) t[k]=DEFAULT_TAC[k]; if(cfg&&cfg.tac) for(k in cfg.tac) if(cfg.tac[k]!=null) t[k]=cfg.tac[k]; return t; }
+// throws and bats by name; generated players (draft picks, new imports) get a stable made-up side
+function handsOf(n){
+  var h=(typeof HANDS!=='undefined')&&HANDS[n]; if(h) return {t:h[0],b:h[1]};
+  var s=0,i; for(i=0;i<n.length;i++) s+=n.charCodeAt(i);
+  var m=s%10; return {t:(s*2)%10<3?'좌':'우', b:m<3?'좌':m<4?'양':'우'};
+}
+// same-side matchups favor the pitcher a little, opposite-side the hitter
+function platoon(m,batName,pitName){
+  var b=handsOf(batName).b, t=handsOf(pitName).t; if(b==='양') b=t==='좌'?'우':'좌';
+  if(b===t){ m.K+=0.006; m.HR-=0.0015; } else { m.K-=0.003; m.HR+=0.0008; }
+  return m;
+}
 // rate shifts for one plate appearance from both dugouts' settings and the base/out state
 // exO/exD(k) give how well each dugout executes its setting for tactic k: 1 = fully drilled
 // (AI clubs, or no data), lower = a plan the players haven't learned yet. An unlearned plan
@@ -591,10 +604,10 @@ function simGame(cfgH, cfgA, opts){
 // Call once per team per game played, with that game's box score.
 // Players who sat out recover; players who played wear down; tired players risk injury.
 // Returns the injuries that happened: [{n, type:'B'|'P', games}].
-function applyFatigue(teamId, box){
-  var r=ROSTERS[teamId], b=box&&box[teamId], hurt=[];
+function applyFatigue(teamId, box, wear){
+  var r=ROSTERS[teamId], b=box&&box[teamId], hurt=[], injM=(wear&&wear.inj)||1, penUp=(wear&&wear.pen)||0;
   function maybeInjure(p){
-    var chance = 0.002 + Math.max(0, 60-cond(p))*0.0004;
+    var chance = (0.002 + Math.max(0, 60-cond(p))*0.0004)*injM;
     if(rnd()<chance){
       var roll=rnd(), games = roll<0.6? 2+Math.floor(rnd()*6) : roll<0.9? 8+Math.floor(rnd()*12) : 20+Math.floor(rnd()*25);
       p.inj=games; hurt.push({n:p.n, type:p.type, games:games});
@@ -610,7 +623,7 @@ function applyFatigue(teamId, box){
     if(isInjured(p)){ p.inj--; p.cond=Math.min(100,cond(p)+20); return; }
     var s=b&&b.pit[p.n];
     if(s&&s.BF>0){ p.cond=clamp(cond(p)-s.BF*(p.role==="SP"?3.2:3.5),0,100); maybeInjure(p); }
-    else p.cond=Math.min(100,cond(p)+(p.role==="SP"?20:15));
+    else p.cond=Math.min(100,cond(p)+(p.role==="SP"?20:15+penUp));
   });
   return hurt;
 }
@@ -739,6 +752,7 @@ IP.setTac=function(t,k,v){ this.tac[t][k]=v; };
 // how well team t executes its current setting for tactic k (1 = fully drilled)
 IP.ex=function(t,k){ var f=this.fam[t]; if(!f||!f[k]) return 1; var v=f[k][String(this.tac[t][k])]; return v==null? 1 : v; };
 IP.orderCmd=function(t,c){ this.cmd[t]=c; };
+IP.edge=function(t,k){ var e=this.cfg[t].edge; return (e&&e[k])||0; };
 IP.catcher=function(t){ var i=this.pos[t].indexOf('C'); return i>=0? getB(t,this.lineup[t][i]) : null; };
 IP.bench=function(t){var lu=this.lineup[t], gone=this.removed[t];return ROSTERS[t].batters.filter(function(b){return lu.indexOf(b.n)<0 && gone.indexOf(b.n)<0 && !isInjured(b);});};
 IP.availPitchers=function(t){var used=this.pUsed[t];return ROSTERS[t].pitchers.filter(function(p){return used.indexOf(p.n)<0 && !isInjured(p);});};
@@ -820,7 +834,7 @@ IP._decide=function(){
   [w,l].forEach(function(t){
     var lastT=self.pitcher[t];
     self.pUsed[t].forEach(function(n){
-      if(n===self.sp[t] || n===lastT || (t===w&&n===winP)) return;
+      if(n===self.sp[t] || n===lastT || (t===w&&n===winP) || (t===l&&n===ga.loseP)) return;
       var e=self.entryLead[t][n], s=box[t].pit[n];
       if(e>=1 && e<=3 && s.OUT>=1 && !self.blown[t+'|'+n]){ s.HD=1; if(t===w) dec.HD.push(n); }
     });
@@ -840,7 +854,7 @@ IP._stealTry=function(off,def,forced){
     if(rnd()>=tryP) return null;
   }
   var c=this.catcher(def), arm=c? c.arm-posFit(c,'C')*0.5 : 60;
-  var ok = rnd() < clamp(0.66 + (p.spd-75)*0.009 - (arm-70)*0.007 - (this.tac[off].run==="aggr"?0.04+0.06*(1-this.ex(off,"run")):0), 0.4, 0.93);
+  var ok = rnd() < clamp(0.66 + (p.spd-75)*0.009 - (arm-70)*0.007 - (this.tac[off].run==="aggr"?0.04+0.06*(1-this.ex(off,"run")):0) + this.edge(off,'run') - this.edge(def,'arm'), 0.4, 0.93);
   return {runner:r.n, oc: ok?'SB':'CS'};
 };
 // sacrifice bunt: runner on first or second, nobody out (one out on the dugout's sign), weak bat or a tight late game
@@ -888,7 +902,7 @@ IP.prepareAB=function(){
     return this._pending;
   }
   var fatigue=Math.max(0,(this.pBF[def]-(pit.role==='SP'?18:4))*0.7);
-  var oc=simPA(bat,pit,fatigue,this.defense(def),scoutMods(paMods(this.tac[off],this.tac[def],this.bases,this.outs,this.ex.bind(this,off),this.ex.bind(this,def)),this.know[off],this.know[def]));
+  var oc=simPA(bat,pit,fatigue,this.defense(def),platoon(scoutMods(paMods(this.tac[off],this.tac[def],this.bases,this.outs,this.ex.bind(this,off),this.ex.bind(this,def)),this.know[off],this.know[def]),batName,this.pitcher[def]));
   var pitches=genPitchSeq(bat,pit,oc,(this.tac[off].atk==="patient"?0.35:0)+(this.tac[def].bat==="nibble"?0.35:0));
   this._pending={off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:oc,pitches:pitches,slot:slot};
   return this._pending;
@@ -994,7 +1008,7 @@ global.KBO = {
   newBatStat:newBatStat, newPitStat:newPitStat,
   getB:getB, getP:getP, InteractiveGame:InteractiveGame,
   cond:cond, mor:mor, isInjured:isInjured, applyFatigue:applyFatigue, restAdjust:restAdjust,
-  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf,
+  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf, handsOf:handsOf,
   POS_LIST:POS_LIST, posFit:posFit, fieldVal:fieldVal, teamDefense:teamDefense, autoPositions:autoPositions, positionIssues:positionIssues
 };
 
