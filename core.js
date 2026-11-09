@@ -279,18 +279,33 @@ function ovr(p){
   }
 }
 
+// ---- condition / morale (FM-style player state) ----
+// cond: 0..100 physical freshness, mor: 0..100 morale (60 = neutral), inj: games left on the injured list.
+// Missing fields (old saves, fresh rosters) read as fully fit and neutral.
+function cond(p){ return p.cond==null?100:p.cond; }
+function mor(p){ return p.mor==null?60:p.mor; }
+function isInjured(p){ return (p.inj||0)>0; }
+// rating points gained/lost from morale (about -3..+3)
+function moraleMod(p){ return (mor(p)-60)*0.08; }
+// batter rating points lost to tiredness (0 when cond >= 85, -5 at cond 60)
+function batTiredMod(p){ var c=cond(p); return c<85?(c-85)*0.2:0; }
+// extra pitcher fatigue carried in from earlier games (0 at cond 100, ~7.5 at cond 50)
+function pitCarryFatigue(p){ return (100-cond(p))*0.15; }
+
 // ---- plate appearance simulation ----
 // returns one of: K,BB,HBP,HR,1B,2B,3B,OUT
 function simPA(bat, pit, fatigue){
-  var fpen = fatigue||0; // 0..~25 reduces pitcher
+  var fpen = Math.max(-3, (fatigue||0) + pitCarryFatigue(pit) - moraleMod(pit)); // reduces pitcher
   var stu = pit.stu - fpen, ctl = pit.ctl - fpen, mov = pit.mov - fpen*0.6;
-  var pK  = clamp(0.18 + 0.0048*(stu - bat.con), 0.03, 0.42);
-  var pBB = clamp(0.086 + 0.0040*(bat.eye - ctl), 0.02, 0.21);
+  var bm = batTiredMod(bat) + moraleMod(bat);
+  var con = bat.con + bm, pow = bat.pow + bm, eye = bat.eye + bm;
+  var pK  = clamp(0.18 + 0.0048*(stu - con), 0.03, 0.42);
+  var pBB = clamp(0.086 + 0.0040*(eye - ctl), 0.02, 0.21);
   var pHBP= 0.011;
-  var pHR = clamp(0.030 + 0.0014*(bat.pow-70) - 0.0011*(mov-70), 0.004, 0.10);
+  var pHR = clamp(0.030 + 0.0014*(pow-70) - 0.0011*(mov-70), 0.004, 0.10);
   var rest = 1 - pK - pBB - pHBP - pHR;
   if(rest<0.05) rest=0.05;
-  var babip = clamp(0.307 + 0.0024*(bat.con-70) + 0.0016*(bat.spd-70) - 0.0019*(mov-70), 0.230, 0.385);
+  var babip = clamp(0.307 + 0.0024*(con-70) + 0.0016*(bat.spd-70) - 0.0019*(mov-70), 0.230, 0.385);
   var pHit = rest*babip;
   var pOut = rest*(1-babip);
   var r = rnd();
@@ -304,7 +319,7 @@ function simPA(bat, pit, fatigue){
   r -= pHR;
   if(r < pHit){
     // distribute hit type
-    var dShare = clamp(0.20 + 0.004*(bat.pow-70), 0.12, 0.34);
+    var dShare = clamp(0.20 + 0.004*(pow-70), 0.12, 0.34);
     var tShare = clamp(0.012 + 0.0018*(bat.spd-70), 0.004, 0.05);
     var rr = rnd();
     if(rr < tShare) return "3B";
@@ -397,6 +412,25 @@ function defaultLineup(teamId){
 function getP(teamId,name){return ROSTERS[teamId].pitchers.find(function(p){return p.n===name;});}
 function getB(teamId,name){return ROSTERS[teamId].batters.find(function(p){return p.n===name;});}
 
+// Relievers below this condition are skipped while a fresher arm is available.
+var TIRED_RP = 55;
+// Next reliever from bullpen[idx..]: the first unused, healthy, rested arm, else the first unused one.
+// Returns {name, idx} (idx = where the next search starts) or null.
+function nextReliever(teamId, bullpen, idx, used){
+  var fallback=null;
+  for(var i=idx;i<bullpen.length;i++){
+    var n=bullpen[i]; if(used.indexOf(n)>=0) continue;
+    var p=getP(teamId,n); if(!p||isInjured(p)) continue;
+    if(cond(p)>=TIRED_RP) return {name:n, idx:i+1};
+    if(!fallback) fallback={name:n, idx:i+1};
+  }
+  return fallback;
+}
+function closerReady(teamId, name, used){
+  var p=name&&getP(teamId,name);
+  return !!p && used.indexOf(name)<0 && !isInjured(p) && cond(p)>=TIRED_RP;
+}
+
 // Simulate a full game. cfgA/cfgB = {teamId, lineup[], spName, bullpen[], closer}
 // statsStore optional: {teamId:{bat:{name:stat}, pit:{name:stat}}}
 function simGame(cfgH, cfgA, opts){
@@ -428,15 +462,11 @@ function simGame(cfgH, cfgA, opts){
     var tired = def.pitcherBF >= fatigueLimit;
     var blownUp = def.pitcherRuns>=5;
     // closer logic handled separately in 9th
-    if((tired||blownUp) && def.bullpenIdx < def.cfg.bullpen.length){
-      // pick next bullpen arm not used
-      var next=null;
-      while(def.bullpenIdx < def.cfg.bullpen.length){
-        var cand = def.cfg.bullpen[def.bullpenIdx++];
-        if(def.pitchersUsed.indexOf(cand)<0){next=cand;break;}
-      }
+    if(tired||blownUp){
+      var next = nextReliever(def.id, def.cfg.bullpen, def.bullpenIdx, def.pitchersUsed);
       if(next){
-        def.pitcherName=next; def.pitcherBF=0; def.pitcherRuns=0; def.pitchersUsed.push(next);
+        def.bullpenIdx=next.idx;
+        def.pitcherName=next.name; def.pitcherBF=0; def.pitcherRuns=0; def.pitchersUsed.push(next.name);
       }
     }
   }
@@ -457,7 +487,7 @@ function simGame(cfgH, cfgA, opts){
     // closer in save situation, inning 9+, defense leading by 1-3
     if(inning>=9){
       var lead = def.runs - off.runs;
-      if(lead>=1 && lead<=3 && def.cfg.closer && def.pitchersUsed.indexOf(def.cfg.closer)<0){
+      if(lead>=1 && lead<=3 && closerReady(def.id, def.cfg.closer, def.pitchersUsed)){
         def.pitcherName=def.cfg.closer; def.pitcherBF=0; def.pitcherRuns=0; def.pitchersUsed.push(def.cfg.closer);
       }
     }
@@ -526,6 +556,74 @@ function simGame(cfgH, cfgA, opts){
   return result;
 }
 
+// ============ BETWEEN-GAME WEAR, RECOVERY, INJURIES ============
+// Call once per team per game played, with that game's box score.
+// Players who sat out recover; players who played wear down; tired players risk injury.
+// Returns the injuries that happened: [{n, type:'B'|'P', games}].
+function applyFatigue(teamId, box){
+  var r=ROSTERS[teamId], b=box&&box[teamId], hurt=[];
+  function maybeInjure(p){
+    var chance = 0.002 + Math.max(0, 60-cond(p))*0.0004;
+    if(rnd()<chance){
+      var roll=rnd(), games = roll<0.6? 2+Math.floor(rnd()*6) : roll<0.9? 8+Math.floor(rnd()*12) : 20+Math.floor(rnd()*25);
+      p.inj=games; hurt.push({n:p.n, type:p.type, games:games});
+    }
+  }
+  r.batters.forEach(function(p){
+    if(isInjured(p)){ p.inj--; p.cond=Math.min(100,cond(p)+8); return; }
+    var s=b&&b.bat[p.n];
+    if(s&&s.PA>0){ p.cond=clamp(cond(p)-(p.pos==="C"?2:1),0,100); maybeInjure(p); }
+    else p.cond=Math.min(100,cond(p)+8);
+  });
+  r.pitchers.forEach(function(p){
+    if(isInjured(p)){ p.inj--; p.cond=Math.min(100,cond(p)+20); return; }
+    var s=b&&b.pit[p.n];
+    if(s&&s.BF>0){ p.cond=clamp(cond(p)-s.BF*(p.role==="SP"?3.2:3.5),0,100); maybeInjure(p); }
+    else p.cond=Math.min(100,cond(p)+(p.role==="SP"?20:15));
+  });
+  return hurt;
+}
+
+// Lineup positions that can cover each other when a starter sits.
+var POS_GROUP={"C":"C","1B":"IF","2B":"IF","3B":"IF","SS":"IF","LF":"OF","CF":"OF","RF":"OF","DH":"DH"};
+// Return a copy of cfg with injured players (and, when restBelow is set, tired batters and
+// starters) swapped for the best available alternatives. `forceRest` names players to sit.
+function restAdjust(teamId, cfg, opts){
+  opts=opts||{};
+  var restBelow=opts.restBelow||0, forceRest=opts.forceRest||[], out={}, k;
+  for(k in cfg) out[k]=cfg[k];
+  var lineup=cfg.lineup.slice(), r=ROSTERS[teamId];
+  function unavailable(p){ return !p || isInjured(p) || forceRest.indexOf(p.n)>=0 || (restBelow && cond(p)<restBelow); }
+  lineup.forEach(function(n,i){
+    var p=getB(teamId,n);
+    if(!unavailable(p)) return;
+    var grp=p?POS_GROUP[p.pos]:null, best=null, bestScore=-1e9;
+    r.batters.forEach(function(c){
+      if(lineup.indexOf(c.n)>=0 || isInjured(c) || forceRest.indexOf(c.n)>=0) return;
+      var score=ovr(c) + (POS_GROUP[c.pos]===grp?12:0) + (grp==="C"&&c.pos!=="C"?-30:0) - (cond(c)<restBelow+10?8:0);
+      if(score>bestScore){bestScore=score;best=c;}
+    });
+    // nobody fresh on the bench: an injured starter must still sit, a tired one plays on
+    if(best) lineup[i]=best.n;
+  });
+  out.lineup=lineup;
+  if(cfg.spName){
+    var sp=getP(teamId,cfg.spName);
+    if(!sp || isInjured(sp) || cond(sp)<50){
+      var pool=(cfg.rotation||[]).concat(r.pitchers.filter(function(p){return p.role!=="CL";}).map(function(p){return p.n;}));
+      var alt=pool.map(function(n){return getP(teamId,n);}).filter(function(p){return p && !isInjured(p) && cond(p)>=70;})
+        .sort(function(a,b){ return (b.role==="SP")-(a.role==="SP") || cond(b)-cond(a) || ovr(b)-ovr(a); })[0];
+      if(alt) out.spName=alt.n;
+    }
+  }
+  var healthy=function(n){ var p=getP(teamId,n); return p && !isInjured(p) && n!==out.spName; };
+  out.bullpen=(cfg.bullpen||[]).filter(healthy);
+  // injured relievers off the bullpen list; add healthy spare starters at the back as long men
+  r.pitchers.forEach(function(p){ if(p.role==="SP" && healthy(p.n) && out.bullpen.indexOf(p.n)<0 && (cfg.rotation||[]).indexOf(p.n)<0) out.bullpen.push(p.n); });
+  if(out.closer && !healthy(out.closer)) out.closer=out.bullpen[0];
+  return out;
+}
+
 // ============ PITCH-BY-PITCH GENERATION ============
 var PITCH_TYPES=[
   {k:'직구',base:147,sp:5},{k:'투심',base:144,sp:4},
@@ -589,18 +687,18 @@ IP.defId=function(){return this.half==='top'?this.h:this.a;};
 IP.dueBatterName=function(){var o=this.offId();return this.lineup[o][this.order[o]%this.lineup[o].length];};
 IP.dueBatter=function(){return getB(this.offId(), this.dueBatterName());};
 IP.curPitcher=function(){return getP(this.defId(), this.pitcher[this.defId()]);};
-IP.bench=function(t){var lu=this.lineup[t];return ROSTERS[t].batters.filter(function(b){return lu.indexOf(b.n)<0;});};
-IP.availPitchers=function(t){var used=this.pUsed[t];return ROSTERS[t].pitchers.filter(function(p){return used.indexOf(p.n)<0;});};
+IP.bench=function(t){var lu=this.lineup[t];return ROSTERS[t].batters.filter(function(b){return lu.indexOf(b.n)<0 && !isInjured(b);});};
+IP.availPitchers=function(t){var used=this.pUsed[t];return ROSTERS[t].pitchers.filter(function(p){return used.indexOf(p.n)<0 && !isInjured(p);});};
 IP.subPitcher=function(t,name){ if(this.pUsed[t].indexOf(name)>=0)return false; var p=getP(t,name); if(!p)return false; this.pitcher[t]=name; this.pUsed[t].push(name); this.pBF[t]=0; this.pRuns[t]=0; this.ptot[t]=0; this.pstr[t]=0; this.pball[t]=0; return true;};
 IP.pinchHit=function(t,name){ var lu=this.lineup[t]; if(lu.indexOf(name)>=0)return false; var p=getB(t,name); if(!p)return false; lu[this.order[t]%lu.length]=name; return true;};
 IP._autoManage=function(){
   var def=this.defId(); var p=getP(def,this.pitcher[def]);
   if(this.inning>=9){ var lead=this.score[def]-this.score[this.offId()]; var cl=this.cfg[def].closer;
-    if(lead>=1&&lead<=3&&cl&&this.pUsed[def].indexOf(cl)<0){ this.subPitcher(def,cl); return; } }
+    if(lead>=1&&lead<=3&&closerReady(def,cl,this.pUsed[def])){ this.subPitcher(def,cl); return; } }
   var isSP=p.role==='SP'; var lim=isSP?(20+Math.round(p.sta*0.18)):6;
   if(this.pBF[def]>=lim||this.pRuns[def]>=5){
-    var bp=this.cfg[def].bullpen;
-    while(this.bpIdx[def]<bp.length){ var cand=bp[this.bpIdx[def]++]; if(this.pUsed[def].indexOf(cand)<0){ this.subPitcher(def,cand); break; } }
+    var next=nextReliever(def,this.cfg[def].bullpen,this.bpIdx[def],this.pUsed[def]);
+    if(next){ this.bpIdx[def]=next.idx; this.subPitcher(def,next.name); }
   }
 };
 IP._endHalf=function(){
@@ -672,7 +770,8 @@ IP.result=function(){
 global.KBO = {
   ROSTERS:ROSTERS, TEAM_IDS:TEAM_IDS, ovr:ovr, simPA:simPA, simGame:simGame,
   defaultLineup:defaultLineup, newBatStat:newBatStat, newPitStat:newPitStat,
-  getB:getB, getP:getP, InteractiveGame:InteractiveGame
+  getB:getB, getP:getP, InteractiveGame:InteractiveGame,
+  cond:cond, mor:mor, isInjured:isInjured, applyFatigue:applyFatigue, restAdjust:restAdjust
 };
 
 })(typeof window!=="undefined"?window:globalThis);
