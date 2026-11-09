@@ -226,33 +226,6 @@ function preseasonControls(){
       <button class="btn" onclick="FM.springSimAll()">⏩ 남은 시범경기 시뮬레이션</button></div>`
     : `<div class="row"><button class="btn gold" onclick="FM.openSeason()">🎉 ${state.year} 정규시즌 개막!</button></div>`;
 }
-function campPicker(){
-  const cur=fm().camp&&fm().camp.year===state.year? fm().camp.focus : null;
-  modal(`<span class="closeX" onclick="App.closeModal()">×</span><h2>🏕 ${state.year} 스프링캠프 훈련 방향</h2>
-    <div class="hint" style="margin-bottom:10px">젊은 선수일수록 훈련 효과가 큽니다. 캠프가 끝나면 수석코치가 성장한 선수를 보고합니다.</div>
-    <div class="grid" style="gap:8px">${Object.entries(CAMP).map(([k,c])=>`<button class="btn ${cur===k?'primary':''}" onclick="FM.setCamp('${k}')" style="text-align:left"><b>${c.label}</b> <span class="muted">— ${c.d}</span></button>`).join('')}</div>`);
-}
-function setCamp(k){ fm().camp={year:state.year, focus:k}; closeModal(); render(); if(window.Track) Track.action('camp'); }
-// camp: young players gain most in the chosen area
-function applyCamp(){
-  const f=fm(), c=CAMP[f.camp.focus], gains=[];
-  if(f.camp.focus==='tac'){ const tf=tfState(), plans=activePlans();
-    plans.forEach(x=>tf[x.k][x.v]=Math.min(100,tf[x.k][x.v]+TF_CAMP)); allPlayers(USER).forEach(p=>addMor(p,2));
-    return `${c.label} — ${plans.length? plans.map(x=>`${tacName(x.k)} '${tacLabel(x.k,x.v==='true'?true:x.v)}' 숙련 ${famOf(x.k,x.v)}%`).join(', ') : '특수 작전이 없어 기본기 위주로 훈련했습니다'}`; }
-  allPlayers(USER).forEach(p=>{
-    const keys = c.keys? (c.type===p.type? c.keys : []) : (p.type==='B'? ['con','pow','eye','spd','fld','arm'] : ['stu','ctl','mov','sta']);
-    if(!keys.length) return;
-    const base = p.age<=24? 0.9 : p.age<=28? 0.55 : p.age<=32? 0.3 : 0.1; // chance of +1 per trained attribute
-    let tot=0;
-    // camp works within potential too: a gain that would carry him past it doesn't stick
-    keys.forEach(k=>{ const g=Math.random()<base*(c.keys?1:0.5)? 1 : 0; if(!g||p[k]>=99) return;
-      const was=K.ovr(p); p[k]++; if(K.ovr(p)>Math.max(p.pot||0,was)) p[k]--; else tot++; });
-    if(f.camp.focus==='fit') p.cond=100;
-    if(tot>=2) gains.push(`${p.n} (+${tot})`);
-  });
-  allPlayers(USER).forEach(p=>addMor(p,2));
-  return `${c.label} — 성장: ${gains.slice(0,8).join(', ')||'눈에 띄는 변화 없음'}`;
-}
 function startSpring(){
   const f=fm();
   if(!(f.camp&&f.camp.year===state.year&&f.camp.focus)){ campPicker(); return; }
@@ -280,6 +253,7 @@ function springRecord(res){
   const add=(dst,src)=>{ for(const k in src) if(typeof src[k]==='number') dst[k]=(dst[k]||0)+src[k]; };
   for(const nm in bx.bat){ add(sp.stats.bat[nm]||(sp.stats.bat[nm]={}), bx.bat[nm]); }
   for(const nm in bx.pit){ add(sp.stats.pit[nm]||(sp.stats.pit[nm]={}), bx.pit[nm]); }
+  sharpAfterSpring(res);
   tacticsAfterGame(res,false); // spring games drill the plans but teach little about opponents
   gameReport(res,'spring');
   if(!springNext()) send('수석코치','📋',`시범경기 종료 (${sp.W}승 ${sp.L}패 ${sp.T}무)`, '시범경기 일정을 모두 마쳤습니다. 대시보드에서 정규시즌 개막을 선언하세요.', []);
@@ -316,6 +290,7 @@ function openSeason(){
   state.phase='regular';
   if(state.fm) pressMediaDay();
   K.TEAM_IDS.forEach(t=>allPlayers(t).forEach(p=>{ p.cond=100; }));
+  sharpOnOpen();
   send('KBO','🎉',`${state.year} KBO 정규시즌 개막`, `${state.year} 시즌 144경기 대장정이 시작됩니다. ${K.ROSTERS[USER].name}의 개막전 상대는 ${(()=>{ const g=state.schedule.find(g=>g.home===USER||g.away===USER); return g? K.ROSTERS[g.home===USER?g.away:g.home].name : '-'; })()}입니다.`, []);
   render();
 }

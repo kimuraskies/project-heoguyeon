@@ -60,6 +60,7 @@ function coachDesk(ug){
 // contracts and goodwill are settled when the season ends
 function coachSeasonEnd(){
   const s=staffOf(USER), lines=[];
+  allPlayers(USER).forEach(p=>{ delete p.tough; });
   COACH_ROLES.forEach(([r,label])=>{ const c=coachInit(s[r]); c.yrs--;
     const quit=c.sat<30&&c.noN>c.okN, retire=c.age>=66, expired=c.yrs<=0&&c.sat<45;
     if(quit||retire||expired){ const used=new Set(); K.TEAM_IDS.forEach(t=>Object.values(staffOf(t)).forEach(x=>used.add(x.n)));

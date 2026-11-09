@@ -549,7 +549,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
     const g=pendingMatch(); if(!g) return;
     this.idx=state.pendingGame; this.ps=g.ps; this.spring=!!g.spring;
     this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away), {maxInnings:g.ps?15:g.spring?9:12});
-    this._ended=false; this.paused=false; this.panel=null; this.logOpen=window.innerWidth>=1000; this.commentaryOpen=false; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
+    this.wpLog=[]; this._ended=false; this.paused=false; this.panel=null; this.logOpen=window.innerWidth>=1000; this.commentaryOpen=false; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
     closeModal(); closePreview();
     let o=document.getElementById('relay'); if(o)o.remove();
     o=el('<div id="relay" class="matchpage"></div>');
@@ -566,6 +566,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
     const g=this.game, ab=this.ab;
     if(g.over && (!ab || ab.committed)){ this.end(); return; }
     if(!ab){ const p=g.prepareAB(); if(!p){ this.end(); return; }
+      const wpNow=winProb(g); this.wpLog.push(Math.round((g.h===USER?wpNow:1-wpNow)*100)/100);
       this.ab={pitches:p.pitches,shown:0,pre:false,susp:false,committed:false,pitName:p.pitName,batName:p.batName,off:p.off,def:p.def,slot:p.slot,oc:p.oc,ev:null,wp0:winProb(g),steal:p.kind==='steal',variant:p.variant,runner:p.runner,kind:p.kind||'pa'};
       this._say(Comm.intro(g,this.ab)); this.renderLive(); return; }
     if(ab.shown < ab.pitches.length){
@@ -604,7 +605,8 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
   // the final out keeps the result safe at once: it goes in the save, and if the page closes before
   // the manager leaves the broadcast, applySave records it on the next load
   end(){ if(this._ended)return; this._ended=true; this.paused=true; clearTimeout(this.timer);
-    state.finishedGame={idx:this.idx, ps:!!this.ps, spring:!!this.spring, res:this.game.result()};
+    const finalRes=this.game.result(); finalRes.wp=this.wpLog||null;
+    state.finishedGame={idx:this.idx, ps:!!this.ps, spring:!!this.spring, res:finalRes};
     autosave();
     if(window.Track) Track.match('end',{type:this.spring?'spring':this.ps?'ps':'regular'});
     this.renderLive(); },
@@ -1124,7 +1126,7 @@ function nextSeason(){
 }
 
 // ================= RENDERING =================
-const TABS=[["dash","dashboard","대시보드"],["inbox","inbox","받은편지함"],["feed","feed","피드"],["squad","squad","스쿼드"],["lineup","lineup","라인업"],["tactics","settings","팀 전술"],["train","camp","훈련"],["sched","schedule","일정·경기"],["stand","standings","순위"],["leaders","records","기록실"],["trade","trade","트레이드"],["club","club","구단"]];
+const TABS=[["dash","dashboard","대시보드"],["inbox","inbox","받은편지함"],["feed","feed","뉴스"],["squad","squad","스쿼드"],["lineup","lineup","라인업"],["tactics","settings","팀 전술"],["train","camp","훈련"],["sched","schedule","일정·경기"],["stand","standings","순위"],["leaders","records","기록실"],["trade","trade","트레이드"],["club","club","구단"]];
 
 function render(){
   FM.ensure();
@@ -1185,13 +1187,14 @@ function heroInfo(rank){
   const pad=n=>String(n).padStart(3,'0');
   if(ph==="stove"){
     const ready=!!(FM.ensure(), state.fm&&state.fm.camp&&state.fm.camp.year===state.year&&state.fm.camp.focus);
-    return {eyebrow:`${state.year} SEASON / PREPARATION`, title:"새 시즌의 첫 수를 두다.",
-      sub:`스토브리그 → 스프링캠프 → 시범경기 ${FM.SPRING_GAMES}경기 → 개막`, m:null, tbd:"시범경기",
+    const wk=FM.stoveWeek(), done=wk>FM.STOVE_WEEKS;
+    return {eyebrow:`${state.year} SEASON / PREPARATION`, title:done?"이제 캠프로 떠납니다.":`스토브리그 ${wk}주차`,
+      sub:`스토브리그 ${FM.STOVE_WEEKS}주 → 스프링캠프 4주 → 시범경기 ${FM.SPRING_GAMES}경기 → 개막`, m:null, tbd:"시범경기",
       starters:`<p>다음 경기 · 시범경기</p><strong>선발 미정 <span class="muted">vs</span> 선발 미정</strong><p>캠프를 마치면 시범경기 대진이 정해집니다.</p>`,
-      cta: ready? `<button class="btn primary hero-cta" onclick="FM.startSpring()">${I('play')}스프링캠프 출발</button>`
-                 : `<button class="btn primary hero-cta" onclick="FM.campPicker()">${I('camp')}캠프 방향 결정</button>`,
-      hint: ready? '준비 끝났어요. 출발하면 시범경기로 넘어갑니다. FA·편지는 나중에 봐도 돼요.' : '꼭 정할 건 훈련 방향 하나뿐이에요. FA·전술·편지는 나중에 봐도 시즌이 진행됩니다.',
-      more: (FM.canQuickStart()?FM.quickBtn():'')+(ready? `<button class="btn" onclick="FM.campPicker()">${I('camp')}훈련 방향 변경</button>` : '')};
+      cta: !done? `<button class="btn primary hero-cta" onclick="FM.stoveNext()">${I('play')}다음 주로</button>`
+           : `<button class="btn primary hero-cta" onclick="FM.campPicker()">${I('camp')}스프링캠프 계획</button>`,
+      hint: !done? '매주 다른 구단도 FA에 입찰합니다. 구단 탭에서 FA에게 제안을 넣을 수 있어요.' : (ready? '주간 훈련을 확인하고 출발하세요.' : '훈련 방향을 고르면 캠프를 시작할 수 있어요.'),
+      more: (FM.canQuickStart()?FM.quickBtn():'')+(!done? `<button class="btn" onclick="FM.stoveSkip()">캠프까지 건너뛰기</button>` : (ready? `<button class="btn" onclick="FM.startSpring()">남은 캠프 한 번에 진행</button>` : ''))};
   }
   if(ph==="spring"){
     const n=FM.springNext(), sp=state.spring;

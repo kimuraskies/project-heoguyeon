@@ -60,10 +60,10 @@ function prepareCfg(team, cfg){
   while(r.batters.filter(p=>!K.isInjured(p)).length<10) callUp(team,'B');
   while(r.pitchers.filter(p=>!K.isInjured(p)).length<8) callUp(team,'P','RP');
   const isUser=team===USER;
-  const opts={ restBelow: (!isUser||f.autoRest)? 70 : 0, forceRest: isUser? f.restNext : [] };
+  const opts={ restBelow: (!isUser||f.autoRest)? 70 : 0, forceRest: isUser? f.restNext.concat(state.phase==='spring'?springRest():[]) : [] };
   // relievers who joined after the bullpen was set (rookies, call-ups, trades) go to the back of it
   const extraRP=r.pitchers.filter(p=>p.role!=='SP' && p.n!==cfg.closer && (cfg.bullpen||[]).indexOf(p.n)<0).map(p=>p.n);
-  const extra=Object.assign({edge:coachEdge(team)}, isUser? {tacFam:execTable(), scoutKnow:knowTable(), splits:true, plan:userPlan()} : {tacFam:aiExecTable(team), scoutKnow:aiKnowTable(team)});
+  const extra=Object.assign({edge:coachEdge(team)}, isUser? {tacFam:execTable(), scoutKnow:knowTable(), splits:true, plan:userPlan(), sharp:state.phase==='regular'&&userGamesPlayed()<18} : {tacFam:aiExecTable(team), scoutKnow:aiKnowTable(team)});
   return K.restAdjust(team, Object.assign({}, cfg, extra, {rotation: state.cfgs[team].rotation, bullpen:(cfg.bullpen||[]).concat(extraRP)}), opts);
 }
 // what prepareCfg will change for the user's next game, for the preview screen

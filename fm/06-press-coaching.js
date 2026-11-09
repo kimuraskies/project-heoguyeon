@@ -61,7 +61,7 @@ function resultHTML(res,kind,info,next){
     <h1 class="result-title ${tie?'':won?'win':'loss'}">${tie?'무승부':won?'승리':'패배'}</h1>
     <p class="result-score"><b>${esc(K.ROSTERS[USER].name)}</b> <strong>${us} : ${th}</strong> <b>${esc(K.ROSTERS[opp].name)}</b></p>
     <div class="result-line"><table class="stat-table"><thead><tr><th></th>${head.join('')}<th class="result-r">R</th></tr></thead><tbody>${row(res.away)}${row(res.home)}</tbody></table></div>
-    <ul class="result-facts">${facts}</ul>${signLine(res)}
+    <ul class="result-facts">${facts}</ul>${signLine(res)}${wpChart(res.wp)}${coachWord(res,kind)}
     <section class="result-next"><div><small>다음 할 일</small><b>${esc(info.title)}</b><p class="muted">${info.sub||''}</p></div>
       <div class="result-btns"><button class="btn" onclick="Match.closeResult()">대시보드로</button>${next}</div></section>
   </div>`;
@@ -315,8 +315,8 @@ function coachPicker(role){
   modal(`<span class="closeX" onclick="App.closeModal()">×</span><h2>🧢 ${roleL} 교체</h2>
     <div class="muted">현재: <b>${esc(cur.n)}</b> ${coachStars(cur.q)} · 연봉 ${cur.sal}억 — 교체 시 위약금 ${pay}억 + 새 코치 첫해 연봉 지급</div>
     <table style="margin-top:12px"><thead><tr><th class="name">후보 (FA 코치)</th><th>능력</th><th>연봉</th><th></th></tr></thead><tbody>
-    ${cands.map((c,i)=>`<tr><td class="name">${esc(c.n)} <span class="pill" style="background:var(--panel2);color:var(--dim)">가상</span></td><td title="${c.q}/20">${coachStars(c.q)}</td><td>${c.sal}억</td>
-      <td><button class="btn primary" style="font-size:12px" onclick="FM.hireCoach('${role}','${q(c.n)}')">영입</button></td></tr>`).join('')||'<tr><td colspan="4" class="muted">이번 시즌 남은 후보가 없습니다.</td></tr>'}
+    ${cands.map((c,i)=>`<tr><td class="name">${esc(c.n)} <span class="pill" style="background:var(--panel2);color:var(--dim)">가상</span></td><td>${coachRange(c)}/20</td><td>${c.sal}억</td>
+      <td><button class="btn" style="font-size:12px" onclick="FM.coachInterview('${role}','${q(c.n)}')">면접</button> <button class="btn primary" style="font-size:12px" onclick="FM.hireCoach('${role}','${q(c.n)}')">영입</button></td></tr>`).join('')||'<tr><td colspan="4" class="muted">이번 시즌 남은 후보가 없습니다.</td></tr>'}
     </tbody></table><div class="hint" style="margin-top:8px">후보 명단은 매 시즌 새로 꾸려집니다.</div>`);
 }
 function hireCoach(role, n){
@@ -339,7 +339,7 @@ function renderFeed(){
   const f=fm(); let list=f.feed||[];
   if(feedFilter!=='all') list=list.filter(x=>x.kind===feedFilter);
   const ft=(id,l)=>`<button class="${feedFilter===id?'active':''}" onclick="FM.setFeedFilter('${id}')">${l}</button>`;
-  return `<div class="card"><h3>📰 피드 <span class="tag">경기 리포트 · 최근 160건</span></h3>
+  return `${newsHub()}<div class="card"><h3>기사 목록 <span class="tag">경기 리포트 · 최근 160건</span></h3>
     <div class="tabsm">${ft('all','전체')}${ft('regular','정규시즌')}${ft('ps','포스트시즌')}${ft('spring','시범경기')}${ft('press','언론')}</div>
     ${list.length? list.slice(0,60).map(x=>`<details style="border-bottom:1px solid var(--line);padding:8px 2px"${x===list[0]?' open':''}>
       <summary style="cursor:pointer"><b>${esc(x.title)}</b> <span class="muted" style="font-size:12px">· ${x.year} ${x.kind==='spring'?'시범경기':x.kind==='ps'?'포스트시즌':x.kind==='press'?'언론 · '+x.ug+'경기':x.ug+'경기'}</span></summary>

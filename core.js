@@ -343,6 +343,7 @@ var POS_GROUP={"C":"C","1B":"IF","2B":"IF","3B":"IF","SS":"IF","LF":"OF","CF":"O
 // rating points a fielder loses away from his own position (0 = natural spot)
 function posFit(p,pos){
   if(pos==="DH"||!p||p.pos===pos) return 0;
+  if(p.alt===pos) return 3;           // learned at camp
   if(pos==="C") return 30;            // nobody catches without being a catcher
   if(p.pos==="DH") return 18;
   if(pos==="1B") return p.pos==="C"?8:4;
@@ -641,7 +642,7 @@ function simGame(cfgH, cfgA, opts){
 function applyFatigue(teamId, box, wear){
   var r=ROSTERS[teamId], b=box&&box[teamId], hurt=[], injM=(wear&&wear.inj)||1, penUp=(wear&&wear.pen)||0;
   function maybeInjure(p){
-    var chance = (0.002 + Math.max(0, 60-cond(p))*0.0004)*injM;
+    var chance = (0.002 + Math.max(0, 60-cond(p))*0.0004)*injM*(p.tough?0.7:1);
     if(rnd()<chance){
       var roll=rnd(), games = roll<0.6? 2+Math.floor(rnd()*6) : roll<0.9? 8+Math.floor(rnd()*12) : 20+Math.floor(rnd()*25);
       p.inj=games; hurt.push({n:p.n, type:p.type, games:games});
@@ -1035,6 +1036,8 @@ IP.prepareAB=function(){
   var fatigue=Math.max(0,(this.pBF[def]-(pit.role==='SP'?18:4))*0.7);
   var mods=platoon(scoutMods(paMods(this.tac[off],this.tac[def],this.bases,this.outs,this.ex.bind(this,off),this.ex.bind(this,def)),this.know[off],this.know[def]),batName,this.pitcher[def]);
   mods=planMods(mods,this.cfg[off].plan,this.cfg[def].plan,batName,this.pitcher[def],bat,pit,this.know[off],this.know[def]);
+  if(this.cfg[off].sharp){ var sb=clamp(((bat.sharp==null?70:bat.sharp)-70)/30,-1,1); mods.K-=0.006*sb; mods.HR+=0.001*sb; mods.BIP+=0.004*sb; }
+  if(this.cfg[def].sharp){ var sp2=clamp(((pit.sharp==null?70:pit.sharp)-70)/30,-1,1); mods.K+=0.006*sp2; mods.HR-=0.001*sp2; mods.BIP-=0.004*sp2; }
   if(hr==='hitrun'){ mods.K-=0.012; mods.BIP+=0.012; mods.HR-=0.002; }
   else if(hr==='runhit'){ mods.K-=0.004; }
   else if(sign==='buster'){ mods.K-=0.01; mods.BIP+=0.016+(dcall==='buntd'?0.02:0); mods.HR-=0.003; }
