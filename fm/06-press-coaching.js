@@ -284,8 +284,8 @@ function staffOf(t){
   if(!cur[COACH_ROLES[COACH_ROLES.length-1][0]]){ const used=new Set(); for(const o in f.staff) for(const r in f.staff[o]) used.add(f.staff[o][r].n);
     COACH_ROLES.forEach(([r])=>{ if(!cur[r]) cur[r]=makeCoach(r,used,null,t); }); }
   // saves made before the real staffs: every coach the player didn't hire becomes the real one
-  f.staffDB=f.staffDB||{};
-  if(!f.staffDB[t]){ f.staffDB[t]=1; COACH_ROLES.forEach(([r])=>{ const d=dbCoach(t,r); if(d&&!(cur[r]&&cur[r].hired)) cur[r]=d; }); }
+  f.staffDB26=f.staffDB26||{};
+  if(!f.staffDB26[t]){ f.staffDB26[t]=1; COACH_ROLES.forEach(([r])=>{ const d=dbCoach(t,r); if(d&&!(cur[r]&&cur[r].hired)) cur[r]=d; }); }
   return cur;
 }
 function coachPool(){

@@ -1,9 +1,9 @@
 {
  "source": "KBO 구단별 선수 등록 현황 및 기록실",
- "fetched": "2026-11-09T14:58:42.605Z",
+ "fetched": "2026-11-09T15:36:09.287Z",
  "teams": {
   "삼성": {
-   "date": "20261012",
+   "date": "20260328",
    "coaches": [
     {
      "no": "70",
@@ -41,6 +41,41 @@
      }
     },
     {
+     "no": "33",
+     "n": "박한이",
+     "hand": "좌투좌타",
+     "birth": "1979-01-28",
+     "mgr": false,
+     "rec": {
+      "pos": "외야수",
+      "isP": false,
+      "totals": {
+       "AVG": 0.294,
+       "G": 2127,
+       "PA": 8712,
+       "AB": 7392,
+       "R": 1211,
+       "H": 2174,
+       "2B": 368,
+       "3B": 32,
+       "HR": 146,
+       "TB": 3044,
+       "RBI": 906,
+       "SB": 149,
+       "CS": 102,
+       "BB": 1028,
+       "HBP": 70,
+       "SO": 1130,
+       "GDP": 156,
+       "SLG": 0.412,
+       "OBP": 0.383,
+       "E": 42,
+       "years": 19
+      },
+      "link": "/Record/Retire/Hitter.aspx?playerId=71432"
+     }
+    },
+    {
      "no": "76",
      "n": "손주인",
      "hand": "우투우타",
@@ -73,41 +108,6 @@
        "years": 15
       },
       "link": "/Record/Retire/Hitter.aspx?playerId=72456"
-     }
-    },
-    {
-     "no": "77",
-     "n": "배영섭",
-     "hand": "우투우타",
-     "birth": "1986-06-27",
-     "mgr": false,
-     "rec": {
-      "pos": "외야수",
-      "isP": false,
-      "totals": {
-       "AVG": 0.275,
-       "G": 633,
-       "PA": 2256,
-       "AB": 1944,
-       "R": 300,
-       "H": 534,
-       "2B": 83,
-       "3B": 7,
-       "HR": 16,
-       "TB": 679,
-       "RBI": 169,
-       "SB": 94,
-       "CS": 32,
-       "BB": 225,
-       "HBP": 51,
-       "SO": 324,
-       "GDP": 42,
-       "SLG": 0.349,
-       "OBP": 0.363,
-       "E": 10,
-       "years": 9
-      },
-      "link": "/Record/Retire/Hitter.aspx?playerId=79465"
      }
     },
     {
@@ -327,7 +327,7 @@
    ]
   },
   "KT": {
-   "date": "20261012",
+   "date": "20260328",
    "coaches": [
     {
      "no": "71",
@@ -709,7 +709,7 @@
    ]
   },
   "KIA": {
-   "date": "20261012",
+   "date": "20260328",
    "coaches": [
     {
      "no": "71",
@@ -1038,7 +1038,7 @@
    ]
   },
   "LG": {
-   "date": "20261012",
+   "date": "20260328",
    "coaches": [
     {
      "no": "85",
@@ -1179,74 +1179,12 @@
      }
     },
     {
-     "no": "75",
-     "n": "김용의",
-     "hand": "우투좌타",
-     "birth": "1985-08-20",
-     "mgr": false,
-     "rec": {
-      "pos": "내야수",
-      "isP": false,
-      "totals": {
-       "AVG": 0.26,
-       "G": 980,
-       "PA": 2053,
-       "AB": 1782,
-       "R": 322,
-       "H": 463,
-       "2B": 56,
-       "3B": 17,
-       "HR": 9,
-       "TB": 580,
-       "RBI": 165,
-       "SB": 106,
-       "CS": 42,
-       "BB": 202,
-       "HBP": 9,
-       "SO": 400,
-       "GDP": 25,
-       "SLG": 0.325,
-       "OBP": 0.336,
-       "E": 23,
-       "years": 11
-      },
-      "link": "/Record/Retire/Hitter.aspx?playerId=78217"
-     }
-    },
-    {
-     "no": "76",
-     "n": "윤진호",
+     "no": "80",
+     "n": "스즈키",
      "hand": "우투우타",
-     "birth": "1986-06-23",
+     "birth": "1975-05-23",
      "mgr": false,
-     "rec": {
-      "pos": "내야수",
-      "isP": false,
-      "totals": {
-       "AVG": 0.154,
-       "G": 403,
-       "PA": 288,
-       "AB": 260,
-       "R": 42,
-       "H": 40,
-       "2B": 10,
-       "3B": 0,
-       "HR": 1,
-       "TB": 53,
-       "RBI": 15,
-       "SB": 6,
-       "CS": 4,
-       "BB": 11,
-       "HBP": 2,
-       "SO": 70,
-       "GDP": 9,
-       "SLG": 0.204,
-       "OBP": 0.194,
-       "E": 19,
-       "years": 9
-      },
-      "link": "/Record/Retire/Hitter.aspx?playerId=79198"
-     }
+     "rec": null
     },
     {
      "no": "81",
@@ -1281,41 +1219,6 @@
        "years": 1
       },
       "link": "/Record/Retire/Hitter.aspx?playerId=92905"
-     }
-    },
-    {
-     "no": "82",
-     "n": "최경철",
-     "hand": "우투우타",
-     "birth": "1980-08-15",
-     "mgr": false,
-     "rec": {
-      "pos": "포수",
-      "isP": false,
-      "totals": {
-       "AVG": 0.211,
-       "G": 560,
-       "PA": 1068,
-       "AB": 925,
-       "R": 95,
-       "H": 195,
-       "2B": 32,
-       "3B": 3,
-       "HR": 10,
-       "TB": 263,
-       "RBI": 89,
-       "SB": 8,
-       "CS": 5,
-       "BB": 68,
-       "HBP": 23,
-       "SO": 252,
-       "GDP": 13,
-       "SLG": 0.284,
-       "OBP": 0.28,
-       "E": 22,
-       "years": 11
-      },
-      "link": "/Record/Retire/Hitter.aspx?playerId=73824"
      }
     },
     {
@@ -1387,6 +1290,41 @@
      }
     },
     {
+     "no": "94",
+     "n": "김재율",
+     "hand": "우투우타",
+     "birth": "1989-01-14",
+     "mgr": false,
+     "rec": {
+      "pos": "내야수",
+      "isP": false,
+      "totals": {
+       "AVG": 0.253,
+       "G": 149,
+       "PA": 320,
+       "AB": 289,
+       "R": 31,
+       "H": 73,
+       "2B": 14,
+       "3B": 0,
+       "HR": 7,
+       "TB": 108,
+       "RBI": 40,
+       "SB": 0,
+       "CS": 1,
+       "BB": 21,
+       "HBP": 4,
+       "SO": 61,
+       "GDP": 12,
+       "SLG": 0.374,
+       "OBP": 0.31,
+       "E": 3,
+       "years": 6
+      },
+      "link": "/Record/Retire/Hitter.aspx?playerId=61114"
+     }
+    },
+    {
      "no": "97",
      "n": "모창민",
      "hand": "우투우타",
@@ -1424,7 +1362,7 @@
    ]
   },
   "두산": {
-   "date": "20261012",
+   "date": "20260328",
    "coaches": [
     {
      "no": "70",
@@ -1781,7 +1719,7 @@
    ]
   },
   "SSG": {
-   "date": "20260920",
+   "date": "20260328",
    "coaches": [
     {
      "no": "71",
@@ -2113,7 +2051,7 @@
    ]
   },
   "롯데": {
-   "date": "20261012",
+   "date": "20260328",
    "coaches": [
     {
      "no": "88",
@@ -2216,6 +2154,41 @@
        "years": 3
       },
       "link": "/Record/Retire/Pitcher.aspx?playerId=75539"
+     }
+    },
+    {
+     "no": "80",
+     "n": "백용환",
+     "hand": "우투우타",
+     "birth": "1989-03-20",
+     "mgr": false,
+     "rec": {
+      "pos": "포수",
+      "isP": false,
+      "totals": {
+       "AVG": 0.203,
+       "G": 390,
+       "PA": 862,
+       "AB": 752,
+       "R": 81,
+       "H": 153,
+       "2B": 28,
+       "3B": 0,
+       "HR": 29,
+       "TB": 268,
+       "RBI": 83,
+       "SB": 5,
+       "CS": 3,
+       "BB": 90,
+       "HBP": 6,
+       "SO": 231,
+       "GDP": 26,
+       "SLG": 0.356,
+       "OBP": 0.292,
+       "E": 20,
+       "years": 10
+      },
+      "link": "/Record/Retire/Hitter.aspx?playerId=78643"
      }
     },
     {
@@ -2359,76 +2332,6 @@
      }
     },
     {
-     "no": "90",
-     "n": "정경배",
-     "hand": "우투우타",
-     "birth": "1974-02-20",
-     "mgr": false,
-     "rec": {
-      "pos": "내야수",
-      "isP": false,
-      "totals": {
-       "AVG": 0.266,
-       "G": 1322,
-       "PA": 4598,
-       "AB": 3991,
-       "R": 525,
-       "H": 1062,
-       "2B": 203,
-       "3B": 10,
-       "HR": 100,
-       "TB": 1585,
-       "RBI": 522,
-       "SB": 70,
-       "CS": 57,
-       "BB": 314,
-       "HBP": 118,
-       "SO": 754,
-       "GDP": 82,
-       "SLG": 0.397,
-       "OBP": 0.335,
-       "E": 104,
-       "years": 14
-      },
-      "link": "/Record/Retire/Hitter.aspx?playerId=96441"
-     }
-    },
-    {
-     "no": "93",
-     "n": "용덕한",
-     "hand": "우투우타",
-     "birth": "1981-04-09",
-     "mgr": false,
-     "rec": {
-      "pos": "포수",
-      "isP": false,
-      "totals": {
-       "AVG": 0.226,
-       "G": 653,
-       "PA": 1100,
-       "AB": 988,
-       "R": 106,
-       "H": 223,
-       "2B": 36,
-       "3B": 1,
-       "HR": 9,
-       "TB": 288,
-       "RBI": 74,
-       "SB": 7,
-       "CS": 7,
-       "BB": 59,
-       "HBP": 15,
-       "SO": 203,
-       "GDP": 33,
-       "SLG": 0.291,
-       "OBP": 0.277,
-       "E": 22,
-       "years": 11
-      },
-      "link": "/Record/Retire/Hitter.aspx?playerId=74223"
-     }
-    },
-    {
      "no": "94",
      "n": "이성곤",
      "hand": "우투좌타",
@@ -2499,7 +2402,7 @@
    ]
   },
   "NC": {
-   "date": "20260920",
+   "date": "20260328",
    "coaches": [
     {
      "no": "27",
@@ -2836,7 +2739,7 @@
    ]
   },
   "한화": {
-   "date": "20260920",
+   "date": "20260328",
    "coaches": [
     {
      "no": "74",
@@ -2874,36 +2777,38 @@
      }
     },
     {
-     "no": "72",
-     "n": "박승민",
-     "hand": "우언우타",
-     "birth": "1977-03-18",
+     "no": "62",
+     "n": "강인권",
+     "hand": "우투우타",
+     "birth": "1972-06-26",
      "mgr": false,
      "rec": {
-      "pos": "투수",
-      "isP": true,
+      "pos": "포수",
+      "isP": false,
       "totals": {
-       "ERA": 3.13,
-       "G": 264,
-       "CG": 0,
-       "SHO": 0,
-       "W": 17,
-       "L": 18,
-       "SV": 44,
-       "HLD": 29,
-       "WPCT": 0.486,
-       "TBF": 1086,
-       "IP": 262,
-       "H": 208,
-       "HR": 18,
-       "BB": 89,
-       "HBP": 30,
-       "SO": 216,
-       "R": 97,
-       "ER": 91,
-       "years": 10
+       "AVG": 0.244,
+       "G": 710,
+       "PA": 1494,
+       "AB": 1252,
+       "R": 114,
+       "H": 305,
+       "2B": 41,
+       "3B": 2,
+       "HR": 8,
+       "TB": 374,
+       "RBI": 119,
+       "SB": 7,
+       "CS": 12,
+       "BB": 160,
+       "HBP": 35,
+       "SO": 264,
+       "GDP": 20,
+       "SLG": 0.299,
+       "OBP": 0.343,
+       "E": 42,
+       "years": 12
       },
-      "link": "/Record/Retire/Pitcher.aspx?playerId=70349"
+      "link": "/Record/Retire/Hitter.aspx?playerId=95712"
      }
     },
     {
@@ -2940,38 +2845,36 @@
      }
     },
     {
-     "no": "80",
-     "n": "고동진",
+     "no": "79",
+     "n": "양상문",
      "hand": "좌투좌타",
-     "birth": "1980-04-01",
+     "birth": "1961-03-24",
      "mgr": false,
      "rec": {
-      "pos": "외야수",
-      "isP": false,
+      "pos": "투수",
+      "isP": true,
       "totals": {
-       "AVG": 0.249,
-       "G": 820,
-       "PA": 2652,
-       "AB": 2296,
-       "R": 311,
-       "H": 572,
-       "2B": 97,
-       "3B": 7,
-       "HR": 21,
-       "TB": 746,
-       "RBI": 201,
-       "SB": 62,
-       "CS": 34,
-       "BB": 214,
-       "HBP": 73,
-       "SO": 428,
-       "GDP": 52,
-       "SLG": 0.325,
-       "OBP": 0.331,
-       "E": 19,
-       "years": 10
+       "ERA": 3.59,
+       "G": 272,
+       "CG": 41,
+       "SHO": 10,
+       "W": 63,
+       "L": 79,
+       "SV": 13,
+       "HLD": 0,
+       "WPCT": 0.444,
+       "TBF": 5098,
+       "IP": 1209,
+       "H": 1167,
+       "HR": 98,
+       "BB": 447,
+       "HBP": 32,
+       "SO": 599,
+       "R": 567,
+       "ER": 483,
+       "years": 9
       },
-      "link": "/Record/Retire/Hitter.aspx?playerId=74745"
+      "link": "/Record/Retire/Pitcher.aspx?playerId=85570"
      }
     },
     {
@@ -3222,7 +3125,7 @@
    ]
   },
   "키움": {
-   "date": "20260920",
+   "date": "20260328",
    "coaches": [
     {
      "no": "81",
@@ -3258,6 +3161,19 @@
      }
     },
     {
+     "no": "15",
+     "n": "이용규",
+     "hand": "좌투좌타",
+     "birth": "1985-08-26",
+     "mgr": false,
+     "rec": {
+      "pos": "외야수",
+      "isP": false,
+      "totals": {},
+      "link": "/Record/Player/HitterDetail/Basic.aspx?playerId=74163"
+     }
+    },
+    {
      "no": "74",
      "n": "문찬종",
      "hand": "우투양타",
@@ -3290,41 +3206,6 @@
        "years": 2
       },
       "link": "/Record/Retire/Hitter.aspx?playerId=50365"
-     }
-    },
-    {
-     "no": "75",
-     "n": "이병규",
-     "hand": "우투좌타",
-     "birth": "1994-10-05",
-     "mgr": false,
-     "rec": {
-      "pos": "외야수",
-      "isP": false,
-      "totals": {
-       "AVG": 0.2,
-       "G": 31,
-       "PA": 57,
-       "AB": 55,
-       "R": 10,
-       "H": 11,
-       "2B": 1,
-       "3B": 1,
-       "HR": 0,
-       "TB": 14,
-       "RBI": 7,
-       "SB": 1,
-       "CS": 0,
-       "BB": 2,
-       "HBP": 0,
-       "SO": 15,
-       "GDP": 0,
-       "SLG": 0.255,
-       "OBP": 0.228,
-       "E": 1,
-       "years": 2
-      },
-      "link": "/Record/Retire/Hitter.aspx?playerId=67363"
      }
     },
     {
@@ -3431,41 +3312,6 @@
      }
     },
     {
-     "no": "80",
-     "n": "장영석",
-     "hand": "우투우타",
-     "birth": "1990-05-14",
-     "mgr": false,
-     "rec": {
-      "pos": "내야수",
-      "isP": false,
-      "totals": {
-       "AVG": 0.23,
-       "G": 434,
-       "PA": 1227,
-       "AB": 1080,
-       "R": 127,
-       "H": 248,
-       "2B": 54,
-       "3B": 1,
-       "HR": 33,
-       "TB": 403,
-       "RBI": 160,
-       "SB": 1,
-       "CS": 1,
-       "BB": 99,
-       "HBP": 36,
-       "SO": 291,
-       "GDP": 32,
-       "SLG": 0.373,
-       "OBP": 0.313,
-       "E": 36,
-       "years": 10
-      },
-      "link": "/Record/Retire/Hitter.aspx?playerId=79334"
-     }
-    },
-    {
      "no": "83",
      "n": "노병오",
      "hand": "우투우타",
@@ -3496,6 +3342,41 @@
        "years": 5
       },
       "link": "/Record/Retire/Pitcher.aspx?playerId=72461"
+     }
+    },
+    {
+     "no": "88",
+     "n": "김태완",
+     "hand": "우투우타",
+     "birth": "1984-01-27",
+     "mgr": false,
+     "rec": {
+      "pos": "내야수",
+      "isP": false,
+      "totals": {
+       "AVG": 0.263,
+       "G": 720,
+       "PA": 2261,
+       "AB": 1898,
+       "R": 256,
+       "H": 500,
+       "2B": 82,
+       "3B": 3,
+       "HR": 80,
+       "TB": 828,
+       "RBI": 295,
+       "SB": 9,
+       "CS": 10,
+       "BB": 293,
+       "HBP": 53,
+       "SO": 491,
+       "GDP": 52,
+       "SLG": 0.436,
+       "OBP": 0.375,
+       "E": 11,
+       "years": 11
+      },
+      "link": "/Record/Retire/Hitter.aspx?playerId=76746"
      }
     },
     {
@@ -3531,6 +3412,41 @@
        "years": 2
       },
       "link": "/Record/Retire/Hitter.aspx?playerId=72154"
+     }
+    },
+    {
+     "no": "90",
+     "n": "박정음",
+     "hand": "좌투좌타",
+     "birth": "1989-04-15",
+     "mgr": false,
+     "rec": {
+      "pos": "외야수",
+      "isP": false,
+      "totals": {
+       "AVG": 0.249,
+       "G": 411,
+       "PA": 595,
+       "AB": 507,
+       "R": 124,
+       "H": 126,
+       "2B": 11,
+       "3B": 6,
+       "HR": 7,
+       "TB": 170,
+       "RBI": 52,
+       "SB": 38,
+       "CS": 21,
+       "BB": 54,
+       "HBP": 20,
+       "SO": 143,
+       "GDP": 7,
+       "SLG": 0.335,
+       "OBP": 0.342,
+       "E": 6,
+       "years": 6
+      },
+      "link": "/Record/Retire/Hitter.aspx?playerId=62353"
      }
     }
    ]

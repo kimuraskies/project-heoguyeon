@@ -48,9 +48,9 @@ async function career(n, birth) {
 (async () => {
   const out = {source: 'KBO 구단별 선수 등록 현황 및 기록실', fetched: new Date().toISOString(), teams: {}};
   for (const code of Object.keys(TEAMS)) {
-    // clubs knocked out early have nobody registered on the last date: use the final week of the regular season
-    let {date, coaches} = await register(code);
-    if (!coaches.length) ({date, coaches} = await register(code, '20260920'));
+    // the staff as registered when the 2026 season opened: the first date with anyone registered
+    let date, coaches = [];
+    for (const d of ['20260328', '20260329', '20260331', '20260401', '20260403']) { ({date, coaches} = await register(code, d)); if (coaches.length) break; }
     for (const c of coaches) { try { c.rec = await career(c.n, c.birth); } catch (e) { c.rec = null; c.err = String(e); } }
     out.teams[TEAMS[code]] = {date, coaches};
     console.log(TEAMS[code], date, coaches.length, 'coaches,', coaches.filter(c => c.rec && Object.keys(c.rec.totals).length).length, 'with records');

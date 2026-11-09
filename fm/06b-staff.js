@@ -19,6 +19,10 @@ function coachInit(c){
   c.yrs=c.yrs||1+h('yrs')%3; c.sat=c.sat==null?60:c.sat; c.okN=c.okN||0; c.noN=c.noN||0;
   return c;
 }
+// moves a coach to another post; whoever held it takes his old one. What he does best now depends on the post.
+function coachSetRole(c,r){ c.role=r; if(c.a) c.q=c.a[ROLE_MAIN[r]]||c.q; const sp=COACH_SPEC[r]||['전반']; if(sp.indexOf(c.spec)<0) c.spec=sp[hash(c.n+r)%sp.length]; }
+function coachMove(from,to){ if(from===to) return; const s=staffOf(USER), a=coachInit(s[from]), b=coachInit(s[to]); s[to]=a; s[from]=b; coachSetRole(a,to); coachSetRole(b,from);
+  if(window.Track) Track.action('coach_move'); render(); }
 function coachA(role,key,t){ const c=staffOf(t||USER)[role]; return c? coachInit(c).a[key] : 10; }
 const BG_STYLE={mlb:'데이터형',coach:'성적형',legend:'올드스쿨',rookie:'육성형',kbo:'성적형'};
 const STYLE_CLASH={'데이터형':'올드스쿨','올드스쿨':'데이터형','육성형':'성적형','성적형':'육성형'};
@@ -75,11 +79,12 @@ const bar=(v,max)=>`<div class="st-bar" role="img" aria-label="${v}/${max}"><i s
 function staffBoard(){
   const s=staffOf(USER), roleL=Object.fromEntries(COACH_ROLES);
   const card=r=>{ const c=coachInit(s[r]), fit=coachFit(c);
-    return `<article class="st-card"><header><span class="st-av">${esc(c.n[0])}</span><div><b>${esc(c.n)}</b><small>${roleL[r]} · ${c.age}세 · ${c.real?(c.guess?'실존 · 보직 추정':'실존'):'가상'}</small>${c.bio?`<small>${esc(c.bio)}</small>`:''}</div></header>
+    return `<article class="st-card"><header><span class="st-av">${esc(c.n[0])}</span><div><b>${esc(c.n)}</b><small>${c.age}세 · ${c.real?'실존':'가상'}</small>${c.bio?`<small>${esc(c.bio)}</small>`:''}</div></header>
+      <label class="st-post"><span>보직</span><select aria-label="${esc(c.n)} 보직" onchange="FM.coachMove('${r}',this.value)">${COACH_ROLES.map(([k,l])=>`<option value="${k}" ${k===r?'selected':''}>${l}</option>`).join('')}</select><small>핵심 능력 ${Object.fromEntries(COACH_ATTR)[ROLE_MAIN[r]]}</small></label>
       <div class="st-tags"><span class="chip">${c.style}</span><span class="chip">${c.spec}</span>${fit>0?'<span class="chip good">궁합 좋음</span>':fit<0?'<span class="chip warn">궁합 나쁨</span>':''}</div>
       <div class="st-attr">${COACH_ATTR.map(([k,l])=>`<span>${l}</span>${bar(c.a[k],20)}<b>${c.a[k]}</b>`).join('')}</div>
       <footer><small>만족도 ${Math.round(c.sat)} · 계약 ${c.yrs}년 · ${c.sal}억</small><button class="btn" onclick="FM.coachPicker('${r}')">교체</button></footer></article>`; };
   return `<div class="card" style="margin-top:14px"><h3>코칭스태프 <span class="tag">연봉 합계 ${staffPayroll(USER)}억</span></h3>
     ${STAFF_GROUPS.map(([g,rs])=>`<h4 class="st-group">${g}</h4><div class="st-grid">${rs.map(card).join('')}</div>`).join('')}
-    <div class="hint" style="margin-top:8px">구단 공식 코칭스태프와 KBO 등록 현황 기준입니다. 능력치는 현역 기록과 나이로 추정한 게임용 수치입니다. 담당 코치의 전술 능력이 그 분야 작전의 수행도에 ±10% 영향을 줍니다. 건의를 계속 보류하면 만족도가 떨어져 시즌 후 떠날 수 있습니다.</div></div>`;
+    <div class="hint" style="margin-top:8px">2026 개막 시점 KBO 등록 코치 기준입니다. 보직은 카드의 드롭다운으로 바꿀 수 있고, 다른 코치가 맡던 보직을 고르면 서로 맞바꿉니다. 능력치는 현역 기록과 나이로 추정한 게임용 수치입니다. 담당 코치의 전술 능력이 그 분야 작전의 수행도에 ±10% 영향을 줍니다. 건의를 계속 보류하면 만족도가 떨어져 시즌 후 떠날 수 있습니다.</div></div>`;
 }

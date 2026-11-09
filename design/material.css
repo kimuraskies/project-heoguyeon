@@ -597,3 +597,7 @@ nav.tabs button.active{background:var(--md-surface-container-high);color:var(--m
 .aw-list>div{padding:8px 10px;border:1px solid var(--md-outline-variant);border-radius:8px}
 .result-wp{margin:10px 0}.result-wp svg{display:block;width:100%;height:auto}
 @media(max-width:700px){.news-hub{grid-template-columns:1fr}.aw-hero{grid-template-columns:1fr}}
+
+.st-post{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 8px;align-items:center;font-size:12px;color:var(--dim)}
+.st-post select{width:100%;min-height:36px}
+.st-post small{grid-column:2;font-size:11.5px}
