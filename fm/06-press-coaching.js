@@ -38,6 +38,35 @@ function gameReport(res,kind){
   feedPush({year:state.year, kind, ug:userGamesPlayed(), won, tie, title:`${tie?'⚖️':won?'🟢':'🔴'} ${head}`, body});
   if(kind!=='spring'){ rivalResult(opp, won, tie); maybeInterview(res, kind, {won, tie, us, th, pog, opp, res}); }
 }
+// the page after a watched game. next: the button to whatever comes after, built by the caller
+function resultHTML(res,kind,info,next){
+  ensure();
+  const home=res.home===USER, opp=home?res.away:res.home, us=home?res.homeRuns:res.awayRuns, th=home?res.awayRuns:res.homeRuns;
+  const won=us>th, tie=us===th, pog=pogOf(res,USER), d=res.decisions;
+  const sp=home?res.homeSP:res.awaySP, sps=res.box[USER].pit[sp];
+  const hrs=[]; [USER,opp].forEach(t=>{ for(const n in res.box[t].bat){ const s=res.box[t].bat[n]; if(s.HR) hrs.push(`${n}${s.HR>1?' '+s.HR+'개':''}`); } });
+  const label=kind==='spring'?'시범경기':kind==='ps'?'포스트시즌':`${userGamesPlayed()}번째 경기`;
+  const inn=Math.max(res.line[res.away].length,res.line[res.home].length), head=[]; for(let i=1;i<=inn;i++) head.push(`<th>${i}</th>`);
+  const row=t=>{ const a=res.line[t].slice(); while(a.length<inn) a.push('X');
+    return `<tr class="${t===USER?'selected':''}"><th>${esc(t)}</th>${a.map(x=>`<td>${x}</td>`).join('')}<td class="result-r">${t===res.home?res.homeRuns:res.awayRuns}</td></tr>`; };
+  const facts=[
+    d? `<li><span>승패</span><b>승 ${esc(d.W)} · 패 ${esc(d.L)}${d.SV?' · 세 '+esc(d.SV):''}</b></li>` : '',
+    pog? `<li><span>수훈 선수</span><b>${esc(pog.n)}</b><em>${esc(pog.line)} · 평점 ${pog.r.toFixed(1)}</em></li>` : '',
+    sps? `<li><span>선발</span><b>${esc(sp)}</b><em>${ipStr(sps.OUT)}이닝 ${sps.ER}자책 ${sps.SO}탈삼진</em></li>` : '',
+    hrs.length? `<li><span>홈런</span><b>${esc(hrs.join(', '))}</b></li>` : ''
+  ].join('');
+  const fb=window.Feedback&&Feedback.firstAsk? Feedback.firstAsk() : '';
+  return `<div class="mp-wrap result-wrap">
+    <p class="eyebrow">${esc(label)} · ${home?'홈':'원정'} · 경기 결과</p>
+    <h1 class="result-title ${tie?'':won?'win':'loss'}">${tie?'무승부':won?'승리':'패배'}</h1>
+    <p class="result-score"><b>${esc(K.ROSTERS[USER].name)}</b> <strong>${us} : ${th}</strong> <b>${esc(K.ROSTERS[opp].name)}</b></p>
+    <div class="result-line"><table class="stat-table"><thead><tr><th></th>${head.join('')}<th class="result-r">R</th></tr></thead><tbody>${row(res.away)}${row(res.home)}</tbody></table></div>
+    <ul class="result-facts">${facts}</ul>
+    ${fb}
+    <section class="result-next"><div><small>다음 할 일</small><b>${esc(info.title)}</b><p class="muted">${info.sub||''}</p></div>
+      <div class="result-btns"><button class="btn" onclick="Match.closeResult()">대시보드로</button>${next}</div></section>
+  </div>`;
+}
 function maybeInterview(res, kind, x){
   const f=fm(), ug=userGamesPlayed();
   const big = res.walkoff || (x.won&&x.th===0) || x.us>=10 || (x.pog&&x.pog.r>=8.3) || kind==='ps';

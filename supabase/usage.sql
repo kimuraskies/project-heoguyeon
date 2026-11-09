@@ -40,3 +40,27 @@ select device,
        (array_agg(data->>'team' order by created_at desc) filter (where data ? 'team'))[1] as team
 from public.events group by device order by last_seen desc;
 revoke all on public.usage_daily, public.usage_players from anon, authenticated;
+
+-- 2026-11-09: finer events (screen, action, match, leave) and a funnel over them. Only rows from the
+-- newer client (they carry a session id) count, so the funnel is not diluted by older rows.
+alter table public.events drop constraint if exists events_kind_check;
+alter table public.events add constraint events_kind_check check (kind in ('open','career','play','season','screen','action','match','leave'));
+create or replace view public.usage_funnel with (security_invoker = true) as
+with s as (
+  select device,
+    bool_or(kind='screen' and data->>'name'='setup') or bool_or(kind='open') as opened,
+    bool_or(kind='action' and data->>'name'='pick_club') as picked_club,
+    bool_or(kind='career') as started_career,
+    bool_or(kind='action' and data->>'name' in ('camp','quick_start')) as prepared,
+    bool_or(kind='screen' and data->>'name'='preview') as saw_preview,
+    bool_or(kind='match' and data->>'stage'='start') as started_game,
+    bool_or(kind='match' and data->>'stage'='end') as finished_game,
+    bool_or(kind='action' and data->>'name'='quick_start') as used_quick_start,
+    bool_or(kind='action' and data->>'name'='guide_skip') as skipped_guide
+  from public.events where data ? 'sid' group by device)
+select count(*) filter (where opened) as opened, count(*) filter (where picked_club) as picked_club,
+  count(*) filter (where started_career) as started_career, count(*) filter (where prepared) as prepared,
+  count(*) filter (where saw_preview) as saw_preview, count(*) filter (where started_game) as started_game,
+  count(*) filter (where finished_game) as finished_game, count(*) filter (where used_quick_start) as used_quick_start,
+  count(*) filter (where skipped_guide) as skipped_guide from s;
+revoke all on public.usage_funnel from anon, authenticated;

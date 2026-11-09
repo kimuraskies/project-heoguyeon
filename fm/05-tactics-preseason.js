@@ -228,7 +228,7 @@ function campPicker(){
     <div class="hint" style="margin-bottom:10px">젊은 선수일수록 훈련 효과가 큽니다. 캠프가 끝나면 수석코치가 성장한 선수를 보고합니다.</div>
     <div class="grid" style="gap:8px">${Object.entries(CAMP).map(([k,c])=>`<button class="btn ${cur===k?'primary':''}" onclick="FM.setCamp('${k}')" style="text-align:left"><b>${c.label}</b> <span class="muted">— ${c.d}</span></button>`).join('')}</div>`);
 }
-function setCamp(k){ fm().camp={year:state.year, focus:k}; closeModal(); render(); }
+function setCamp(k){ fm().camp={year:state.year, focus:k}; closeModal(); render(); if(window.Track) Track.action('camp'); }
 // camp: young players gain most in the chosen area
 function applyCamp(){
   const f=fm(), c=CAMP[f.camp.focus], gains=[];
@@ -252,6 +252,7 @@ function applyCamp(){
 function startSpring(){
   const f=fm();
   if(!(f.camp&&f.camp.year===state.year&&f.camp.focus)){ campPicker(); return; }
+  if(window.Track) Track.action('spring_go');
   const campTxt=applyCamp();
   const signed=aiSignFAs();
   send('수석코치','🏕',`${state.year} 스프링캠프 결과`, `${campTxt}\n\n시범경기 ${SPRING_GAMES}경기로 라인업과 작전을 점검합니다. 시범경기는 순위와 시즌 기록에 들어가지 않습니다.`+
@@ -280,11 +281,34 @@ function springRecord(res){
   if(!springNext()) send('수석코치','📋',`시범경기 종료 (${sp.W}승 ${sp.L}패 ${sp.T}무)`, '시범경기 일정을 모두 마쳤습니다. 대시보드에서 정규시즌 개막을 선언하세요.', []);
 }
 function springSimAll(){
+  if(window.Track) Track.action('spring_sim');
   state.pendingGame=null; state.matchTac=null;
   let n; while((n=springNext())){ springRecord(K.simGame(buildCfg(n.home), buildCfg(n.away), {maxInnings:9})); }
   closeModal(); render();
 }
+// a first-season shortcut: balanced camp, exhibition games simulated, straight to the opening-day preview
+function canQuickStart(){
+  const f=fm();
+  if(state.phase!=='stove'&&!(state.phase==='spring'&&springNext())) return false;
+  return f.firstYear!=null? f.firstYear===state.year : state.year===2026;
+}
+function quickBtn(){ return `<button class="btn gold" onclick="FM.quickStart()">${icon('play')}추천 준비로 개막전까지</button>`; }
+function quickStart(){
+  const f=fm();
+  if(window.Track) Track.action('quick_start');
+  if(state.phase==='stove'){
+    if(!(f.camp&&f.camp.year===state.year&&f.camp.focus)) f.camp={year:state.year, focus:'bal'};
+    startSpring();
+  }
+  if(state.phase!=='spring') return;
+  springSimAll();
+  const sp=state.spring;
+  openSeason();
+  notify(`${CAMP[f.camp.focus].label}를 마치고 시범경기는 ${sp.W}승 ${sp.L}패 ${sp.T}무로 끝냈어요. 개막전을 준비하세요.`);
+  window.App.nextGame();
+}
 function openSeason(){
+  if(window.Track) Track.action('open_season');
   state.phase='regular';
   if(state.fm) pressMediaDay();
   K.TEAM_IDS.forEach(t=>allPlayers(t).forEach(p=>{ p.cond=100; }));

@@ -41,13 +41,14 @@ function teamPitch(t){
 }
 
 // ---------- new career: manager profile + club selection ----------
-let setup={name:'', bg:'coach', team:null, photo:null};
+let setup={name:'', bg:'coach', team:null, photo:null, more:false};
 function showSetup(){
   ensurePlayers();
   document.getElementById('tabs').hidden=true;
   document.getElementById('teaminfo').innerHTML='<span class="muted">새 커리어</span>';
   { const ns=document.getElementById('nextStep'); if(ns) ns.innerHTML=''; }
   renderSetup();
+  if(window.Track) Track.screen('setup');
 }
 function renderSetup(){
   const ranks={}; K.TEAM_IDS.slice().sort((a,b)=>teamStrength(b)-teamStrength(a)).forEach((t,i)=>ranks[t]=i+1);
@@ -83,10 +84,14 @@ function renderSetup(){
   </style>
   <div class="card" style="margin-top:12px">
     <h3 style="font-size:18px">⚾ 새 커리어 시작 <span class="tag">${state&&state.year||2026} 시즌</span></h3>
-    <div class="hint">① 감독 프로필을 정하고 ② 지휘할 구단을 고른 뒤 ③ 맨 아래에서 취임하세요. 구단마다 전력과 이사회 기대치가 다릅니다.</div>
+    <div class="hint">지휘할 구단만 고르면 바로 시작할 수 있어요. 구단마다 전력과 이사회 기대치가 다릅니다.</div>
   </div>
-  <div class="card setup-prof-card" style="margin-top:14px"><h3>① 감독 프로필</h3>
-    <div class="setup-prof">
+  <div class="card" style="margin-top:14px"><h3>구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">${K.TEAM_IDS.slice().sort((a,b)=>ranks[a]-ranks[b]).map(card).join('')}</div>
+  </div>
+  <details class="card setup-more" style="margin-top:14px" ${setup.more?'open':''} ontoggle="FM.setupMore(this.open)">
+    <summary><b>감독 프로필</b> <span class="muted">이름 · 사진 · 경력 (선택, 나중에 안 정해도 돼요)</span></summary>
+    <div class="setup-prof" style="margin-top:14px">
       <div class="setup-photo">${mgrAvatar(104,me)}
         <label class="btn" for="mgrphoto" style="font-size:12px;cursor:pointer">📷 사진 ${setup.photo?'바꾸기':'올리기'}</label>
         <input id="mgrphoto" type="file" accept="image/*" hidden onchange="FM.setupPhoto(this.files[0])">
@@ -99,10 +104,7 @@ function renderSetup(){
         <div class="setup-bgs">${Object.keys(MGR_BG).map(bgOpt).join('')}</div>
       </div>
     </div>
-  </div>
-  <div class="card" style="margin-top:14px"><h3>② 구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">${K.TEAM_IDS.slice().sort((a,b)=>ranks[a]-ranks[b]).map(card).join('')}</div>
-  </div>
+  </details>
   <div class="card setup-foot">
     <div class="sum">${mgrAvatar(44,me)}<div style="min-width:0">
       <b id="setup-sum-name">${esc((setup.name||'').trim()||'무명')} 감독</b> <span class="muted">· ${MGR_BG[setup.bg].label}</span><br>
@@ -111,7 +113,8 @@ function renderSetup(){
     <button class="btn primary" style="padding:12px 22px;font-size:15px" ${ready?'':'disabled'} onclick="FM.setupStart()">✍ 감독 취임하기</button>
   </div>`;
 }
-function setupPick(t){ setup.team=t; applyTheme(t); renderSetup(); }
+function setupMore(open){ setup.more=!!open; }
+function setupPick(t){ setup.team=t; applyTheme(t); renderSetup(); if(window.Track) Track.action('pick_club'); }
 function setupBg(k){ setup.bg=k; renderSetup(); }
 function setupName(v){ setup.name=v; const el=document.getElementById('setup-sum-name'); if(el) el.textContent=((v||'').trim()||'무명')+' 감독'; } // no re-render, so typing keeps focus
 function setupPhoto(file){ if(!file){ setup.photo=null; renderSetup(); return; } readPhoto(file, url=>{ setup.photo=url; renderSetup(); }); }
@@ -124,6 +127,7 @@ function setupStart(){
 // called by the game once state exists for the new career
 function onCareerStart(){
   ensure();
+  { const f0=fm(); f0.firstYear=state.year; f0.guide={step:0, done:false}; }
   seedFAs();
   send('단장','🔥',`${state.year} 스토브리그가 시작됐습니다`, `개막까지 준비할 시간이 있습니다.\n\n• FA 시장과 외국인 선수 후보는 구단 탭에서\n• 트레이드는 트레이드 탭에서\n• 타순·로테이션은 라인업 탭, 팀 기본 전술은 팀 전술 탭에서\n• 전지훈련 방향을 정하면 스프링캠프 → 시범경기 ${SPRING_GAMES}경기 → 정규시즌 개막 순서로 진행됩니다.`, []);
   const bonus=(MGR_BG[state.user.bg]||MGR_BG.coach).mor;

@@ -19,7 +19,26 @@
       year: s && s.year, phase: s && s.phase, team: typeof USER !== 'undefined' ? USER : null,
       viewport: innerWidth + 'x' + innerHeight, host: location.host};
   }
+  // one tap after the first watched game, for people who won't open a form
+  const FIRST = 'kbo-first-asked', FIRST_OPT = [[5, '😀 재밌었어요'], [3, '😐 그저 그래요'], [1, '😵 헷갈렸어요']];
+  function firstAsk() {
+    if (store.get(FIRST)) return '';
+    return `<section class="fb-first" id="fb-first"><b>첫 경기, 어땠어요?</b><div>${FIRST_OPT.map(([s, l]) => `<button type="button" class="btn" onclick="Feedback.quick(${s})">${l}</button>`).join('')}</div></section>`;
+  }
+  function quick(stars) {
+    store.set(FIRST, '1');
+    const el = document.getElementById('fb-first'), o = FIRST_OPT.find(x => x[0] === stars);
+    if (el) el.innerHTML = `<b>고마워요!</b> <button type="button" class="btn btn-quiet btn-sm" onclick="Match.closeResult();Feedback.open()">자세히 남기기</button>`;
+    if (window.Track) Track.action('feedback_quick', {stars});
+    if (!window.Track || !Track.enabled()) return; // test hosts and the preview send nothing
+    try {
+      fetch(CFG.url.replace(/\/$/, '') + '/rest/v1/feedback', {method: 'POST',
+        headers: {'apikey': CFG.key, 'Content-Type': 'application/json', 'Prefer': 'return=minimal'},
+        body: JSON.stringify({kind: 'etc', stars, body: '첫 경기 한 줄 평가: ' + o[1].slice(2).trim(), context: context()})}).catch(() => {});
+    } catch (e) {}
+  }
   function open() {
+    if (window.Track) Track.action('feedback_open');
     try { const d = JSON.parse(store.get(DRAFT) || 'null'); if (d && d.text) form = Object.assign(form, d); } catch (e) {}
     render();
   }
@@ -65,6 +84,7 @@
         body: JSON.stringify({kind: form.kind, stars: form.stars || null, body: text, nickname: (form.nick || '').trim() || null, context: context()})});
       if (!r.ok) throw new Error('HTTP ' + r.status);
       store.set(LAST, String(Date.now())); store.del(DRAFT);
+      if (window.Track) Track.action('feedback_sent');
       form = {kind: form.kind, stars: 0, text: '', nick: form.nick}; sending = false;
       render({ok: true, t: '고마워요! 피드백이 전달됐어요. 🙌'});
     } catch (e) {
@@ -72,5 +92,5 @@
       render({ok: false, t: `보내지 못했어요 (${esc(e.message)}). 작성한 내용은 이 브라우저에 남겨 뒀어요. 공개 사이트 kbo-manager-2026.vercel.app 에서 다시 보내 주세요.`});
     }
   }
-  window.Feedback = {open, set, send, config: CFG};
+  window.Feedback = {open, set, send, firstAsk, quick, config: CFG};
 })();

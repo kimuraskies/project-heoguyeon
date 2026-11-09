@@ -58,15 +58,57 @@ function renderInbox(){
     <style>@media(max-width:820px){#inboxgrid{grid-template-columns:1fr!important}}</style>`;
 }
 
+// ---------- first-career guide: the head coach explains five things, once ----------
+const GUIDE=[
+  {sel:'#nextStep', t:'취임을 축하드립니다, 감독님. 오른쪽 위 버튼이 언제나 <b>다음 할 일</b>입니다. 모르겠으면 이것만 눌러도 시즌이 굴러갑니다.'},
+  {sel:'#tabs button[onclick*="inbox"]', t:'구단 소식과 결정할 일은 <b>받은편지함</b>에 모입니다. 급하지 않아요. 기한이 지나면 제가 기본값으로 처리합니다.'},
+  {sel:'#tabs button[onclick*="lineup"]', t:'타순과 로테이션은 제가 <b>이미 짜 뒀습니다</b>. 바꾸고 싶을 때만 라인업 탭을 보세요.'},
+  {sel:'.hero-more .gold', dash:true, skip:()=>!canQuickStart(), t:'준비 과정이 번거로우면 <b>추천 준비로 개막전까지</b>를 누르세요. 캠프와 시범경기를 제가 맡고 바로 개막전으로 모시겠습니다.'},
+  {relay:true, t:'경기가 시작됐습니다. 위쪽 버튼으로 <b>재생·정지·끝까지</b>를, 대타·투수 교체·작전은 그 옆 메뉴에서 지시하세요. 바쁘면 끝까지를 눌러도 됩니다.'}
+];
+function guideRender(){
+  if(typeof document.querySelector!=='function'||!document.body||!state||!state.fm) return;
+  const old=document.getElementById('coachTip'); if(old) old.remove();
+  document.querySelectorAll('.guide-hl').forEach(x=>x.classList.remove('guide-hl'));
+  document.body.classList.remove('guide-relay');
+  const g=state.fm.guide; if(!g||g.done) return;
+  while(GUIDE[g.step]&&GUIDE[g.step].skip&&GUIDE[g.step].skip()) g.step++;
+  const s=GUIDE[g.step]; if(!s){ g.done=true; return; }
+  const relay=document.getElementById('relay'), cover=document.getElementById('prematch')||document.getElementById('result');
+  if(s.relay? !relay||cover : relay||cover) return;
+  if(s.dash&&currentTab!=='dash') return;
+  if(!s.relay){ const t=document.querySelector(s.sel); if(t) t.classList.add('guide-hl'); } else document.body.classList.add('guide-relay');
+  const name=(staffOf(USER).head||{}).n||'수석코치', last=g.step>=GUIDE.length-1;
+  const tip=document.createElement('aside'); tip.id='coachTip'; tip.className='coach-tip'+(s.relay?' on-relay':''); tip.setAttribute('role','status');
+  tip.innerHTML=`<small>${esc(name)} 수석코치 · ${g.step+1}/${GUIDE.length}</small><p>${s.t}</p>
+    <div><button type="button" class="btn btn-quiet btn-sm" onclick="FM.guideSkip()">건너뛰기</button><button type="button" class="btn primary btn-sm" onclick="FM.guideNext()">${last?'알겠어요':'다음'}</button></div>`;
+  document.body.appendChild(tip);
+}
+function guideNext(){ const g=fm().guide; if(!g) return; g.step++; if(g.step>=GUIDE.length) g.done=true; if(window.Track) Track.action('guide_'+g.step); guideRender(); }
+function guideSkip(){ const g=fm().guide; if(!g) return; g.done=true; if(window.Track) Track.action('guide_skip'); guideRender(); }
+
+// ---------- welcome back: what happened last, what to do next, that the career is safe ----------
+let returnInfo=null;
+function noteReturn(savedAt, finished){ if(finished || Date.now()-(savedAt||0)>30*60000) returnInfo={savedAt, finished}; }
+function dismissReturn(){ returnInfo=null; const el=document.getElementById('returnCard'); if(el) el.remove(); }
+function returnCard(){
+  if(!returnInfo) return '';
+  const f=fm(), last=(f.feed||[])[0], next=heroInfo(standings().findIndex(x=>x.t===USER)+1);
+  const when=returnInfo.savedAt? new Date(returnInfo.savedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+  return `<section class="return-card" id="returnCard"><div><b>${returnInfo.finished?'끝난 경기까지 저장해 뒀어요.':'다시 오셨군요, 감독님.'}</b>
+    <p>${last?`지난 경기: ${esc(last.title.replace(/^\S+\s/,''))}`:'아직 치른 경기가 없어요.'}${next&&next.title?` · 다음: ${esc(next.title)}`:''}${when?` · ${when} 자동 저장`:''}</p></div>
+    <button type="button" class="closeX" style="position:static" onclick="FM.dismissReturn()" aria-label="닫기">×</button></section>`;
+}
+
 // ---------- UI: dashboard (design pass 1: hero → decisions → reference panels) ----------
 // Decisions the manager owes right now, most urgent first. Each: {ic, t, d, a, go}
 function dashTasks(){
   ensure();
   const f=fm(), out=[], c=state.cfgs[USER];
   const camp=f.camp&&f.camp.year===state.year&&f.camp.focus;
-  const dr=draftState(); if(dr&&!draftDone(dr)&&draftOnClock(dr)===USER) out.push({ic:'trophy', t:`신인 드래프트 ${Math.floor(dr.pick/dr.order.length)+1}라운드 — 우리 차례`, d:`스카우트 팀 · 지명 ${dr.picks[USER].length}/${DRAFT_ROUNDS}`, a:'지명하기', go:'FM.showDraft()'});
+  const dr=draftState(); if(dr&&!draftDone(dr)&&draftOnClock(dr)===USER) out.push({req:true, ic:'trophy', t:`신인 드래프트 ${Math.floor(dr.pick/dr.order.length)+1}라운드 — 우리 차례`, d:`스카우트 팀 · 지명 ${dr.picks[USER].length}/${DRAFT_ROUNDS}`, a:'지명하기', go:'FM.showDraft()'});
   const tw=tradeWindow(); if(state.phase==='regular'&&tw.open&&tw.daysLeft!=null&&tw.daysLeft<=14) out.push({ic:'trade', t:`트레이드 마감 D-${tw.daysLeft}`, d:`단장 · ${DEADLINE[0]}월 ${DEADLINE[1]}일까지 · 마감이 가까워 제안이 늘어납니다`, a:'트레이드', go:"App.tab('trade')"});
-  if(state.phase==='stove' && !camp) out.push({ic:'camp', t:'스프링캠프 방향 선택', d:'수석코치 · '+Object.values(CAMP).map(x=>x.label).join(' / '), a:'훈련 선택', go:"FM.campPicker()"});
+  if(state.phase==='stove' && !camp) out.push({req:true, ic:'camp', t:'스프링캠프 방향 선택', d:'수석코치 · '+Object.values(CAMP).map(x=>x.label).join(' / '), a:'훈련 선택', go:"FM.campPicker()"});
   // real decisions only (plain acknowledgements are reports), soonest deadline first, press last
   const open=f.inbox.filter(m=>!m.done&&isDecision(m));
   const rankOf=m=>(msgType(m)==='press'?1000:0)+(m.due==null?500:dueLeft(m));

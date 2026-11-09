@@ -340,13 +340,14 @@ function teamPitch(t){
 }
 
 // ---------- new career: manager profile + club selection ----------
-let setup={name:'', bg:'coach', team:null, photo:null};
+let setup={name:'', bg:'coach', team:null, photo:null, more:false};
 function showSetup(){
   ensurePlayers();
   document.getElementById('tabs').hidden=true;
   document.getElementById('teaminfo').innerHTML='<span class="muted">새 커리어</span>';
   { const ns=document.getElementById('nextStep'); if(ns) ns.innerHTML=''; }
   renderSetup();
+  if(window.Track) Track.screen('setup');
 }
 function renderSetup(){
   const ranks={}; K.TEAM_IDS.slice().sort((a,b)=>teamStrength(b)-teamStrength(a)).forEach((t,i)=>ranks[t]=i+1);
@@ -382,10 +383,14 @@ function renderSetup(){
   </style>
   <div class="card" style="margin-top:12px">
     <h3 style="font-size:18px">⚾ 새 커리어 시작 <span class="tag">${state&&state.year||2026} 시즌</span></h3>
-    <div class="hint">① 감독 프로필을 정하고 ② 지휘할 구단을 고른 뒤 ③ 맨 아래에서 취임하세요. 구단마다 전력과 이사회 기대치가 다릅니다.</div>
+    <div class="hint">지휘할 구단만 고르면 바로 시작할 수 있어요. 구단마다 전력과 이사회 기대치가 다릅니다.</div>
   </div>
-  <div class="card setup-prof-card" style="margin-top:14px"><h3>① 감독 프로필</h3>
-    <div class="setup-prof">
+  <div class="card" style="margin-top:14px"><h3>구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">${K.TEAM_IDS.slice().sort((a,b)=>ranks[a]-ranks[b]).map(card).join('')}</div>
+  </div>
+  <details class="card setup-more" style="margin-top:14px" ${setup.more?'open':''} ontoggle="FM.setupMore(this.open)">
+    <summary><b>감독 프로필</b> <span class="muted">이름 · 사진 · 경력 (선택, 나중에 안 정해도 돼요)</span></summary>
+    <div class="setup-prof" style="margin-top:14px">
       <div class="setup-photo">${mgrAvatar(104,me)}
         <label class="btn" for="mgrphoto" style="font-size:12px;cursor:pointer">📷 사진 ${setup.photo?'바꾸기':'올리기'}</label>
         <input id="mgrphoto" type="file" accept="image/*" hidden onchange="FM.setupPhoto(this.files[0])">
@@ -398,10 +403,7 @@ function renderSetup(){
         <div class="setup-bgs">${Object.keys(MGR_BG).map(bgOpt).join('')}</div>
       </div>
     </div>
-  </div>
-  <div class="card" style="margin-top:14px"><h3>② 구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">${K.TEAM_IDS.slice().sort((a,b)=>ranks[a]-ranks[b]).map(card).join('')}</div>
-  </div>
+  </details>
   <div class="card setup-foot">
     <div class="sum">${mgrAvatar(44,me)}<div style="min-width:0">
       <b id="setup-sum-name">${esc((setup.name||'').trim()||'무명')} 감독</b> <span class="muted">· ${MGR_BG[setup.bg].label}</span><br>
@@ -410,7 +412,8 @@ function renderSetup(){
     <button class="btn primary" style="padding:12px 22px;font-size:15px" ${ready?'':'disabled'} onclick="FM.setupStart()">✍ 감독 취임하기</button>
   </div>`;
 }
-function setupPick(t){ setup.team=t; applyTheme(t); renderSetup(); }
+function setupMore(open){ setup.more=!!open; }
+function setupPick(t){ setup.team=t; applyTheme(t); renderSetup(); if(window.Track) Track.action('pick_club'); }
 function setupBg(k){ setup.bg=k; renderSetup(); }
 function setupName(v){ setup.name=v; const el=document.getElementById('setup-sum-name'); if(el) el.textContent=((v||'').trim()||'무명')+' 감독'; } // no re-render, so typing keeps focus
 function setupPhoto(file){ if(!file){ setup.photo=null; renderSetup(); return; } readPhoto(file, url=>{ setup.photo=url; renderSetup(); }); }
@@ -423,6 +426,7 @@ function setupStart(){
 // called by the game once state exists for the new career
 function onCareerStart(){
   ensure();
+  { const f0=fm(); f0.firstYear=state.year; f0.guide={step:0, done:false}; }
   seedFAs();
   send('단장','🔥',`${state.year} 스토브리그가 시작됐습니다`, `개막까지 준비할 시간이 있습니다.\n\n• FA 시장과 외국인 선수 후보는 구단 탭에서\n• 트레이드는 트레이드 탭에서\n• 타순·로테이션은 라인업 탭, 팀 기본 전술은 팀 전술 탭에서\n• 전지훈련 방향을 정하면 스프링캠프 → 시범경기 ${SPRING_GAMES}경기 → 정규시즌 개막 순서로 진행됩니다.`, []);
   const bonus=(MGR_BG[state.user.bg]||MGR_BG.coach).mor;
@@ -1193,7 +1197,7 @@ function campPicker(){
     <div class="hint" style="margin-bottom:10px">젊은 선수일수록 훈련 효과가 큽니다. 캠프가 끝나면 수석코치가 성장한 선수를 보고합니다.</div>
     <div class="grid" style="gap:8px">${Object.entries(CAMP).map(([k,c])=>`<button class="btn ${cur===k?'primary':''}" onclick="FM.setCamp('${k}')" style="text-align:left"><b>${c.label}</b> <span class="muted">— ${c.d}</span></button>`).join('')}</div>`);
 }
-function setCamp(k){ fm().camp={year:state.year, focus:k}; closeModal(); render(); }
+function setCamp(k){ fm().camp={year:state.year, focus:k}; closeModal(); render(); if(window.Track) Track.action('camp'); }
 // camp: young players gain most in the chosen area
 function applyCamp(){
   const f=fm(), c=CAMP[f.camp.focus], gains=[];
@@ -1217,6 +1221,7 @@ function applyCamp(){
 function startSpring(){
   const f=fm();
   if(!(f.camp&&f.camp.year===state.year&&f.camp.focus)){ campPicker(); return; }
+  if(window.Track) Track.action('spring_go');
   const campTxt=applyCamp();
   const signed=aiSignFAs();
   send('수석코치','🏕',`${state.year} 스프링캠프 결과`, `${campTxt}\n\n시범경기 ${SPRING_GAMES}경기로 라인업과 작전을 점검합니다. 시범경기는 순위와 시즌 기록에 들어가지 않습니다.`+
@@ -1245,11 +1250,34 @@ function springRecord(res){
   if(!springNext()) send('수석코치','📋',`시범경기 종료 (${sp.W}승 ${sp.L}패 ${sp.T}무)`, '시범경기 일정을 모두 마쳤습니다. 대시보드에서 정규시즌 개막을 선언하세요.', []);
 }
 function springSimAll(){
+  if(window.Track) Track.action('spring_sim');
   state.pendingGame=null; state.matchTac=null;
   let n; while((n=springNext())){ springRecord(K.simGame(buildCfg(n.home), buildCfg(n.away), {maxInnings:9})); }
   closeModal(); render();
 }
+// a first-season shortcut: balanced camp, exhibition games simulated, straight to the opening-day preview
+function canQuickStart(){
+  const f=fm();
+  if(state.phase!=='stove'&&!(state.phase==='spring'&&springNext())) return false;
+  return f.firstYear!=null? f.firstYear===state.year : state.year===2026;
+}
+function quickBtn(){ return `<button class="btn gold" onclick="FM.quickStart()">${icon('play')}추천 준비로 개막전까지</button>`; }
+function quickStart(){
+  const f=fm();
+  if(window.Track) Track.action('quick_start');
+  if(state.phase==='stove'){
+    if(!(f.camp&&f.camp.year===state.year&&f.camp.focus)) f.camp={year:state.year, focus:'bal'};
+    startSpring();
+  }
+  if(state.phase!=='spring') return;
+  springSimAll();
+  const sp=state.spring;
+  openSeason();
+  notify(`${CAMP[f.camp.focus].label}를 마치고 시범경기는 ${sp.W}승 ${sp.L}패 ${sp.T}무로 끝냈어요. 개막전을 준비하세요.`);
+  window.App.nextGame();
+}
 function openSeason(){
+  if(window.Track) Track.action('open_season');
   state.phase='regular';
   if(state.fm) pressMediaDay();
   K.TEAM_IDS.forEach(t=>allPlayers(t).forEach(p=>{ p.cond=100; }));
@@ -1307,6 +1335,35 @@ function gameReport(res,kind){
   ].filter(Boolean).join('\n');
   feedPush({year:state.year, kind, ug:userGamesPlayed(), won, tie, title:`${tie?'⚖️':won?'🟢':'🔴'} ${head}`, body});
   if(kind!=='spring'){ rivalResult(opp, won, tie); maybeInterview(res, kind, {won, tie, us, th, pog, opp, res}); }
+}
+// the page after a watched game. next: the button to whatever comes after, built by the caller
+function resultHTML(res,kind,info,next){
+  ensure();
+  const home=res.home===USER, opp=home?res.away:res.home, us=home?res.homeRuns:res.awayRuns, th=home?res.awayRuns:res.homeRuns;
+  const won=us>th, tie=us===th, pog=pogOf(res,USER), d=res.decisions;
+  const sp=home?res.homeSP:res.awaySP, sps=res.box[USER].pit[sp];
+  const hrs=[]; [USER,opp].forEach(t=>{ for(const n in res.box[t].bat){ const s=res.box[t].bat[n]; if(s.HR) hrs.push(`${n}${s.HR>1?' '+s.HR+'개':''}`); } });
+  const label=kind==='spring'?'시범경기':kind==='ps'?'포스트시즌':`${userGamesPlayed()}번째 경기`;
+  const inn=Math.max(res.line[res.away].length,res.line[res.home].length), head=[]; for(let i=1;i<=inn;i++) head.push(`<th>${i}</th>`);
+  const row=t=>{ const a=res.line[t].slice(); while(a.length<inn) a.push('X');
+    return `<tr class="${t===USER?'selected':''}"><th>${esc(t)}</th>${a.map(x=>`<td>${x}</td>`).join('')}<td class="result-r">${t===res.home?res.homeRuns:res.awayRuns}</td></tr>`; };
+  const facts=[
+    d? `<li><span>승패</span><b>승 ${esc(d.W)} · 패 ${esc(d.L)}${d.SV?' · 세 '+esc(d.SV):''}</b></li>` : '',
+    pog? `<li><span>수훈 선수</span><b>${esc(pog.n)}</b><em>${esc(pog.line)} · 평점 ${pog.r.toFixed(1)}</em></li>` : '',
+    sps? `<li><span>선발</span><b>${esc(sp)}</b><em>${ipStr(sps.OUT)}이닝 ${sps.ER}자책 ${sps.SO}탈삼진</em></li>` : '',
+    hrs.length? `<li><span>홈런</span><b>${esc(hrs.join(', '))}</b></li>` : ''
+  ].join('');
+  const fb=window.Feedback&&Feedback.firstAsk? Feedback.firstAsk() : '';
+  return `<div class="mp-wrap result-wrap">
+    <p class="eyebrow">${esc(label)} · ${home?'홈':'원정'} · 경기 결과</p>
+    <h1 class="result-title ${tie?'':won?'win':'loss'}">${tie?'무승부':won?'승리':'패배'}</h1>
+    <p class="result-score"><b>${esc(K.ROSTERS[USER].name)}</b> <strong>${us} : ${th}</strong> <b>${esc(K.ROSTERS[opp].name)}</b></p>
+    <div class="result-line"><table class="stat-table"><thead><tr><th></th>${head.join('')}<th class="result-r">R</th></tr></thead><tbody>${row(res.away)}${row(res.home)}</tbody></table></div>
+    <ul class="result-facts">${facts}</ul>
+    ${fb}
+    <section class="result-next"><div><small>다음 할 일</small><b>${esc(info.title)}</b><p class="muted">${info.sub||''}</p></div>
+      <div class="result-btns"><button class="btn" onclick="Match.closeResult()">대시보드로</button>${next}</div></section>
+  </div>`;
 }
 function maybeInterview(res, kind, x){
   const f=fm(), ug=userGamesPlayed();
@@ -1935,15 +1992,57 @@ function renderInbox(){
     <style>@media(max-width:820px){#inboxgrid{grid-template-columns:1fr!important}}</style>`;
 }
 
+// ---------- first-career guide: the head coach explains five things, once ----------
+const GUIDE=[
+  {sel:'#nextStep', t:'취임을 축하드립니다, 감독님. 오른쪽 위 버튼이 언제나 <b>다음 할 일</b>입니다. 모르겠으면 이것만 눌러도 시즌이 굴러갑니다.'},
+  {sel:'#tabs button[onclick*="inbox"]', t:'구단 소식과 결정할 일은 <b>받은편지함</b>에 모입니다. 급하지 않아요. 기한이 지나면 제가 기본값으로 처리합니다.'},
+  {sel:'#tabs button[onclick*="lineup"]', t:'타순과 로테이션은 제가 <b>이미 짜 뒀습니다</b>. 바꾸고 싶을 때만 라인업 탭을 보세요.'},
+  {sel:'.hero-more .gold', dash:true, skip:()=>!canQuickStart(), t:'준비 과정이 번거로우면 <b>추천 준비로 개막전까지</b>를 누르세요. 캠프와 시범경기를 제가 맡고 바로 개막전으로 모시겠습니다.'},
+  {relay:true, t:'경기가 시작됐습니다. 위쪽 버튼으로 <b>재생·정지·끝까지</b>를, 대타·투수 교체·작전은 그 옆 메뉴에서 지시하세요. 바쁘면 끝까지를 눌러도 됩니다.'}
+];
+function guideRender(){
+  if(typeof document.querySelector!=='function'||!document.body||!state||!state.fm) return;
+  const old=document.getElementById('coachTip'); if(old) old.remove();
+  document.querySelectorAll('.guide-hl').forEach(x=>x.classList.remove('guide-hl'));
+  document.body.classList.remove('guide-relay');
+  const g=state.fm.guide; if(!g||g.done) return;
+  while(GUIDE[g.step]&&GUIDE[g.step].skip&&GUIDE[g.step].skip()) g.step++;
+  const s=GUIDE[g.step]; if(!s){ g.done=true; return; }
+  const relay=document.getElementById('relay'), cover=document.getElementById('prematch')||document.getElementById('result');
+  if(s.relay? !relay||cover : relay||cover) return;
+  if(s.dash&&currentTab!=='dash') return;
+  if(!s.relay){ const t=document.querySelector(s.sel); if(t) t.classList.add('guide-hl'); } else document.body.classList.add('guide-relay');
+  const name=(staffOf(USER).head||{}).n||'수석코치', last=g.step>=GUIDE.length-1;
+  const tip=document.createElement('aside'); tip.id='coachTip'; tip.className='coach-tip'+(s.relay?' on-relay':''); tip.setAttribute('role','status');
+  tip.innerHTML=`<small>${esc(name)} 수석코치 · ${g.step+1}/${GUIDE.length}</small><p>${s.t}</p>
+    <div><button type="button" class="btn btn-quiet btn-sm" onclick="FM.guideSkip()">건너뛰기</button><button type="button" class="btn primary btn-sm" onclick="FM.guideNext()">${last?'알겠어요':'다음'}</button></div>`;
+  document.body.appendChild(tip);
+}
+function guideNext(){ const g=fm().guide; if(!g) return; g.step++; if(g.step>=GUIDE.length) g.done=true; if(window.Track) Track.action('guide_'+g.step); guideRender(); }
+function guideSkip(){ const g=fm().guide; if(!g) return; g.done=true; if(window.Track) Track.action('guide_skip'); guideRender(); }
+
+// ---------- welcome back: what happened last, what to do next, that the career is safe ----------
+let returnInfo=null;
+function noteReturn(savedAt, finished){ if(finished || Date.now()-(savedAt||0)>30*60000) returnInfo={savedAt, finished}; }
+function dismissReturn(){ returnInfo=null; const el=document.getElementById('returnCard'); if(el) el.remove(); }
+function returnCard(){
+  if(!returnInfo) return '';
+  const f=fm(), last=(f.feed||[])[0], next=heroInfo(standings().findIndex(x=>x.t===USER)+1);
+  const when=returnInfo.savedAt? new Date(returnInfo.savedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+  return `<section class="return-card" id="returnCard"><div><b>${returnInfo.finished?'끝난 경기까지 저장해 뒀어요.':'다시 오셨군요, 감독님.'}</b>
+    <p>${last?`지난 경기: ${esc(last.title.replace(/^\S+\s/,''))}`:'아직 치른 경기가 없어요.'}${next&&next.title?` · 다음: ${esc(next.title)}`:''}${when?` · ${when} 자동 저장`:''}</p></div>
+    <button type="button" class="closeX" style="position:static" onclick="FM.dismissReturn()" aria-label="닫기">×</button></section>`;
+}
+
 // ---------- UI: dashboard (design pass 1: hero → decisions → reference panels) ----------
 // Decisions the manager owes right now, most urgent first. Each: {ic, t, d, a, go}
 function dashTasks(){
   ensure();
   const f=fm(), out=[], c=state.cfgs[USER];
   const camp=f.camp&&f.camp.year===state.year&&f.camp.focus;
-  const dr=draftState(); if(dr&&!draftDone(dr)&&draftOnClock(dr)===USER) out.push({ic:'trophy', t:`신인 드래프트 ${Math.floor(dr.pick/dr.order.length)+1}라운드 — 우리 차례`, d:`스카우트 팀 · 지명 ${dr.picks[USER].length}/${DRAFT_ROUNDS}`, a:'지명하기', go:'FM.showDraft()'});
+  const dr=draftState(); if(dr&&!draftDone(dr)&&draftOnClock(dr)===USER) out.push({req:true, ic:'trophy', t:`신인 드래프트 ${Math.floor(dr.pick/dr.order.length)+1}라운드 — 우리 차례`, d:`스카우트 팀 · 지명 ${dr.picks[USER].length}/${DRAFT_ROUNDS}`, a:'지명하기', go:'FM.showDraft()'});
   const tw=tradeWindow(); if(state.phase==='regular'&&tw.open&&tw.daysLeft!=null&&tw.daysLeft<=14) out.push({ic:'trade', t:`트레이드 마감 D-${tw.daysLeft}`, d:`단장 · ${DEADLINE[0]}월 ${DEADLINE[1]}일까지 · 마감이 가까워 제안이 늘어납니다`, a:'트레이드', go:"App.tab('trade')"});
-  if(state.phase==='stove' && !camp) out.push({ic:'camp', t:'스프링캠프 방향 선택', d:'수석코치 · '+Object.values(CAMP).map(x=>x.label).join(' / '), a:'훈련 선택', go:"FM.campPicker()"});
+  if(state.phase==='stove' && !camp) out.push({req:true, ic:'camp', t:'스프링캠프 방향 선택', d:'수석코치 · '+Object.values(CAMP).map(x=>x.label).join(' / '), a:'훈련 선택', go:"FM.campPicker()"});
   // real decisions only (plain acknowledgements are reports), soonest deadline first, press last
   const open=f.inbox.filter(m=>!m.done&&isDecision(m));
   const rankOf=m=>(msgType(m)==='press'?1000:0)+(m.due==null?500:dueLeft(m));
@@ -2606,7 +2705,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, staffCard, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, staffCard, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,

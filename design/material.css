@@ -436,3 +436,39 @@ body.gate-on{overflow:hidden}
 .sv-txt span{color:var(--dim);font-size:13px}
 .sv-btns{display:flex;gap:6px;flex-wrap:wrap}
 .sv-btns label.btn{cursor:pointer}
+
+/* first-game patch: result page, hints, coach guide, return card */
+.result-wrap{max-width:720px;display:flex;flex-direction:column;gap:16px}
+.result-wrap .eyebrow{margin:0;color:var(--dim);font-size:13px}
+.result-title{margin:0;font-size:44px;font-weight:500;line-height:1.1}
+.result-title.win{color:var(--md-primary)}
+.result-title.loss{color:var(--dim)}
+.result-score{margin:0;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;font-size:16px}
+.result-score strong{font-size:30px;font-variant-numeric:tabular-nums}
+.result-line{overflow-x:auto;background:var(--md-surface-container,var(--panel2));border-radius:12px;padding:6px 10px}
+.result-line table{min-width:100%}
+.result-line th,.result-line td{text-align:center;font-variant-numeric:tabular-nums;padding:5px 6px}
+.result-r{font-weight:700}
+.result-facts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.result-facts li{display:grid;grid-template-columns:76px minmax(0,1fr);gap:2px 12px;padding:10px 0;border-top:1px solid var(--md-outline-variant)}
+.result-facts span{color:var(--dim);font-size:13px}
+.result-facts em{grid-column:2;font-style:normal;color:var(--dim);font-size:13px}
+.result-next{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:16px;border-radius:16px;background:var(--md-primary-container)}
+.result-next>div:first-child{flex:1 1 240px;min-width:0}
+.result-next small{display:block;font-size:12px;opacity:.8}
+.result-next p{margin:2px 0 0;font-size:13px}
+.result-btns{display:flex;gap:8px;flex-wrap:wrap}
+.fb-first{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:var(--md-surface-container,var(--panel2))}
+.fb-first div{display:flex;gap:6px;flex-wrap:wrap}
+.hero-hint{margin:12px 0 0;font-size:13px;opacity:.85}
+.task-note{margin:8px 0 0;font-size:12.5px;color:var(--dim)}
+.task-req{font-size:11px;padding:1px 7px;vertical-align:1px}
+.setup-more>summary{cursor:pointer;min-height:24px}
+.return-card{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin:12px 0;padding:12px 16px;border-radius:16px;background:var(--md-surface-container,var(--panel2))}
+.return-card p{margin:3px 0 0;font-size:13px;color:var(--dim)}
+.coach-tip{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;width:min(340px,calc(100vw - 32px));padding:14px 16px;border-radius:16px;background:var(--md-surface-container-high,var(--panel));border:1px solid var(--md-outline-variant);box-shadow:0 8px 28px rgba(0,0,0,.45)}
+.coach-tip.on-relay{z-index:45}
+.coach-tip small{color:var(--md-primary);font-size:12px}
+.coach-tip p{margin:6px 0 10px;font-size:14px;line-height:1.55}
+.coach-tip div{display:flex;justify-content:flex-end;gap:6px}
+.guide-hl,.guide-relay .live-ctrl{outline:2px solid var(--md-primary);outline-offset:3px;border-radius:12px}
