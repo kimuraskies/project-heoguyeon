@@ -260,11 +260,9 @@ function rivalResult(opp, won, tie){
 // club's official announcement before relying on it). Every other post starts with a fictional
 // coach marked 가상, until the club's official list is filled in here.
 const COACH_ROLES=[['head','수석코치'],['pit','투수코치'],['pen','불펜코치'],['bat','타격코치'],['fld','수비코치'],['run','주루코치'],['bat2','배터리코치'],['cond','컨디셔닝코치'],['ana','전력분석팀장'],['fut','퓨처스 감독']];
-const COACH_REAL={
-  'LG':{bat:'송지만', fld:'김일경'},          // 2026.7.27 보직 개편 (OSEN)
-  '두산':{bat:'이진영'},                      // 2025.11 1·2군 타격 총괄 선임
-  '키움':{bat:'이용규'}                       // 2026.5.21 1군 타격 코치 이동
-};
+const COACH_REAL={};
+// a real coach from COACH_DB for this post, if the club's staff has one
+function dbCoach(t,r){ const d=(COACH_DB[t]||{})[r]; if(!d) return null; return coachInit(Object.assign({role:r, sal:coachSal(d.q), real:true, team:t}, JSON.parse(JSON.stringify(d)))); }
 const CO_FAM=['김','이','박','최','정','강','조','윤','장','임','한','오','서','신','권','황','안','송','류','홍'];
 const CO_GIV=['도윤','서준','현우','지훈','건우','우진','민재','태윤','성민','재원','동하','상훈','영재','기현','승호','정민','태호','준혁','진우','경수'];
 function coachName(used){ for(let i=0;i<400;i++){ const n=pick(CO_FAM)+pick(CO_GIV); if(!used.has(n)){ used.add(n); return n; } } return '코치'+R(100,999); }
@@ -280,11 +278,14 @@ function staffOf(t){
   if(!f.staff[t]){ const used=new Set(), s={};
     for(const o in f.staff) for(const r in f.staff[o]) used.add(f.staff[o][r].n); // names stay unique league-wide
     for(const o in COACH_REAL) for(const r in COACH_REAL[o]) used.add(COACH_REAL[o][r]);
-    COACH_ROLES.forEach(([r])=>{ s[r]=makeCoach(r, used, (COACH_REAL[t]||{})[r], t); });
+    COACH_ROLES.forEach(([r])=>{ s[r]=dbCoach(t,r)||makeCoach(r, used, null, t); });
     f.staff[t]=s; }
   const cur=f.staff[t]; // a save from before the staff grew to ten posts
   if(!cur[COACH_ROLES[COACH_ROLES.length-1][0]]){ const used=new Set(); for(const o in f.staff) for(const r in f.staff[o]) used.add(f.staff[o][r].n);
-    COACH_ROLES.forEach(([r])=>{ if(!cur[r]) cur[r]=makeCoach(r,used,(COACH_REAL[t]||{})[r],t); }); }
+    COACH_ROLES.forEach(([r])=>{ if(!cur[r]) cur[r]=makeCoach(r,used,null,t); }); }
+  // saves made before the real staffs: every coach the player didn't hire becomes the real one
+  f.staffDB=f.staffDB||{};
+  if(!f.staffDB[t]){ f.staffDB[t]=1; COACH_ROLES.forEach(([r])=>{ const d=dbCoach(t,r); if(d&&!(cur[r]&&cur[r].hired)) cur[r]=d; }); }
   return cur;
 }
 function coachPool(){
@@ -327,7 +328,7 @@ function hireCoach(role, n){
   if(f.fin.balance-cost < -10){ notify(`잔고가 부족합니다. 필요 금액 ${cost}억 (잔고 ${f.fin.balance.toFixed(1)}억)`); return; }
   if(inSeason) f.staffSwapYear=state.year;
   f.fin.balance=Math.round((f.fin.balance-cost)*10)/10; f.fin.exp=(f.fin.exp||0)+cost;
-  pool.splice(i,1); c.team=USER; s[role]=c;
+  pool.splice(i,1); c.team=USER; c.hired=true; s[role]=c;
   if(!old.real) pool.push(Object.assign({},old,{team:null}));
   send('단장','🧢',`${Object.fromEntries(COACH_ROLES)[role]} 교체: ${old.n} → ${c.n}`, `${c.n} 코치가 ${Object.fromEntries(COACH_ROLES)[role]}로 합류했습니다.\n지출: ${cost}억 원 (위약금 ${Math.round(old.sal*0.5*10)/10}억 + 첫해 연봉 ${c.sal}억)`, []);
   closeModal(); render();

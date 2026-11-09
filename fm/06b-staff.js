@@ -10,12 +10,12 @@ const STAFF_GROUPS=[['1군',['head','pit','pen','bat','fld','run','bat2']],['지
 // which coach answers for which team tactic
 const TAC_COACH={atk:'bat',dir:'bat',teamBat:'bat',bunt:'bat',run:'run',adv:'run',shift:'fld',bat:'bat2',pick:'bat2',ibb:'bat2',hook:'pit'};
 function coachInit(c){
-  if(c.a) return c;
+  if(c.style) return c;
   const h=x=>hash(c.n+c.role+x), a={};
   COACH_ATTR.forEach(([k])=>{ a[k]=clampN(c.q+h(k)%7-3,1,20); });
   a[ROLE_MAIN[c.role]||'lead']=c.q;
   const sp=COACH_SPEC[c.role]||['전반'];
-  c.a=a; c.style=COACH_STYLES[h('style')%4]; c.spec=sp[h('spec')%sp.length]; c.age=c.age||45+h('age')%18;
+  c.a=c.a||a; c.style=COACH_STYLES[h('style')%4]; c.spec=c.spec||sp[h('spec')%sp.length]; c.age=c.age||45+h('age')%18;
   c.yrs=c.yrs||1+h('yrs')%3; c.sat=c.sat==null?60:c.sat; c.okN=c.okN||0; c.noN=c.noN||0;
   return c;
 }
@@ -75,11 +75,11 @@ const bar=(v,max)=>`<div class="st-bar" role="img" aria-label="${v}/${max}"><i s
 function staffBoard(){
   const s=staffOf(USER), roleL=Object.fromEntries(COACH_ROLES);
   const card=r=>{ const c=coachInit(s[r]), fit=coachFit(c);
-    return `<article class="st-card"><header><span class="st-av">${esc(c.n[0])}</span><div><b>${esc(c.n)}</b><small>${roleL[r]} · ${c.age}세 · ${c.real?'실존':'가상'}</small></div></header>
+    return `<article class="st-card"><header><span class="st-av">${esc(c.n[0])}</span><div><b>${esc(c.n)}</b><small>${roleL[r]} · ${c.age}세 · ${c.real?(c.guess?'실존 · 보직 추정':'실존'):'가상'}</small>${c.bio?`<small>${esc(c.bio)}</small>`:''}</div></header>
       <div class="st-tags"><span class="chip">${c.style}</span><span class="chip">${c.spec}</span>${fit>0?'<span class="chip good">궁합 좋음</span>':fit<0?'<span class="chip warn">궁합 나쁨</span>':''}</div>
       <div class="st-attr">${COACH_ATTR.map(([k,l])=>`<span>${l}</span>${bar(c.a[k],20)}<b>${c.a[k]}</b>`).join('')}</div>
       <footer><small>만족도 ${Math.round(c.sat)} · 계약 ${c.yrs}년 · ${c.sal}억</small><button class="btn" onclick="FM.coachPicker('${r}')">교체</button></footer></article>`; };
   return `<div class="card" style="margin-top:14px"><h3>코칭스태프 <span class="tag">연봉 합계 ${staffPayroll(USER)}억</span></h3>
     ${STAFF_GROUPS.map(([g,rs])=>`<h4 class="st-group">${g}</h4><div class="st-grid">${rs.map(card).join('')}</div>`).join('')}
-    <div class="hint" style="margin-top:8px">담당 코치의 전술 능력이 그 분야 작전의 수행도에 ±10% 영향을 줍니다. 건의를 계속 보류하면 만족도가 떨어져 시즌 후 떠날 수 있습니다. 코치 능력치는 게임용 수치입니다.</div></div>`;
+    <div class="hint" style="margin-top:8px">구단 공식 코칭스태프와 KBO 등록 현황 기준입니다. 능력치는 현역 기록과 나이로 추정한 게임용 수치입니다. 담당 코치의 전술 능력이 그 분야 작전의 수행도에 ±10% 영향을 줍니다. 건의를 계속 보류하면 만족도가 떨어져 시즌 후 떠날 수 있습니다.</div></div>`;
 }
