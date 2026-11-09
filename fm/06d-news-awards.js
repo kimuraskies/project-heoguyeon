@@ -20,7 +20,10 @@ function seasonAwards(){
   const qB=B.filter(a=>a.x.PA>=446), qP=P.filter(a=>a.x.OUT>=432), all=B.concat(P);
   const line=(l,a,v)=>a?{l,n:a.n,t:a.t,v}:null;
   const top=(arr,k,l,fmt)=>{ const a=winnerBy(arr,x=>x.x[k]||0); return a&&a.x[k]?line(l,a,fmt?fmt(a):a.x[k]):null; };
-  const mvp=winnerBy(all,a=>a.war), roy=winnerBy(all.filter(a=>a.p.age<=24&&!((state.hist||{})[a.n]||[]).some(h=>h.y<state.year)&&!(window.KBO_CAREER&&window.KBO_CAREER[a.n])),a=>a.war);
+  // a rookie has almost no first-team record before this year (real rows: PA index 3, outs index 7)
+  const fresh=a=>{ if(((state.hist||{})[a.n]||[]).some(h=>h.y<state.year)) return false; const c=window.KBO_CAREER&&window.KBO_CAREER[a.n]; if(!c) return true;
+    return c.t==='B'? c.y.reduce((s,r)=>s+r[3],0)<60 : c.y.reduce((s,r)=>s+r[7],0)<90; };
+  const mvp=winnerBy(all,a=>a.war), roy=winnerBy(all.filter(a=>a.p.age<=25&&fresh(a)),a=>a.war);
   const avgK=winnerBy(qB,a=>a.m.avg), eraK=winnerBy(qP,a=>-a.m.era);
   const titles=[avgK&&line('타율',avgK,fmtAvg(avgK.m.avg)),top(B,'HR','홈런'),top(B,'RBI','타점'),top(B,'SB','도루'),top(P,'W','다승'),eraK&&line('평균자책',eraK,f2(eraK.m.era)),top(P,'SO','탈삼진'),top(P,'SV','세이브'),top(P,'HD','홀드')].filter(Boolean);
   const pos=['C','1B','2B','3B','SS','LF','CF','RF','DH'], gg=pos.map(k=>{ const a=winnerBy(B.filter(x=>x.p.pos===k&&x.x.PA>=200),x=>x.war); return a?{pos:k,n:a.n,t:a.t,war:a.war}:null; }).filter(Boolean);

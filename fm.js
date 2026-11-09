@@ -1178,7 +1178,7 @@ function preseasonCard(){
       .map(([n,s])=>`${n} ${fmtAvg(s.H/s.AB)}${s.HR?' '+s.HR+'홈런':''}`).join(' · ');
     const topP=Object.entries(sp.stats.pit).filter(([n,s])=>s.OUT>=9).sort((a,b)=>(a[1].ER/a[1].OUT)-(b[1].ER/b[1].OUT)).slice(0,3)
       .map(([n,s])=>`${n} ERA ${fmtEra(s.ER,s.OUT)}`).join(' · ');
-    return `<div class="card" style="margin-bottom:14px;border-color:var(--accent)"><h3>🌸 ${state.year} 시범경기 <span class="tag">${sp.W}승 ${sp.L}패 ${sp.T}무 · 순위·기록 미반영</span></h3>
+    return `${springUseCard()}<div class="card" style="margin-bottom:14px;border-color:var(--accent)"><h3>🌸 ${state.year} 시범경기 <span class="tag">${sp.W}승 ${sp.L}패 ${sp.T}무 · 순위·기록 미반영</span></h3>
       <div class="grid cols2"><div style="max-height:260px;overflow:auto"><table><thead><tr><th>#</th><th>구분</th><th class="name">상대</th><th>결과</th></tr></thead><tbody>${rows}</tbody></table></div>
       <div><div class="muted" style="font-weight:700">시범경기 타격 ↑</div><div style="margin:4px 0 10px">${top||'<span class="muted">아직 기록 없음</span>'}</div>
         <div class="muted" style="font-weight:700">시범경기 마운드 ↑</div><div style="margin:4px 0">${topP||'<span class="muted">아직 기록 없음</span>'}</div>
@@ -1341,6 +1341,7 @@ function applyCamp(){ const c=campState(); if(!c.focus) c.focus='bal'; while(c.w
   return `${CAMP[c.focus].label} · ${c.log.slice(-5).join(' / ')}`; }
 // match sharpness rises through the exhibition games
 function sharpAfterSpring(res){ const bx=res.box[USER]; if(!bx) return;
+  allPlayers(USER).forEach(p=>{ if(p.inj>0) p.inj--; });   // camp knocks heal through the exhibition games
   for(const n in bx.bat){ const p=findPlayer(USER,n), s=bx.bat[n]; if(p) { p.sharp=clampN((p.sharp==null?40:p.sharp)+4*s.PA,0,100); p.sprPA=(p.sprPA||0)+s.PA; } }
   for(const n in bx.pit){ const p=findPlayer(USER,n), s=bx.pit[n]; if(!p||!s.BF) continue; const ip=s.OUT/3, gain=p.role==='SP'? 5*ip : 8;
     p.sharp=clampN((p.sharp==null?40:p.sharp)+gain,0,100); p.sprIP=(p.sprIP||0)+ip; } }
@@ -1348,7 +1349,9 @@ function sharpOnOpen(){ allPlayers(USER).forEach(p=>{ if((p.sprPA||0)>40||(p.spr
 const USE_L={much:'많이',normal:'보통',low:'적게',none:'안 씀'};
 function springUseOf(p){ const f=fm(), u=(f.springUse||{})[p.n]; if(u) return u; return p.age>=35?'low':(K.ovr(p)<62?'much':'normal'); }
 function setSpringUse(n,v){ const f=fm(); f.springUse=f.springUse||{}; f.springUse[n]=v; render(); }
-function springRest(){ const sp=state.spring; if(!sp) return []; const odd=sp.played%2===1; return allPlayers(USER).filter(p=>{ const u=springUseOf(p); return u==='none'||(u==='low'&&odd); }).map(p=>p.n); }
+// never rests so many that an injured starter has no one to replace him
+function springRest(){ const sp=state.spring; if(!sp||allPlayers(USER).some(p=>K.isInjured(p))) return []; const odd=sp.played%2===1;
+  return allPlayers(USER).filter(p=>{ const u=springUseOf(p); return u==='none'||(u==='low'&&odd); }).map(p=>p.n).slice(0,3); }
 function springUseCard(){ const ps=allPlayers(USER).slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).slice(0,20);
   return `<div class="card" style="margin-bottom:14px"><h3>시범경기 출전 계획 <span class="tag">경기 감각은 개막 후 18경기까지 ±3% 영향</span></h3><div class="cp-use">${ps.map(p=>`<div><span>${esc(p.n)} <small class="muted">감각 ${Math.round(p.sharp==null?40:p.sharp)}</small></span><select aria-label="${esc(p.n)} 출전량" onchange="FM.setSpringUse('${q(p.n)}',this.value)">${Object.entries(USE_L).map(([k,l])=>`<option value="${k}" ${springUseOf(p)===k?'selected':''}>${l}</option>`).join('')}</select></div>`).join('')}</div></div>`; }
 
@@ -1972,7 +1975,10 @@ function seasonAwards(){
   const qB=B.filter(a=>a.x.PA>=446), qP=P.filter(a=>a.x.OUT>=432), all=B.concat(P);
   const line=(l,a,v)=>a?{l,n:a.n,t:a.t,v}:null;
   const top=(arr,k,l,fmt)=>{ const a=winnerBy(arr,x=>x.x[k]||0); return a&&a.x[k]?line(l,a,fmt?fmt(a):a.x[k]):null; };
-  const mvp=winnerBy(all,a=>a.war), roy=winnerBy(all.filter(a=>a.p.age<=24&&!((state.hist||{})[a.n]||[]).some(h=>h.y<state.year)&&!(window.KBO_CAREER&&window.KBO_CAREER[a.n])),a=>a.war);
+  // a rookie has almost no first-team record before this year (real rows: PA index 3, outs index 7)
+  const fresh=a=>{ if(((state.hist||{})[a.n]||[]).some(h=>h.y<state.year)) return false; const c=window.KBO_CAREER&&window.KBO_CAREER[a.n]; if(!c) return true;
+    return c.t==='B'? c.y.reduce((s,r)=>s+r[3],0)<60 : c.y.reduce((s,r)=>s+r[7],0)<90; };
+  const mvp=winnerBy(all,a=>a.war), roy=winnerBy(all.filter(a=>a.p.age<=25&&fresh(a)),a=>a.war);
   const avgK=winnerBy(qB,a=>a.m.avg), eraK=winnerBy(qP,a=>-a.m.era);
   const titles=[avgK&&line('타율',avgK,fmtAvg(avgK.m.avg)),top(B,'HR','홈런'),top(B,'RBI','타점'),top(B,'SB','도루'),top(P,'W','다승'),eraK&&line('평균자책',eraK,f2(eraK.m.era)),top(P,'SO','탈삼진'),top(P,'SV','세이브'),top(P,'HD','홀드')].filter(Boolean);
   const pos=['C','1B','2B','3B','SS','LF','CF','RF','DH'], gg=pos.map(k=>{ const a=winnerBy(B.filter(x=>x.p.pos===k&&x.x.PA>=200),x=>x.war); return a?{pos:k,n:a.n,t:a.t,war:a.war}:null; }).filter(Boolean);

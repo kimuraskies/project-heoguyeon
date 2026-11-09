@@ -62,6 +62,7 @@ function applyCamp(){ const c=campState(); if(!c.focus) c.focus='bal'; while(c.w
   return `${CAMP[c.focus].label} · ${c.log.slice(-5).join(' / ')}`; }
 // match sharpness rises through the exhibition games
 function sharpAfterSpring(res){ const bx=res.box[USER]; if(!bx) return;
+  allPlayers(USER).forEach(p=>{ if(p.inj>0) p.inj--; });   // camp knocks heal through the exhibition games
   for(const n in bx.bat){ const p=findPlayer(USER,n), s=bx.bat[n]; if(p) { p.sharp=clampN((p.sharp==null?40:p.sharp)+4*s.PA,0,100); p.sprPA=(p.sprPA||0)+s.PA; } }
   for(const n in bx.pit){ const p=findPlayer(USER,n), s=bx.pit[n]; if(!p||!s.BF) continue; const ip=s.OUT/3, gain=p.role==='SP'? 5*ip : 8;
     p.sharp=clampN((p.sharp==null?40:p.sharp)+gain,0,100); p.sprIP=(p.sprIP||0)+ip; } }
@@ -69,7 +70,9 @@ function sharpOnOpen(){ allPlayers(USER).forEach(p=>{ if((p.sprPA||0)>40||(p.spr
 const USE_L={much:'많이',normal:'보통',low:'적게',none:'안 씀'};
 function springUseOf(p){ const f=fm(), u=(f.springUse||{})[p.n]; if(u) return u; return p.age>=35?'low':(K.ovr(p)<62?'much':'normal'); }
 function setSpringUse(n,v){ const f=fm(); f.springUse=f.springUse||{}; f.springUse[n]=v; render(); }
-function springRest(){ const sp=state.spring; if(!sp) return []; const odd=sp.played%2===1; return allPlayers(USER).filter(p=>{ const u=springUseOf(p); return u==='none'||(u==='low'&&odd); }).map(p=>p.n); }
+// never rests so many that an injured starter has no one to replace him
+function springRest(){ const sp=state.spring; if(!sp||allPlayers(USER).some(p=>K.isInjured(p))) return []; const odd=sp.played%2===1;
+  return allPlayers(USER).filter(p=>{ const u=springUseOf(p); return u==='none'||(u==='low'&&odd); }).map(p=>p.n).slice(0,3); }
 function springUseCard(){ const ps=allPlayers(USER).slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).slice(0,20);
   return `<div class="card" style="margin-bottom:14px"><h3>시범경기 출전 계획 <span class="tag">경기 감각은 개막 후 18경기까지 ±3% 영향</span></h3><div class="cp-use">${ps.map(p=>`<div><span>${esc(p.n)} <small class="muted">감각 ${Math.round(p.sharp==null?40:p.sharp)}</small></span><select aria-label="${esc(p.n)} 출전량" onchange="FM.setSpringUse('${q(p.n)}',this.value)">${Object.entries(USE_L).map(([k,l])=>`<option value="${k}" ${springUseOf(p)===k?'selected':''}>${l}</option>`).join('')}</select></div>`).join('')}</div></div>`; }
 

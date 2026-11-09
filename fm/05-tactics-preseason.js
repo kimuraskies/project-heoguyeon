@@ -207,7 +207,7 @@ function preseasonCard(){
       .map(([n,s])=>`${n} ${fmtAvg(s.H/s.AB)}${s.HR?' '+s.HR+'홈런':''}`).join(' · ');
     const topP=Object.entries(sp.stats.pit).filter(([n,s])=>s.OUT>=9).sort((a,b)=>(a[1].ER/a[1].OUT)-(b[1].ER/b[1].OUT)).slice(0,3)
       .map(([n,s])=>`${n} ERA ${fmtEra(s.ER,s.OUT)}`).join(' · ');
-    return `<div class="card" style="margin-bottom:14px;border-color:var(--accent)"><h3>🌸 ${state.year} 시범경기 <span class="tag">${sp.W}승 ${sp.L}패 ${sp.T}무 · 순위·기록 미반영</span></h3>
+    return `${springUseCard()}<div class="card" style="margin-bottom:14px;border-color:var(--accent)"><h3>🌸 ${state.year} 시범경기 <span class="tag">${sp.W}승 ${sp.L}패 ${sp.T}무 · 순위·기록 미반영</span></h3>
       <div class="grid cols2"><div style="max-height:260px;overflow:auto"><table><thead><tr><th>#</th><th>구분</th><th class="name">상대</th><th>결과</th></tr></thead><tbody>${rows}</tbody></table></div>
       <div><div class="muted" style="font-weight:700">시범경기 타격 ↑</div><div style="margin:4px 0 10px">${top||'<span class="muted">아직 기록 없음</span>'}</div>
         <div class="muted" style="font-weight:700">시범경기 마운드 ↑</div><div style="margin:4px 0">${topP||'<span class="muted">아직 기록 없음</span>'}</div>
