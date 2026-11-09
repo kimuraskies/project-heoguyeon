@@ -11,7 +11,7 @@ function applyPlanRec(opp){ const r=K.ROSTERS[opp], c=state.cfgs[opp], p=planOf(
   c.lineup.forEach(n=>{ const x=r.batters.find(b=>b.n===n); if(x) p.vs[n]=recBat(x); });
   r.pitchers.filter(x=>x.role==='SP').forEach(x=>{ p.pit[x.n]=recPit(x); });
   refreshBrief(opp); if(window.Track) Track.action('plan_rec'); }
-function toFM(v){ return typeof K.toFM==='function'? K.toFM(v) : Math.round(v/5); }
+const toFM=attr20;
 const chipRow=(cur,labels,click)=>`<div class="bf-chips" role="group">${Object.keys(labels).map(k=>`<button type="button" aria-pressed="${String(cur||'')===k}" onclick="${click(k)}">${labels[k]}</button>`).join('')}</div>`;
 function briefingCard(oppArg){
   ensure();

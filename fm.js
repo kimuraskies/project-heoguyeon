@@ -1365,7 +1365,7 @@ function resultHTML(res,kind,info,next){
     <h1 class="result-title ${tie?'':won?'win':'loss'}">${tie?'무승부':won?'승리':'패배'}</h1>
     <p class="result-score"><b>${esc(K.ROSTERS[USER].name)}</b> <strong>${us} : ${th}</strong> <b>${esc(K.ROSTERS[opp].name)}</b></p>
     <div class="result-line"><table class="stat-table"><thead><tr><th></th>${head.join('')}<th class="result-r">R</th></tr></thead><tbody>${row(res.away)}${row(res.home)}</tbody></table></div>
-    <ul class="result-facts">${facts}</ul>
+    <ul class="result-facts">${facts}</ul>${signLine(res)}
     <section class="result-next"><div><small>다음 할 일</small><b>${esc(info.title)}</b><p class="muted">${info.sub||''}</p></div>
       <div class="result-btns"><button class="btn" onclick="Match.closeResult()">대시보드로</button>${next}</div></section>
   </div>`;
@@ -1753,7 +1753,7 @@ function applyPlanRec(opp){ const r=K.ROSTERS[opp], c=state.cfgs[opp], p=planOf(
   c.lineup.forEach(n=>{ const x=r.batters.find(b=>b.n===n); if(x) p.vs[n]=recBat(x); });
   r.pitchers.filter(x=>x.role==='SP').forEach(x=>{ p.pit[x.n]=recPit(x); });
   refreshBrief(opp); if(window.Track) Track.action('plan_rec'); }
-function toFM(v){ return typeof K.toFM==='function'? K.toFM(v) : Math.round(v/5); }
+const toFM=attr20;
 const chipRow=(cur,labels,click)=>`<div class="bf-chips" role="group">${Object.keys(labels).map(k=>`<button type="button" aria-pressed="${String(cur||'')===k}" onclick="${click(k)}">${labels[k]}</button>`).join('')}</div>`;
 function briefingCard(oppArg){
   ensure();
