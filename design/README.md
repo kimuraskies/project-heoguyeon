@@ -21,7 +21,7 @@
 | `badges.js` | `teamBadge(teamId, color, size)` → SVG 문자열, `BADGE_TEAMS` 색상표 |
 | `badges.html` | `core.js` ROSTERS와 같은 10개 구단 색상 미리보기 |
 | `tokens.css` | 간격·곡률·서체·표면·상태·팀 색상 및 컴포넌트 |
-| `mockup-dashboard.html` | KIA 스토브리그/정규시즌 전환, 할 일 예시 안내, 순위 펼치기 |
+| `mockup-dashboard.html` | KIA 정규시즌 화면(실제 게임은 단계에 따라 자동 전환), 할 일 예시 안내, 순위 펼치기 |
 
 ```html
 <html lang="ko" data-team="한화">
