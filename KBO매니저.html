@@ -364,20 +364,26 @@ function roundRobin(teams){
   }
   return rounds;
 }
+// KBO-style series: each pair meets 16 times as four 3-game series and two 2-game series,
+// home field alternating series by series (8 home games each). 144 days, five games a day.
+const SCHED_V=2;
 function buildSchedule(){
   const rounds = roundRobin(K.TEAM_IDS); // 9 rounds x 5 pairs
   const sched=[]; let day=0;
-  const cycles = SEASON_GAMES / (K.TEAM_IDS.length-1); // 144/9 = 16
-  for(let c=0;c<cycles;c++){
-    rounds.forEach(pairs=>{
-      pairs.forEach(p=>{
-        const home = (c%2===0)? p[0]:p[1];
-        const away = (c%2===0)? p[1]:p[0];
-        sched.push({day:day, home, away, played:false, hr:0, ar:0});
-      });
-      day++;
+  const series=[3,3,3,3,2,2];
+  series.forEach((len,c)=>{
+    rounds.forEach((pairs,r)=>{
+      for(let g=0;g<len;g++){
+        pairs.forEach(p=>{
+          const flip=(c+r)%2===0; // alternates home and away from one series to the next
+          const home = flip? p[0]:p[1];
+          const away = flip? p[1]:p[0];
+          sched.push({day:day, home, away, played:false, hr:0, ar:0, ser:g+1, serLen:len});
+        });
+        day++;
+      }
     });
-  }
+  });
   return sched;
 }
 
@@ -387,7 +393,7 @@ function initState(){
     year: 2026,
     cfgs: {},
     season: {},
-    schedule: buildSchedule(),
+    schedule: buildSchedule(), schedV: 2,
     gameIdx: 0,
     phase: "stove", // stove (스토브리그·전지훈련) | spring (시범경기) | regular | postseason | offseason
     history: [],
@@ -1109,7 +1115,7 @@ function nextSeason(){
   ageRosters();
   FM.offseasonMoves(); // departures, retirements, rookies before lineups are rebuilt
   state.year++;
-  state.schedule=buildSchedule();
+  state.schedule=buildSchedule(); state.schedV=SCHED_V;
   state.gameIdx=0;
   state.phase="stove";
   state.spring=null;
@@ -1224,7 +1230,7 @@ function heroInfo(rank){
       cta:`<button class="btn primary hero-cta" onclick="App.simRest()">${I('skip')}남은 경기 진행</button>`, more:''};
     const opp=next.home===USER?next.away:next.home;
     return {eyebrow:`NEXT GAME / GAME ${pad(played+1)}`, title:`${next.home===USER?'홈':'원정'} · ${K.ROSTERS[opp].name}전`,
-      sub:`${FM.dateLabel(FM.calDate(next.day))} · ${played+1}번째 경기 · 남은 ${SEASON_GAMES-played}경기${played?` · 현재 ${rank}위`:''}`, m:{home:next.home,away:next.away,label:'정규시즌'},
+      sub:`${FM.dateLabel(FM.calDate(next.day))} · ${played+1}번째 경기${next.serLen?` · ${next.serLen}연전 ${next.ser}차전`:""} · 남은 ${SEASON_GAMES-played}경기${played?` · 현재 ${rank}위`:''}`, m:{home:next.home,away:next.away,label:'정규시즌'},
       progress:Math.round(played/SEASON_GAMES*100),
       cta:`<button class="btn primary hero-cta" onclick="App.nextGame()">${I('play')}경기 준비</button>`,
       more:`<button class="btn" onclick="App.userGames(5)">${I('fast-forward')}5경기 빠르게</button>
@@ -1671,6 +1677,8 @@ function applySave(data){
   USER=(state.user&&state.user.team)||"KIA"; // saves from before team selection were KIA careers
   FM.applyTheme(USER);
   if(state.finishedGame) recordFinished(state.finishedGame); // the page closed right after the final out
+  // a save from before series play gets the new schedule if its regular season hasn't started yet
+  if(state.schedV!==SCHED_V && !state.schedule.some(g=>g.played)){ state.schedule=buildSchedule(); state.schedV=SCHED_V; state.gameIdx=0; }
 }
 function autosave(){
   if(!state) return;
