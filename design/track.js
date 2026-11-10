@@ -15,6 +15,7 @@
   let lastPlay = 0, seq = 0, curScreen = null, visibleSince = Date.now(), visibleSec = 0, lastLeave = 0;
   function enabled() {
     if (typeof location === 'undefined' || !/^https?:$/.test(location.protocol || '')) return false;
+    try { if (localStorage.getItem('kbo-track-off') === '1') return false; } catch (e) {}  // turned off in 옵션
     const h = location.hostname || '';
     if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(h) || /\.(localhost|test)$/.test(h)) return false;
     return !/claude\.ai|claudeusercontent|claude\.site/.test(location.host || '');

@@ -612,3 +612,19 @@ nav.tabs button.active{background:var(--md-surface-container-high);color:var(--m
 .live-row .btn,.live-row select{min-width:0;width:100%;white-space:nowrap}
 .pv-log-more>summary{padding:6px 8px;font-size:12px;color:var(--dim);cursor:pointer}
 @media(max-width:600px){.live-play{grid-template-columns:repeat(4,minmax(0,1fr))}.live-play select{grid-column:1/-1}.live-row .btn{padding-inline:6px;font-size:12.5px}}
+
+/* notices, options and info pages */
+.notice-btn{position:relative}
+.notice-btn #notice-dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--md-tertiary)}
+.info-note{padding:12px 0;border-top:1px solid var(--md-outline-variant)}
+.info-note small{color:var(--dim);font-size:12px}
+.info-note h3{margin:2px 0 6px;font-size:15px}
+.info-note ul,.info-page ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.7}
+.info-page p{font-size:14px;line-height:1.7;margin:0 0 10px}
+.opt-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--md-outline-variant)}
+.opt-row small{display:block;color:var(--dim);font-size:12.5px;margin-top:2px}
+.opt-links{display:flex;gap:8px;flex-wrap:wrap}
+footer a{color:inherit}
+@media(max-width:600px){.notice-btn .lbl{display:none}}
+
+.an-sort,.an-link{min-height:36px;padding:8px 2px}

@@ -293,9 +293,12 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
     <div class="teaminfo" id="teaminfo"></div>
     <div class="headctrl">
       <span id="nextStep" class="next-step"></span>
+      <button type="button" class="btn notice-btn" onclick="Info.notices()" aria-label="공지사항" title="공지사항"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h3l6 4V6l-6 4H4z M17 9c1.2 1.6 1.2 4.400 0 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span class="lbl">공지</span><i id="notice-dot" hidden></i></button>
       <details class="hmenu">
         <summary class="btn" aria-label="설정 메뉴" title="설정"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg><span class="lbl">설정</span></summary>
         <div class="hmenu-list" role="menu">
+        <button type="button" role="menuitem" onclick="this.closest('details').open=false;Info.options()"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>옵션 · 정보</button>
+        <button type="button" role="menuitem" onclick="this.closest('details').open=false;Info.notices()"><svg class="icon" aria-hidden="true"><use href="#i-feed"/></svg>공지사항</button>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.saves()"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>세이브 관리</button>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;FM.delegPicker()"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>업무 분담</button>
         <button type="button" role="menuitem" onclick="this.closest('details').open=false;Feedback.open()"><svg class="icon" aria-hidden="true"><use href="#i-inbox"/></svg>유저 피드백</button>
@@ -311,7 +314,8 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
   <div id="view"></div>
   </div>
   <footer>
-    KBO 매니저 — KBO 공식 기록실 2026 정규시즌 기록 기반 (능력치는 기록을 엔진에 맞게 환산한 근사값). 재미를 위한 비공식 시뮬레이션입니다.<br>
+    KBO 매니저 — KBO 공식 기록실 2026 정규시즌 기록 기반 (능력치는 기록을 엔진에 맞게 환산한 근사값). <br>
+    <b>비영리 팬 프로젝트</b>예요. KBO와 10개 구단의 공식 게임이 아니고, 광고와 결제가 없어요. <a href="javascript:void(0)" onclick="Info.page('about')">프로젝트 소개</a> · <a href="javascript:void(0)" onclick="Info.page('privacy')">이용 기록 안내</a><br>
     데이터: koreabaseball.com 기록실 · 엔진은 타석 단위 확률 시뮬레이션
   </footer>
 </div>
@@ -322,6 +326,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
 <script src="design/feedback.js"></script>
 <script src="design/gate.js"></script>
 <script src="design/track.js"></script>
+<script src="design/info.js"></script>
 <script src="core.js"></script>
 <script src="career.js"></script>
 <script src="farm.js"></script>
@@ -1209,7 +1214,7 @@ function heroInfo(rank){
     return {eyebrow:`${state.year} SEASON / PREPARATION`, title:done?"이제 캠프로 떠납니다.":`스토브리그 ${wk}주차`,
       sub:`스토브리그 ${FM.STOVE_WEEKS}주 → 스프링캠프 4주 → 시범경기 ${FM.SPRING_GAMES}경기 → 개막`, m:null, tbd:"시범경기",
       starters:`<p>다음 경기 · 시범경기</p><strong>선발 미정 <span class="muted">vs</span> 선발 미정</strong><p>캠프를 마치면 시범경기 대진이 정해집니다.</p>`,
-      cta: !done? `<button class="btn primary hero-cta" onclick="FM.stoveNext()">${I('play')}다음 주로</button>`
+      cta: !done? `<button class="btn primary hero-cta" onclick="FM.stoveNext()">${I('play')}다음 소식까지</button>`
            : `<button class="btn primary hero-cta" onclick="FM.campPicker()">${I('camp')}스프링캠프 계획</button>`,
       hint: !done? '매주 다른 구단도 FA에 입찰합니다. 구단 탭에서 FA에게 제안을 넣을 수 있어요.' : (ready? '주간 훈련을 확인하고 출발하세요.' : '훈련 방향을 고르면 캠프를 시작할 수 있어요.'),
       more: (FM.canQuickStart()?FM.quickBtn():'')+(!done? `<button class="btn" onclick="FM.stoveSkip()">캠프까지 건너뛰기</button>` : (ready? `<button class="btn" onclick="FM.startSpring()">남은 캠프 한 번에 진행</button>` : ''))};

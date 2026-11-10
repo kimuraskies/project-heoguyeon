@@ -13,6 +13,7 @@ function campPicker(){
     <small>${Object.values(p).reduce((a,b)=>a+b,0)}/10${p.fit+p.skill>=8?' · <span class="warn">부상 위험 높음</span>':''}</small></div>`;
   const cand=allPlayers(USER).slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).slice(0,18);
   const opt=p=>Object.entries(CAMP_TASK).filter(([k,x])=>x.t==='A'? p.age>=30 : x.t===p.type && (k!=='pos'||POS_NEXT[p.pos]));
+  closeModal();
   modal(`<span class="closeX" onclick="App.closeModal()" role="button" tabindex="0" aria-label="닫기">×</span><h2>${state.year} 스프링캠프 · ${Math.min(4,c.week+1)}/4주</h2>
     <div class="hint" style="margin-bottom:8px">기술 포인트가 아래 훈련 방향에 쓰입니다. 체력+기술이 높을수록 부상 위험이 커지고, 휴식은 위험을 줄입니다.</div>
     <div class="grid" style="gap:6px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${Object.entries(CAMP).map(([k,x])=>`<button class="btn ${cur===k?'primary':''}" onclick="FM.setCamp('${k}')" style="text-align:left"><b>${x.label}</b><br><span class="muted" style="font-size:11.5px">${x.d}</span></button>`).join('')}</div>
@@ -120,7 +121,8 @@ function stoveStep(){
   st.week=w+1;
   if(ev||news.length) send('단장','🗓',`스토브리그 ${w}주차 보고`,line,[]);
 }
-function stoveNext(){ stoveStep(); saveNow(); render(); if(window.Track) Track.action('stove_week'); }
+// moves on to the next week that has news, so quiet weeks don't each need a click
+function stoveNext(){ const f=fm(), st=stoveState(); let quiet=true, n=0; while(quiet&&st.week<=STOVE_WEEKS&&n++<STOVE_WEEKS){ const before=f.nextId; stoveStep(); quiet=f.nextId===before; } saveNow(); render(); if(window.Track) Track.action('stove_week'); }
 function stoveSkip(){ const st=stoveState(); while(st.week<=STOVE_WEEKS) stoveStep(); saveNow(); render(); }
 function faBid(i){ const f=fm(), x=(f.fa||[])[i]; if(!x) return; const p=x.p, base=x.ask, mine=(x.bids||[]).find(b=>b.team===USER), others=(x.bids||[]).filter(b=>b.team!==USER);
   const top=others.length?Math.max.apply(null,others.map(b=>b.sal)):0, ops=[1,1.1,1.25].map(m=>Math.round(base*m*10)/10);

@@ -429,6 +429,7 @@ function onCareerStart(){
   ensure();
   { const f0=fm(); f0.firstYear=state.year; f0.guide={step:0, done:false}; }
   seedFAs();
+  send('구단 사무국','💾','세이브는 이 브라우저에만 저장됩니다','커리어는 자동으로 저장되지만, 이 기기의 이 브라우저 안에만 있습니다.\n브라우저 데이터를 지우거나 기기를 바꾸면 사라집니다.\n\n설정 → 세이브 관리에서 세이브 파일을 받아 두면 다른 기기에서도 이어서 할 수 있습니다.',[]);
   send('단장','🔥',`${state.year} 스토브리그가 시작됐습니다`, `개막까지 준비할 시간이 있습니다.\n\n• FA 시장과 외국인 선수 후보는 구단 탭에서\n• 트레이드는 트레이드 탭에서\n• 타순·로테이션은 라인업 탭, 팀 기본 전술은 팀 전술 탭에서\n• 전지훈련 방향을 정하면 스프링캠프 → 시범경기 ${SPRING_GAMES}경기 → 정규시즌 개막 순서로 진행됩니다.`, []);
   const bonus=(MGR_BG[state.user.bg]||MGR_BG.coach).mor;
   if(bonus) allPlayers(USER).forEach(p=>{ p.mor=clampN(K.mor(p)+bonus,5,99); });
@@ -1301,6 +1302,7 @@ function campPicker(){
     <small>${Object.values(p).reduce((a,b)=>a+b,0)}/10${p.fit+p.skill>=8?' · <span class="warn">부상 위험 높음</span>':''}</small></div>`;
   const cand=allPlayers(USER).slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).slice(0,18);
   const opt=p=>Object.entries(CAMP_TASK).filter(([k,x])=>x.t==='A'? p.age>=30 : x.t===p.type && (k!=='pos'||POS_NEXT[p.pos]));
+  closeModal();
   modal(`<span class="closeX" onclick="App.closeModal()" role="button" tabindex="0" aria-label="닫기">×</span><h2>${state.year} 스프링캠프 · ${Math.min(4,c.week+1)}/4주</h2>
     <div class="hint" style="margin-bottom:8px">기술 포인트가 아래 훈련 방향에 쓰입니다. 체력+기술이 높을수록 부상 위험이 커지고, 휴식은 위험을 줄입니다.</div>
     <div class="grid" style="gap:6px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${Object.entries(CAMP).map(([k,x])=>`<button class="btn ${cur===k?'primary':''}" onclick="FM.setCamp('${k}')" style="text-align:left"><b>${x.label}</b><br><span class="muted" style="font-size:11.5px">${x.d}</span></button>`).join('')}</div>
@@ -1408,7 +1410,8 @@ function stoveStep(){
   st.week=w+1;
   if(ev||news.length) send('단장','🗓',`스토브리그 ${w}주차 보고`,line,[]);
 }
-function stoveNext(){ stoveStep(); saveNow(); render(); if(window.Track) Track.action('stove_week'); }
+// moves on to the next week that has news, so quiet weeks don't each need a click
+function stoveNext(){ const f=fm(), st=stoveState(); let quiet=true, n=0; while(quiet&&st.week<=STOVE_WEEKS&&n++<STOVE_WEEKS){ const before=f.nextId; stoveStep(); quiet=f.nextId===before; } saveNow(); render(); if(window.Track) Track.action('stove_week'); }
 function stoveSkip(){ const st=stoveState(); while(st.week<=STOVE_WEEKS) stoveStep(); saveNow(); render(); }
 function faBid(i){ const f=fm(), x=(f.fa||[])[i]; if(!x) return; const p=x.p, base=x.ask, mine=(x.bids||[]).find(b=>b.team===USER), others=(x.bids||[]).filter(b=>b.team!==USER);
   const top=others.length?Math.max.apply(null,others.map(b=>b.sal)):0, ops=[1,1.1,1.25].map(m=>Math.round(base*m*10)/10);
@@ -2032,10 +2035,10 @@ function showAwards(y){ const f=fm(), yr=y||state.year, d=(f.awards||{})[yr]||(f
     <h4 class="st-group">골든글러브</h4><div class="aw-list">${a.gg.map(x=>`<div><small>${x.pos}</small><b>${esc(x.n)}</b><span>${esc(x.t)}</span></div>`).join('')}</div>
     <h4 class="st-group">${esc(K.ROSTERS[USER].name)} 시즌 리캡</h4><p>${r.champ?'🏆 통합 우승 · ':''}정규시즌 ${r.rank}위 · ${r.W}승 ${r.L}패 ${r.T}무 · 이사회 신뢰 ${r.conf}</p>
     ${r.best?`<p class="muted">팀 WAR 1위 ${esc(r.best.n)} (${r.best.war.toFixed(1)})</p>`:''}${r.grown.length?`<p class="muted">올해 가장 많이 성장: ${r.grown.map(x=>esc(x.n)+' +'+x.g).join(', ')}</p>`:''}`); }
-function coachInterview(role,n){ const c=coachPool().find(x=>x.role===role&&x.n===n); if(!c) return; coachInit(c);
+function coachInterview(role,n){ const c=coachPool().find(x=>x.role===role&&x.n===n); if(!c) return; coachInit(c); closeModal();
   modal(`<span class="closeX" onclick="App.closeModal()" role="button" tabindex="0" aria-label="닫기">×</span><h2>${esc(n)} 면접</h2><p class="muted">우리 팀에서 가장 중요하게 볼 것을 물었습니다. 답에 따라 연봉 요구가 달라집니다.</p>
     <div class="grid" style="gap:8px;margin-top:8px">${COACH_STYLES.map(s=>`<button class="btn" onclick="FM.coachAnswer('${role}','${q(n)}','${s}')">${{'육성형':'어린 선수를 키워 주십시오','성적형':'올해 성적이 먼저입니다','데이터형':'데이터로 설득해 주십시오','올드스쿨':'기본기와 규율이 우선입니다'}[s]}</button>`).join('')}</div>`); }
-function coachAnswer(role,n,st){ const c=coachPool().find(x=>x.role===role&&x.n===n); if(!c) return; coachInit(c);
+function coachAnswer(role,n,st){ const c=coachPool().find(x=>x.role===role&&x.n===n); if(!c) return; coachInit(c); closeModal();
   if(!c.iv){ c.iv=1; c.sal=Math.round(c.sal*(c.style===st?0.9:STYLE_CLASH[c.style]===st?1.1:1)*10)/10; }
   modal(`<span class="closeX" onclick="App.closeModal()" role="button" tabindex="0" aria-label="닫기">×</span><h2>${esc(n)} 면접 결과</h2><p>${c.style===st?'철학이 잘 맞습니다. 연봉을 낮춰 합류하겠다고 합니다.':STYLE_CLASH[c.style]===st?'생각이 다릅니다. 더 많은 연봉을 원합니다.':'무난한 대화였습니다.'}</p>
     <p class="muted">성향 ${c.style} · 전문 ${c.spec} · 요구 연봉 ${c.sal}억</p><div class="st-attr" style="max-width:320px">${COACH_ATTR.map(([k,l])=>`<span>${l}</span>${bar(c.a[k],20)}<b>${c.a[k]}</b>`).join('')}</div>

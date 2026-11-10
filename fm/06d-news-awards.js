@@ -44,10 +44,10 @@ function showAwards(y){ const f=fm(), yr=y||state.year, d=(f.awards||{})[yr]||(f
     <h4 class="st-group">골든글러브</h4><div class="aw-list">${a.gg.map(x=>`<div><small>${x.pos}</small><b>${esc(x.n)}</b><span>${esc(x.t)}</span></div>`).join('')}</div>
     <h4 class="st-group">${esc(K.ROSTERS[USER].name)} 시즌 리캡</h4><p>${r.champ?'🏆 통합 우승 · ':''}정규시즌 ${r.rank}위 · ${r.W}승 ${r.L}패 ${r.T}무 · 이사회 신뢰 ${r.conf}</p>
     ${r.best?`<p class="muted">팀 WAR 1위 ${esc(r.best.n)} (${r.best.war.toFixed(1)})</p>`:''}${r.grown.length?`<p class="muted">올해 가장 많이 성장: ${r.grown.map(x=>esc(x.n)+' +'+x.g).join(', ')}</p>`:''}`); }
-function coachInterview(role,n){ const c=coachPool().find(x=>x.role===role&&x.n===n); if(!c) return; coachInit(c);
+function coachInterview(role,n){ const c=coachPool().find(x=>x.role===role&&x.n===n); if(!c) return; coachInit(c); closeModal();
   modal(`<span class="closeX" onclick="App.closeModal()" role="button" tabindex="0" aria-label="닫기">×</span><h2>${esc(n)} 면접</h2><p class="muted">우리 팀에서 가장 중요하게 볼 것을 물었습니다. 답에 따라 연봉 요구가 달라집니다.</p>
     <div class="grid" style="gap:8px;margin-top:8px">${COACH_STYLES.map(s=>`<button class="btn" onclick="FM.coachAnswer('${role}','${q(n)}','${s}')">${{'육성형':'어린 선수를 키워 주십시오','성적형':'올해 성적이 먼저입니다','데이터형':'데이터로 설득해 주십시오','올드스쿨':'기본기와 규율이 우선입니다'}[s]}</button>`).join('')}</div>`); }
-function coachAnswer(role,n,st){ const c=coachPool().find(x=>x.role===role&&x.n===n); if(!c) return; coachInit(c);
+function coachAnswer(role,n,st){ const c=coachPool().find(x=>x.role===role&&x.n===n); if(!c) return; coachInit(c); closeModal();
   if(!c.iv){ c.iv=1; c.sal=Math.round(c.sal*(c.style===st?0.9:STYLE_CLASH[c.style]===st?1.1:1)*10)/10; }
   modal(`<span class="closeX" onclick="App.closeModal()" role="button" tabindex="0" aria-label="닫기">×</span><h2>${esc(n)} 면접 결과</h2><p>${c.style===st?'철학이 잘 맞습니다. 연봉을 낮춰 합류하겠다고 합니다.':STYLE_CLASH[c.style]===st?'생각이 다릅니다. 더 많은 연봉을 원합니다.':'무난한 대화였습니다.'}</p>
     <p class="muted">성향 ${c.style} · 전문 ${c.spec} · 요구 연봉 ${c.sal}억</p><div class="st-attr" style="max-width:320px">${COACH_ATTR.map(([k,l])=>`<span>${l}</span>${bar(c.a[k],20)}<b>${c.a[k]}</b>`).join('')}</div>
