@@ -48,7 +48,7 @@
         <label for="gate-code">초대코드</label>
         <div class="gate-row"><input id="gate-code" name="code" required maxlength="20" placeholder="초대코드 입력" autocapitalize="characters" autocomplete="off" spellcheck="false">
           <button class="gate-go" type="submit" ${busy ? 'disabled' : ''}>${busy ? '확인 중…' : '입장하기'}</button></div>
-        ${msg ? `<div class="gate-msg" role="alert">${esc(msg)}</div>` : '<p class="gate-note">초대받은 감독만 입장할 수 있어요.<br><small>비영리 팬 프로젝트예요. KBO와 구단의 공식 게임이 아니에요.<br>더 나은 게임을 위해 익명 이용 기록(접속, 화면 이동, 진행 상황)을 모아요. 입장 후 설정 → 옵션에서 끌 수 있어요.</small></p>'}
+        ${msg ? `<div class="gate-msg" role="alert">${esc(msg)}</div>` : '<p class="gate-note">초대받은 감독만 입장할 수 있어요.<br><small>비영리 팬 프로젝트예요. KBO와 구단의 공식 게임이 아니에요.<br>더 나은 게임을 위해 익명 이용 기록(접속, 화면 이동, 진행 상황)을 모아요. 입장 후 설정에서 끌 수 있어요.</small></p>'}
       </form>`;
     const f = el.querySelector('#gate-code'); if (f && !msg) f.focus();
   }

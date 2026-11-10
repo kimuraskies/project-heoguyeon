@@ -294,19 +294,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
     <div class="headctrl">
       <span id="nextStep" class="next-step"></span>
       <button type="button" class="btn notice-btn" onclick="Info.notices()" aria-label="공지사항" title="공지사항"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h3l6 4V6l-6 4H4z M17 9c1.2 1.6 1.2 4.400 0 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span class="lbl">공지</span><i id="notice-dot" hidden></i></button>
-      <details class="hmenu">
-        <summary class="btn" aria-label="설정 메뉴" title="설정"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg><span class="lbl">설정</span></summary>
-        <div class="hmenu-list" role="menu">
-        <button type="button" role="menuitem" onclick="this.closest('details').open=false;Info.options()"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>옵션 · 정보</button>
-        <button type="button" role="menuitem" onclick="this.closest('details').open=false;Info.notices()"><svg class="icon" aria-hidden="true"><use href="#i-feed"/></svg>공지사항</button>
-        <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.saves()"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>세이브 관리</button>
-        <button type="button" role="menuitem" onclick="this.closest('details').open=false;FM.delegPicker()"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>업무 분담</button>
-        <button type="button" role="menuitem" onclick="this.closest('details').open=false;Feedback.open()"><svg class="icon" aria-hidden="true"><use href="#i-inbox"/></svg>유저 피드백</button>
-        <button type="button" role="menuitem" hidden onclick="this.closest('details').open=false;Gate.logout()"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg><span id="gate-who">로그아웃</span></button>
-        <hr>
-        <button type="button" role="menuitem" onclick="this.closest('details').open=false;App.confirmNew()"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg>새 게임</button>
-        </div>
-      </details>
+      <button type="button" class="btn" onclick="Info.options()" aria-label="설정" title="설정"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg><span class="lbl">설정</span></button>
     </div>
   </header>
   <div class="shell">

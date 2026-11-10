@@ -20,7 +20,7 @@
       <li>모으지 않는 것: 이름, 이메일, 연락처, 세이브 내용, 감독 사진</li>
       <li>쓰는 곳: 몇 명이 어디까지 플레이하고 어디서 그만두는지 보는 데만 써요. 다른 곳에 넘기지 않아요.</li>
       <li>피드백 창에 쓴 글은 적은 내용 그대로 저장돼요. 개인정보는 적지 말아 주세요.</li></ul>
-      <p>옵션에서 <b>이용 기록 수집</b>을 끄면 그 뒤로는 기록을 보내지 않아요.</p>`],
+      <p>설정에서 <b>이용 기록 수집</b>을 끄면 그 뒤로는 기록을 보내지 않아요.</p>`],
     data: ['데이터와 라이선스', `<p>선수 기록은 KBO 공식 기록실(koreabaseball.com)의 2026 정규시즌 공개 기록을 바탕으로 했어요. 능력치는 그 기록을 게임 엔진에 맞게 환산한 근사값이고, 실제 선수의 기량 평가가 아니에요.</p>
       <p>코칭스태프는 2026 개막 시점 KBO 등록 현황 기준이에요. 코치 능력치는 현역 시절 기록과 나이로 추정한 게임용 수치예요. 보직은 게임에서 임의로 나눈 것이라 실제와 다를 수 있어요.</p>
       <p>경기 결과, 기사, 인터뷰, 트레이드는 모두 게임이 만든 가상의 내용이에요.</p>`],
@@ -41,17 +41,20 @@
     set(SEEN, NOTICES[0].id); dot();
     show(`${X}<h2>공지사항</h2>${NOTICES.map(n => `<section class="info-note"><small>${n.id}</small><h3>${n.t}</h3><ul>${n.b.map(x => `<li>${x}</li>`).join('')}</ul></section>`).join('')}`);
   }
-  function page(k) { const p = PAGES[k]; if (!p) return; show(`${X}<h2>${p[0]}</h2><div class="info-page">${p[1]}</div><div class="row" style="margin-top:12px"><button class="btn" onclick="Info.options()">옵션으로</button></div>`); }
+  function page(k) { const p = PAGES[k]; if (!p) return; show(`${X}<h2>${p[0]}</h2><div class="info-page">${p[1]}</div><div class="row" style="margin-top:12px"><button class="btn" onclick="Info.options()">설정으로</button></div>`); }
   function options() {
     const row = (t, d, btn) => `<div class="opt-row"><div><b>${t}</b><small>${d}</small></div>${btn}</div>`;
     const inGame = typeof state !== 'undefined' && state && typeof USER !== 'undefined' && USER;
-    show(`${X}<h2>옵션 · 정보</h2>
+    let gate = null; try { gate = JSON.parse(localStorage.getItem('kbo-gate') || 'null'); } catch (e) {}
+    show(`${X}<h2>설정</h2>
       ${row('이용 기록 수집', '익명 기록만 모아요. 끄면 보내지 않아요.', `<button class="btn${trackOn() ? ' primary' : ''}" role="switch" aria-checked="${trackOn()}" onclick="Info.setTrack(${!trackOn()})">${trackOn() ? '켜짐' : '꺼짐'}</button>`)}
       ${row('세이브 관리', '세이브는 이 브라우저에만 저장돼요. 브라우저 데이터를 지우면 사라지니 파일로 받아 두세요.', `<button class="btn" onclick="App.saves()">열기</button>`)}
       ${inGame ? row('업무 분담', '코치에게 맡길 일을 정해요.', `<button class="btn" onclick="FM.delegPicker()">열기</button>`) : ''}
       ${row('게임 방법', '진행 순서와 기본 조작', `<button class="btn" onclick="Info.page('howto')">보기</button>`)}
       ${row('공지사항', '업데이트 내역과 안내', `<button class="btn" onclick="Info.notices()">보기</button>`)}
       ${row('의견 보내기', '버그, 아이디어, 제휴 제안', `<button class="btn" onclick="App.closeModal();Feedback.open()">열기</button>`)}
+      ${inGame ? row('새 게임', '지금 커리어를 끝내고 처음부터 시작해요.', `<button class="btn" onclick="App.closeModal();App.confirmNew()">시작</button>`) : ''}
+      ${gate && gate.token && window.Gate && Gate.required() ? row('로그아웃', '이 기기의 입장 기록을 지워요. 다시 들어오려면 초대코드가 필요해요.', `<button class="btn" onclick="Gate.logout()">로그아웃</button>`) : ''}
       <h4 class="st-group">정보</h4>
       <div class="opt-links"><button class="btn" onclick="Info.page('about')">프로젝트 소개</button><button class="btn" onclick="Info.page('privacy')">이용 기록과 개인정보</button><button class="btn" onclick="Info.page('data')">데이터와 라이선스</button></div>
       <p class="hint" style="margin-top:12px">KBO 매니저는 비영리 팬 프로젝트이며 KBO와 구단의 공식 게임이 아니에요.</p>`);
