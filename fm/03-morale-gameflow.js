@@ -52,7 +52,8 @@ function callUp(t,type,pos){
     (off? `\n엔트리 ${ENTRY_MAX}명을 지키려고 부상 중인 ${off.n}을(를) 말소했습니다.` : ''), []); }
   return p;
 }
-function userPlan(){ const pm=state.pendingGame!=null? pendingMatch() : null; if(!pm) return null; return planOf(pm.home===USER?pm.away:pm.home); }
+// plans for every opponent go into the config; the engine picks the one for whoever is across the field
+function userPlan(){ const f=fm(); return f.plans||null; }
 function prepareCfg(team, cfg){
   ensure();
   const r=K.ROSTERS[team], f=fm();
@@ -63,7 +64,11 @@ function prepareCfg(team, cfg){
   const opts={ restBelow: (!isUser||f.autoRest)? 70 : 0, forceRest: isUser? f.restNext.concat(state.phase==='spring'?springRest():[]) : [] };
   // relievers who joined after the bullpen was set (rookies, call-ups, trades) go to the back of it
   const extraRP=r.pitchers.filter(p=>p.role!=='SP' && p.n!==cfg.closer && (cfg.bullpen||[]).indexOf(p.n)<0).map(p=>p.n);
-  const extra=Object.assign({edge:coachEdge(team)}, isUser? {tacFam:execTable(), scoutKnow:knowTable(), splits:true, plan:userPlan(), sharp:state.phase==='regular'&&userGamesPlayed()<18} : {tacFam:aiExecTable(team), scoutKnow:aiKnowTable(team)});
+  const extra=Object.assign({edge:coachEdge(team)}, isUser? {tacFam:execTable(), scoutKnow:knowTable(), splits:true, plans:userPlan(), sharp:state.phase==='regular'&&userGamesPlayed()<18} : {tacFam:aiExecTable(team), scoutKnow:aiKnowTable(team)});
+  // an exhibition starter marked 안 씀 hands the ball to the next one who is
+  if(isUser&&state.phase==='spring'&&opts.forceRest.indexOf(cfg.spName)>=0){
+    const alt=state.cfgs[USER].rotation.concat(r.pitchers.map(p=>p.n)).find(n=>opts.forceRest.indexOf(n)<0&&(()=>{ const p=findPlayer(USER,n); return p&&!K.isInjured(p); })());
+    if(alt) cfg=Object.assign({},cfg,{spName:alt}); }
   return K.restAdjust(team, Object.assign({}, cfg, extra, {rotation: state.cfgs[team].rotation, bullpen:(cfg.bullpen||[]).concat(extraRP)}), opts);
 }
 // what prepareCfg will change for the user's next game, for the preview screen

@@ -27,20 +27,23 @@
     const s = load();
     // once this device has entered, the gate never asks again (no server round trip); only
     // 설정 → 로그아웃 or cleared browser data brings it back
-    if (s && s.token) return finish(s);
-    render();
+    // a device that has entered before still sees the title, with one button instead of the code box
+    render(null, s && s.token ? s : null);
   }
+  function enter() { const s = load(); if (s && s.token) finish(s); else render(); }
   function finish(s) {
     document.body.classList.remove('gate-on');
     const el = document.getElementById('gate'); if (el) el.remove();
     const who = document.getElementById('gate-who'); if (who) { who.textContent = s && s.id ? `로그아웃 (${s.id})` : '로그아웃'; who.closest('button').hidden = false; }
     const cb = done; done = null; if (cb) cb();
   }
-  function render(msg) {
+  function render(msg, back) {
     let el = document.getElementById('gate');
     if (!el) { el = document.createElement('div'); el.id = 'gate'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'KBO 매니저 입장'); document.body.appendChild(el); }
     document.body.classList.add('gate-on');
     if (window.Track) Track.screen('gate');
+    if (back) { el.innerHTML = `<div class="gate-panel gate-back"><button class="gate-go gate-enter" type="button" onclick="Gate.enter()">접속하기</button>
+        <p class="gate-note">이 기기는 이미 초대코드를 확인했어요.</p></div>`; const b = el.querySelector('.gate-enter'); if (b) b.focus(); return; }
     el.innerHTML = `<form class="gate-panel" onsubmit="event.preventDefault();Gate.submit(this)">
         <label for="gate-code">초대코드</label>
         <div class="gate-row"><input id="gate-code" name="code" required maxlength="20" placeholder="초대코드 입력" autocapitalize="characters" autocomplete="off" spellcheck="false">
@@ -66,5 +69,5 @@
     if (s && s.token) { try { await rpc('gate_logout', {p_token: s.token}); } catch (e) {} }
     location.reload();
   }
-  window.Gate = {required, ensure, submit, logout};
+  window.Gate = {required, ensure, submit, logout, enter};
 })();

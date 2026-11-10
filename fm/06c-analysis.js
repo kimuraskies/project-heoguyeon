@@ -2,7 +2,7 @@
 // A plan is stored per opposing club: plans[opp] = {vs:{batter:{ap,zone}}, pit:{pitcher:{ap,look}}}.
 const AP_L={attack:'정면',nibble:'유인',walk:'거르기'}, ZONE_L={'':'맡김',in:'몸쪽',out:'바깥쪽'}, PAP_L={'':'보통',first:'초구 공략',patient:'공 보기'}, LOOK_L={'':'맡김',fast:'빠른 공',break:'변화구'};
 function planOf(opp){ const f=fm(); f.plans=f.plans||{}; return f.plans[opp]||(f.plans[opp]={vs:{},pit:{}}); }
-function setPlan(opp,kind,n,key,v){ const p=planOf(opp), o=p[kind][n]||(p[kind][n]={}); if(v) o[key]=v; else delete o[key]; if(!Object.keys(o).length) delete p[kind][n]; refreshBrief(opp); }
+function setPlan(opp,kind,n,key,v){ const p=planOf(opp), o=p[kind][n]||(p[kind][n]={}); if(v) o[key]=v; else delete o[key]; if(!Object.keys(o).length) delete p[kind][n]; refreshBrief(opp); saveNow(); }
 function refreshBrief(opp){ const e=document.getElementById('briefCard'); if(e) e.outerHTML=briefingCard(opp); }
 function recBat(p){ return {ap:p.eye<=62?'nibble':(p.eye>=74&&p.pow<=68)?'attack':'attack', zone:p.pow>=78?'out':p.con<=66?'in':''}; }
 function recPit(p){ return {ap:p.ctl>=72?'first':p.ctl<=62?'patient':'', look:((70-p.stu)/500+0.002)>=((p.mov-70)/500)?'fast':'break'}; }
@@ -10,7 +10,7 @@ function batReason(p){ return p.eye<=62?`선구안이 약합니다(${toFM(p.eye)
 function applyPlanRec(opp){ const r=K.ROSTERS[opp], c=state.cfgs[opp], p=planOf(opp);
   c.lineup.forEach(n=>{ const x=r.batters.find(b=>b.n===n); if(x) p.vs[n]=recBat(x); });
   r.pitchers.filter(x=>x.role==='SP').forEach(x=>{ p.pit[x.n]=recPit(x); });
-  refreshBrief(opp); if(window.Track) Track.action('plan_rec'); }
+  refreshBrief(opp); saveNow(); if(window.Track) Track.action('plan_rec'); }
 const toFM=attr20;
 const chipRow=(cur,labels,click)=>`<div class="bf-chips" role="group">${Object.keys(labels).map(k=>`<button type="button" aria-pressed="${String(cur||'')===k}" onclick="${click(k)}">${labels[k]}</button>`).join('')}</div>`;
 function briefingCard(oppArg){

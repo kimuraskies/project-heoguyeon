@@ -22,7 +22,7 @@ function coachInit(c){
 // moves a coach to another post; whoever held it takes his old one. What he does best now depends on the post.
 function coachSetRole(c,r){ c.role=r; if(c.a) c.q=c.a[ROLE_MAIN[r]]||c.q; const sp=COACH_SPEC[r]||['전반']; if(sp.indexOf(c.spec)<0) c.spec=sp[hash(c.n+r)%sp.length]; }
 function coachMove(from,to){ if(from===to) return; const s=staffOf(USER), a=coachInit(s[from]), b=coachInit(s[to]); s[to]=a; s[from]=b; coachSetRole(a,to); coachSetRole(b,from);
-  if(window.Track) Track.action('coach_move'); render(); }
+  if(window.Track) Track.action('coach_move'); saveNow(); render(); }
 function coachA(role,key,t){ const c=staffOf(t||USER)[role]; return c? coachInit(c).a[key] : 10; }
 const BG_STYLE={mlb:'데이터형',coach:'성적형',legend:'올드스쿨',rookie:'육성형',kbo:'성적형'};
 const STYLE_CLASH={'데이터형':'올드스쿨','올드스쿨':'데이터형','육성형':'성적형','성적형':'육성형'};
@@ -37,16 +37,17 @@ function coachWear(t){ return {inj:1-(coachA('cond','man',t)-10.5)*0.015, pen:(c
 function coachEdge(t){ return {run:(coachA('run','tac',t)-10.5)*0.002, arm:(coachA('bat2','tac',t)-10.5)*0.002, bat:(coachA('bat','tac',t)-10.5)*0.002}; }
 
 // advice arrives in the inbox; taking it pleases the coach, ignoring it costs goodwill
-function coachMood(role,d,ok){ const c=staffOf(USER)[role]; if(!c) return; coachInit(c); c.sat=clampN(c.sat+d,0,100); if(ok) c.okN++; else c.noN++; }
-ACTIONS.coachYes=(m,a)=>{ coachMood(a.role,4,true); const f=fm();
+// advice belongs to the coach who gave it, wherever he works now
+function coachMood(role,d,ok,n){ const s=staffOf(USER), c=(n&&Object.values(s).find(x=>x.n===n))||s[role]; if(!c) return; coachInit(c); c.sat=clampN(c.sat+d,0,100); if(ok) c.okN++; else c.noN++; }
+ACTIONS.coachYes=(m,a)=>{ coachMood(a.role,4,true,a.n); const f=fm();
   if(a.rest) a.rest.forEach(n=>{ if(f.restNext.indexOf(n)<0) f.restNext.push(n); });
   if(a.mor) allPlayers(USER).forEach(p=>{ p.mor=clampN(p.mor+a.mor,5,99); });
   return a.done||'건의를 받아들였습니다.'; };
-ACTIONS.coachNo=(m,a)=>{ coachMood(a.role,-5,false); return '건의를 보류했습니다.'; };
+ACTIONS.coachNo=(m,a)=>{ coachMood(a.role,-5,false,a.n); return '건의를 보류했습니다.'; };
 function coachSay(role,icon,subject,body,yes,done,extra){
   const c=staffOf(USER)[role]; if(!c) return;
   send(`${c.n} ${Object.fromEntries(COACH_ROLES)[role]}`,icon,subject,body,[
-    {label:yes,fn:'coachYes',arg:Object.assign({role,done},extra||{})},{label:'보류',fn:'coachNo',arg:{role}}]);
+    {label:yes,fn:'coachYes',arg:Object.assign({role,n:c.n,done},extra||{})},{label:'보류',fn:'coachNo',arg:{role,n:c.n}}]);
 }
 function styleLine(role){ const c=staffOf(USER)[role]; if(!c) return ''; coachInit(c);
   return {'육성형':'어린 선수들에게 기회가 될 겁니다.','성적형':'지금 순위를 생각해야 합니다.','데이터형':'숫자가 그렇게 말하고 있습니다.','올드스쿨':'선수는 몸으로 말합니다.'}[c.style]; }

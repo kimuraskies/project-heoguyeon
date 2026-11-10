@@ -84,13 +84,9 @@ function renderSetup(){
   </style>
   <div class="card" style="margin-top:12px">
     <h3 style="font-size:18px">⚾ 새 커리어 시작 <span class="tag">${state&&state.year||2026} 시즌</span></h3>
-    <div class="hint">지휘할 구단만 고르면 바로 시작할 수 있어요. 구단마다 전력과 이사회 기대치가 다릅니다.</div>
+    <div class="hint">감독 프로필을 정하고 지휘할 구단을 고르세요. 구단마다 전력과 이사회 기대치가 다릅니다.</div>
   </div>
-  <div class="card" style="margin-top:14px"><h3>구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">${K.TEAM_IDS.slice().sort((a,b)=>ranks[a]-ranks[b]).map(card).join('')}</div>
-  </div>
-  <details class="card setup-more" style="margin-top:14px" ${setup.more?'open':''} ontoggle="FM.setupMore(this.open)">
-    <summary><b>감독 프로필</b> <span class="muted">이름 · 사진 · 경력 (선택, 나중에 안 정해도 돼요)</span></summary>
+  <section class="card setup-prof-card" style="margin-top:14px"><h3>감독 프로필 <span class="tag">이름 · 사진 · 경력</span></h3>
     <div class="setup-prof" style="margin-top:14px">
       <div class="setup-photo">${mgrAvatar(104,me)}
         <label class="btn" for="mgrphoto" style="font-size:12px;cursor:pointer">📷 사진 ${setup.photo?'바꾸기':'올리기'}</label>
@@ -104,12 +100,15 @@ function renderSetup(){
         <div class="setup-bgs">${Object.keys(MGR_BG).map(bgOpt).join('')}</div>
       </div>
     </div>
-  </details>
+  </section>
+  <div class="card" style="margin-top:14px"><h3>구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">${K.TEAM_IDS.slice().sort((a,b)=>ranks[a]-ranks[b]).map(card).join('')}</div>
+  </div>
   <div class="card setup-foot">
     <div class="sum">${mgrAvatar(44,me)}<div style="min-width:0">
       <b id="setup-sum-name">${esc((setup.name||'').trim()||'무명')} 감독</b> <span class="muted">· ${MGR_BG[setup.bg].label}</span><br>
       ${ready? `<span class="muted" style="font-size:13px"><span class="teamdot" style="background:${K.ROSTERS[t].color}"></span> ${K.ROSTERS[t].name} · 전력 ${ranks[t]}위 · 목표 ${expectationFor(ranks[t]).label}</span>`
-        : '<span class="muted" style="font-size:13px">위에서 구단을 선택하세요.</span>'}</div></div>
+        : '<span class="muted" style="font-size:13px">구단을 선택하세요.</span>'}</div></div>
     <button class="btn primary" style="padding:12px 22px;font-size:15px" ${ready?'':'disabled'} onclick="FM.setupStart()">✍ 감독 취임하기</button>
   </div>`;
 }

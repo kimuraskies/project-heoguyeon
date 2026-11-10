@@ -975,7 +975,7 @@ IP._buntCall=function(off,def,bat,slot){
 IP._ibbCall=function(off,def,bat){
   var b=this.bases;
   if(this.cmd[def]==='ibb') return true;
-  var pl=this.cfg[def].plan, one=pl&&pl.vs&&pl.vs[bat.n];
+  var pls=this.cfg[def].plans, pl=pls&&pls[off], one=pl&&pl.vs&&pl.vs[bat.n];
   if(one&&one.ap==='walk'&&!b[0]&&(b[1]||b[2])&&this.inning>=6&&Math.abs(this.score[def]-this.score[off])<=2) return true;
   if(!this.tac[def].ibb || b[0] || !(b[1]||b[2])) return false;
   var diff=this.score[def]-this.score[off];
@@ -994,8 +994,9 @@ IP.prepareAB=function(){
     return this._pending;
   }
   var self=this, sign=this.cmd[off], dcall=this.cmd[def];
-  if(sign && !this.signOK(off,sign)){ this.cmd[off]=null; sign=null; }   // the runners changed since the call
-  if(dcall && !this.signOK(def,dcall)){ this.cmd[def]=null; dcall=null; }
+  // the runners changed since the call: drop it, and say so (dropped is read by the broadcast)
+  if(sign && !this.signOK(off,sign)){ this.cmd[off]=null; this.dropped=this.dropped||{}; this.dropped[off]=sign; sign=null; }
+  if(dcall && !this.signOK(def,dcall)){ this.cmd[def]=null; this.dropped=this.dropped||{}; this.dropped[def]=dcall; dcall=null; }
   var manual=!!sign;
   if(!sign) sign=this._autoSign(off,def,bat);
   if(!dcall) dcall=this._autoDef(off,def);
@@ -1035,7 +1036,7 @@ IP.prepareAB=function(){
   }
   var fatigue=Math.max(0,(this.pBF[def]-(pit.role==='SP'?18:4))*0.7);
   var mods=platoon(scoutMods(paMods(this.tac[off],this.tac[def],this.bases,this.outs,this.ex.bind(this,off),this.ex.bind(this,def)),this.know[off],this.know[def]),batName,this.pitcher[def]);
-  mods=planMods(mods,this.cfg[off].plan,this.cfg[def].plan,batName,this.pitcher[def],bat,pit,this.know[off],this.know[def]);
+  mods=planMods(mods,(this.cfg[off].plans||{})[def],(this.cfg[def].plans||{})[off],batName,this.pitcher[def],bat,pit,this.know[off],this.know[def]);
   if(this.cfg[off].sharp){ var sb=clamp(((bat.sharp==null?70:bat.sharp)-70)/30,-1,1); mods.K-=0.006*sb; mods.HR+=0.001*sb; mods.BIP+=0.004*sb; }
   if(this.cfg[def].sharp){ var sp2=clamp(((pit.sharp==null?70:pit.sharp)-70)/30,-1,1); mods.K+=0.006*sp2; mods.HR-=0.001*sp2; mods.BIP-=0.004*sp2; }
   if(hr==='hitrun'){ mods.K-=0.012; mods.BIP+=0.012; mods.HR-=0.002; }

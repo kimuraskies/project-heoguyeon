@@ -67,7 +67,10 @@ const FIT_RULE={
   'run:aggr':['타선 주력',()=>avgOf(lineupBats(),p=>p.spd)], 'teamBat:true':['타선 컨택',()=>avgOf(lineupBats(),p=>p.con)],
   'shift:dp':['내야 수비',()=>avgOf(fieldersAt(['1B','2B','3B','SS']),p=>p.fld)], 'shift:infieldIn':['내야 수비',()=>avgOf(fieldersAt(['1B','2B','3B','SS']),p=>p.fld)],
   'shift:deep':['외야 수비·주력',()=>avgOf(fieldersAt(['LF','CF','RF']),p=>(p.fld+p.spd)/2)],
-  'bat:attack':['선발 구위',()=>avgOf(rotArms(),p=>p.stu)], 'bat:nibble':['선발 제구·무브',()=>avgOf(rotArms(),p=>(p.ctl+p.mov)/2)]
+  'bat:attack':['선발 구위',()=>avgOf(rotArms(),p=>p.stu)], 'bat:nibble':['선발 제구·무브',()=>avgOf(rotArms(),p=>(p.ctl+p.mov)/2)],
+  'bat:inside':['선발 구위',()=>avgOf(rotArms(),p=>p.stu)], 'bat:outside':['선발 제구',()=>avgOf(rotArms(),p=>p.ctl)], 'bat:breaking':['선발 무브먼트',()=>avgOf(rotArms(),p=>p.mov)],
+  'dir:pull':['타선 파워',()=>avgOf(lineupBats(),p=>p.pow)], 'dir:oppo':['타선 컨택',()=>avgOf(lineupBats(),p=>p.con)],
+  'adv:aggr':['타선 주력',()=>avgOf(lineupBats(),p=>p.spd)], 'pick:often':['선발 제구',()=>avgOf(rotArms(),p=>p.ctl)]
 };
 function fitOf(k,v){ const r=FIT_RULE[k+':'+v]; return r? clampN(Math.round((r[1]()-55)*100/35),0,100) : 100; }
 // do the players follow the manager? morale, the board's backing, and how many are new to the club
@@ -106,7 +109,7 @@ function effectPanel(scope){
   const T=curTac(scope), plans=activePlans(T), b=buyIn(), bp=buyInParts(), opp=nextOpp();
   const fam=plans.length? plans.reduce((a,x)=>a+famOf(x.k,x.v),0)/plans.length : 100;
   const fit=plans.length? plans.reduce((a,x)=>a+fitOf(x.k,x.v),0)/plans.length : null;
-  const lines=plans.map(x=>`• ${tacName(x.k)} <b>${esc(tacLabel(x.k,x.v==='true'?true:x.v))}</b> — 숙련 ${famOf(x.k,x.v)}% · 적합 ${fitOf(x.k,x.v)} (${FIT_RULE[x.k+':'+x.v][0]}) · 실행률 <b>${Math.round(execOf(x.k,x.v,b)*100)}%</b>`);
+  const lines=plans.map(x=>`• ${tacName(x.k)} <b>${esc(tacLabel(x.k,x.v==='true'?true:x.v))}</b> — 숙련 ${famOf(x.k,x.v)}% · 적합 ${fitOf(x.k,x.v)} (${(FIT_RULE[x.k+':'+x.v]||['선수 구성'])[0]}) · 실행률 <b>${Math.round(execOf(x.k,x.v,b)*100)}%</b>`);
   return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line-strong)">
     <div style="font-weight:700;margin-bottom:6px">📊 작전 효과</div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">

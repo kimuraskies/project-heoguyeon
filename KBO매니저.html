@@ -566,6 +566,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
     const g=this.game, ab=this.ab;
     if(g.over && (!ab || ab.committed)){ this.end(); return; }
     if(!ab){ const p=g.prepareAB(); if(!p){ this.end(); return; }
+      if(g.dropped&&g.dropped[USER]){ this.feed.unshift({sysmsg:`${K.SIGNS[g.dropped[USER]].l} 사인 취소 · 주자 상황이 바뀌었습니다`}); g.dropped[USER]=null; }
       const wpNow=winProb(g); this.wpLog.push(Math.round((g.h===USER?wpNow:1-wpNow)*100)/100);
       this.ab={pitches:p.pitches,shown:0,pre:false,susp:false,committed:false,pitName:p.pitName,batName:p.batName,off:p.off,def:p.def,slot:p.slot,oc:p.oc,ev:null,wp0:winProb(g),steal:p.kind==='steal',variant:p.variant,runner:p.runner,kind:p.kind||'pa'};
       this._say(Comm.intro(g,this.ab)); this.renderLive(); return; }
@@ -620,7 +621,11 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
     showMatchResult(fin.res, fin.spring?'spring':fin.ps?'ps':'regular');
   },
   closeResult(){ const o=document.getElementById('result'); if(o) o.remove(); if(window.Track) Track.screen(currentTab); FM.guideRender(); },
-  order(c){ if(!this.game.orderCmd(USER,c)){ FM.notify('지금 주자 상황에서는 낼 수 없는 사인입니다.'); return; } this.panel=null; this.feed.unshift({sysmsg:K.SIGNS[c].l+' 사인 (다음 타석)'}); this.renderLive(); },
+  order(c){ if(!this.game.orderCmd(USER,c)){ FM.notify('지금 주자 상황에서는 낼 수 없는 사인입니다.'); return; } this.panel=null;
+    // before the first pitch the sign is for this batter: drop the prepared at-bat and call it again
+    const ab=this.ab, now=ab&&!ab.committed&&ab.shown===0;
+    if(now){ this.game.cancelPending(); this.ab=null; }
+    this.feed.unshift({sysmsg:K.SIGNS[c].l+' 사인 ('+(now?'이번 타석':'다음 타석')+')'}); this.renderLive(); },
   doRun(base,name){ this._change(()=>{ if(this.game.pinchRun(USER,base,name)) return true; FM.notify('교체할 수 없는 선수입니다.'); return false; }, `대주자 → ${name}`, `대주자 → ${name}`); },
   doDef(slot,name){ this._change(()=>{ if(this.game.defSub(USER,slot,name)) return true; FM.notify('교체할 수 없는 선수입니다.'); return false; }, `수비 교체 → ${name}`, `수비 교체 → ${name}`); },
   setTac(k,v){ if(v==='true')v=true; if(v==='false')v=false; this.game.setTac(USER,k,v); this.feed.unshift({sysmsg:`작전 변경: ${FM.tacLabel(k,v)}`}); this.renderLive(); },
