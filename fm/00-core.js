@@ -17,7 +17,9 @@ function userGamesPlayed(){ return state.schedule.filter(g=>g.played&&(g.home===
 function median(a){ const s=a.slice().sort((x,y)=>x-y); return s.length? s[Math.floor(s.length/2)] : 0; }
 
 // In-page replacements for alert()/confirm(), which embedded viewers block.
-function notify(msg, ms){
+// picks the right particle after a Korean word: 김도영을(를) -> 김도영을, 페라자을(를) -> 페라자를
+function josa(s){ return String(s==null?'':s).replace(/([가-힣])(을\(를\)|이\(가\)|은\(는\)|와\(과\)|과\(와\))/g,(m,c,j)=>{ const tail=(c.charCodeAt(0)-0xAC00)%28>0, p={'을(를)':['을','를'],'이(가)':['이','가'],'은(는)':['은','는'],'와(과)':['과','와'],'과(와)':['과','와']}[j]; return c+(tail?p[0]:p[1]); }); }
+function notify(msg, ms){ msg=josa(msg);
   let box=document.getElementById('toasts');
   if(!box){ box=document.createElement('div'); box.id='toasts';
     box.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;'+

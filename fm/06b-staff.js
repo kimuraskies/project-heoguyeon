@@ -40,12 +40,14 @@ function coachEdge(t){ return {run:(coachA('run','tac',t)-10.5)*0.002, arm:(coac
 // advice belongs to the coach who gave it, wherever he works now
 function coachMood(role,d,ok,n){ const s=staffOf(USER), c=(n&&Object.values(s).find(x=>x.n===n))||s[role]; if(!c) return; coachInit(c); c.sat=clampN(c.sat+d,0,100); if(ok) c.okN++; else c.noN++; }
 ACTIONS.coachYes=(m,a)=>{ coachMood(a.role,4,true,a.n); const f=fm();
+  if(a.rest&&userGamesPlayed()-(m.ug||0)>5) return '보고를 받은 지 오래돼 상황이 달라졌습니다. 휴식은 적용하지 않았습니다.';
   if(a.rest) a.rest.forEach(n=>{ if(f.restNext.indexOf(n)<0) f.restNext.push(n); });
   if(a.mor) allPlayers(USER).forEach(p=>{ p.mor=clampN(p.mor+a.mor,5,99); });
   return a.done||'건의를 받아들였습니다.'; };
 ACTIONS.coachNo=(m,a)=>{ coachMood(a.role,-5,false,a.n); return '건의를 보류했습니다.'; };
 function coachSay(role,icon,subject,body,yes,done,extra){
   const c=staffOf(USER)[role]; if(!c) return;
+  fm().inbox.forEach(m=>{ if(!m.done&&m.actions.some(a=>a.fn==='coachYes'&&a.arg&&a.arg.n===c.n)){ m.done=true; m.read=true; m.result='답을 받지 못한 채 새 보고로 바뀌었습니다.'; coachMood(role,-2,false,c.n); } });
   send(`${c.n} ${Object.fromEntries(COACH_ROLES)[role]}`,icon,subject,body,[
     {label:yes,fn:'coachYes',arg:Object.assign({role,n:c.n,done},extra||{})},{label:'보류',fn:'coachNo',arg:{role,n:c.n}}]);
 }

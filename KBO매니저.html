@@ -572,6 +572,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
     const g=this.game, ab=this.ab;
     if(g.over && (!ab || ab.committed)){ this.end(); return; }
     if(!ab){ const p=g.prepareAB(); if(!p){ this.end(); return; }
+      if(p.po) this.feed.unshift({sysmsg:'피치아웃! 포수가 일어서서 바깥쪽으로 뺀 공을 받습니다'});
       if(g.dropped&&g.dropped[USER]){ this.feed.unshift({sysmsg:`${K.SIGNS[g.dropped[USER]].l} 사인 취소 · 주자 상황이 바뀌었습니다`}); g.dropped[USER]=null; }
       const wpNow=winProb(g); this.wpLog.push(Math.round((g.h===USER?wpNow:1-wpNow)*100)/100);
       this.ab={pitches:p.pitches,shown:0,pre:false,susp:false,committed:false,pitName:p.pitName,batName:p.batName,off:p.off,def:p.def,slot:p.slot,oc:p.oc,ev:null,wp0:winProb(g),steal:p.kind==='steal',variant:p.variant,runner:p.runner,kind:p.kind||'pa'};
@@ -588,13 +589,13 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
   },
   play(){ if(this._ended)return; this.paused=false; this.renderLive(); this._tick(); },
   pause(){ this.paused=true; clearTimeout(this.timer); this.renderLive(); },
-  stepOne(){ this.paused=true; clearTimeout(this.timer); this._do(); while(!this._ended&&this.ab&&(this.ab.pre||(this.ab.susp&&!this.ab.committed))) this._do(); },
+  stepOne(){ this.paused=true; clearTimeout(this.timer); this._do(); while(!this._ended&&this.ab&&(this.ab.pre||(this.ab.susp&&!this.ab.committed))) this._do(); if(this.game.over&&!this._ended&&(!this.ab||this.ab.committed)) this.end(); },
   // plays the rest of this at-bat (or the next one, if this one is finished) and stops on its result
-  stepPA(){ this.paused=true; clearTimeout(this.timer); let g=0; while(!this._ended&&g++<5&&(!this.ab||this.ab.committed)) this._do(); while(!this._ended&&g++<80&&this.ab&&!this.ab.committed) this._do(); this.renderLive(); },
+  stepPA(){ this.paused=true; clearTimeout(this.timer); let g=0; while(!this._ended&&g++<5&&(!this.ab||this.ab.committed)) this._do(); while(!this._ended&&g++<80&&this.ab&&!this.ab.committed) this._do(); if(this.game.over&&!this._ended) this.end(); else this.renderLive(); },
   toEnd(){ this.paused=true; clearTimeout(this.timer);
     if(this.ab && !this.ab.committed){ const ev=this.game.commitAB(); if(ev)this.feed.unshift(ev); }
     this.ab=null; this._flush();
-    let n=0; while(!this.game.over && n<3000){ const ev=this.game.step(); if(ev)this.feed.unshift(ev); n++; }
+    let n=0; while(!this.game.over && n<3000){ const ev=this.game.step(); if(ev){ this.feed.unshift(ev); const w=winProb(this.game); this.wpLog.push(Math.round((this.game.h===USER?w:1-w)*100)/100); } n++; }
     this.renderLive(); this.end();
   },
   setSpeed(v){ this.speed=parseInt(v,10); },
@@ -811,7 +812,7 @@ const Comm={
       case 'PO': t=`아웃! ${ev.runner}, 견제에 걸렸습니다!`; k='tense'; break;
       case 'BOUT': case 'SQOK': case 'SQHOLD': case 'SQFAIL': t=ev.desc+'.'; k='tense'; break;
       case 'SB': if(ev.variant&&ev.variant!=='steal'){ t='세이프! '+ev.desc+'!'; k='tense'; break; } t=P([`세이프! ${ev.runner}, 2루 도루 성공!`,`여유 있게 세이프! ${ev.runner}의 도루!`]); k='tense'; break;
-      case 'CS': t=P([`아웃! 포수의 정확한 송구, ${ev.runner} 도루 실패!`,`태그 아웃! ${ev.runner}, 2루에서 잡힙니다.`]); k='big'; break;
+      case 'CS': if(ev.variant&&ev.variant!=='steal'&&ev.variant!=='delay'){ t='아웃! '+ev.desc+'.'; k='big'; break; } t=P([`아웃! 포수의 정확한 송구, ${ev.runner} 도루 실패!`,`태그 아웃! ${ev.runner}, 2루에서 잡힙니다.`]); k='big'; break;
       case 'E': t=`${P(['유격수','2루수','3루수','1루수'])} 실책! 공을 놓칩니다, 타자 주자 살아 나갑니다.`; k='tense'; break;
       case 'OUT': {
         const of=P(['좌익수','중견수','우익수']), inf=P(['유격수','2루수','3루수','1루수','투수']);
@@ -820,7 +821,7 @@ const Comm={
         else if(fl==='weak') t=P([`${inf} 앞 땅볼, 1루에서 아웃.`,`내야 플라이, ${inf}가 잡습니다.`]);
         else if(fl==='sharp') t=P([`${inf} 정면 직선타! 아웃.`,`${of} 정면으로 가는 타구, 잡혔습니다.`,`${inf}, 몸을 날려 잡아냅니다! 아웃!`]);
         else t=P([`${inf} 땅볼, 1루에서 아웃.`,`${of} 플라이 아웃.`,`${inf} 땅볼, 깔끔하게 처리합니다.`]);
-        if(ev.adv) t+=' 그 사이 2루 주자는 3루까지.';
+        if(ev.adv) t+= ev.hr? ' 스타트를 끊은 1루 주자는 2루까지.' : ' 그 사이 2루 주자는 3루까지.';
         break; }
       case '1B': t=fl==='weak'?P(['빗맞았지만 코스가 좋습니다! 안타!','내야 안타! 1루에서 살았습니다!']):P(['중전 안타!','3유간을 빠지는 좌전 안타!','1-2루간을 꿰뚫는 우전 안타!','투수 옆을 스치는 중전 안타!']); break;
       case '2B': t=P(['좌중간을 가르는 2루타!','우익선상 2루타!','좌익선상을 타고 흐르는 2루타!','우중간 펜스까지 굴러가는 2루타!']); k='tense'; break;

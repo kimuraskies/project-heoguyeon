@@ -103,7 +103,8 @@ function stoveStep(){
       const bestSame=(x.p.type==='B'?r.batters.filter(p=>p.pos===x.p.pos):r.pitchers.filter(p=>p.role===x.p.role)).map(K.ovr).sort((a,b)=>b-a)[0]||50;
       const need=ov>bestSame?1:ov>bestSame-6?0.45:0.12, money=payroll(t)<190?1:0.3, pull=clampN((ov-58)/25,0.1,1);
       if(Math.random()<0.22*need*money*pull){ const mine=x.bids.find(b=>b.team===USER), sal=Math.round(x.ask*(0.95+Math.random()*0.2)*10)/10;
-        x.bids.push({team:t,sal,yrs:x.yrs}); if(mine&&sal>mine.sal) send('단장','📣',`${x.p.n} 경쟁 입찰`,`다른 구단이 ${x.p.n}에게 우리보다 높은 조건을 제시한 것으로 보입니다. 구단 탭 FA 목록에서 다시 제안할 수 있습니다.`,[]); } });
+        x.bids.push({team:t,sal,yrs:x.yrs}); if(mine&&sal>mine.sal){ const room=w<STOVE_WEEKS; if(room) x.decide=Math.max(x.decide||0,w+1);
+          send('단장','📣',`${x.p.n} 경쟁 입찰`,`다른 구단이 ${x.p.n}에게 우리보다 높은 조건을 제시한 것으로 보입니다. `+(room?'선수는 다음 주에 결정합니다. 그 전에 구단 탭 FA 목록에서 다시 제안할 수 있습니다.':'스토브리그 마지막 주라 다시 제안할 시간이 없습니다.'),[]); } } });
     if(x.bids.length&&x.decide==null) x.decide=Math.min(STOVE_WEEKS,w+(ov>=75?R(2,3):R(1,2)));
     // a bid that can't be honored any more (budget, foreign quota) drops out before the player decides
     x.bids=x.bids.filter(b=>{ const fx=x.p.f&&foreignOf(b.team).length>=FX_MAX, money=b.team===USER&&payroll(USER)+b.sal>f.fin.budget*1.1;
@@ -111,7 +112,7 @@ function stoveStep(){
       return !(fx||money); });
     if(x.bids.length&&(w>=x.decide||w>=STOVE_WEEKS)){ const best=x.bids.slice().sort((a,b)=>faScore(x,b)-faScore(x,a))[0], mine=x.bids.find(b=>b.team===USER);
       faSign(x,best); news.push(`${x.p.n} → ${best.team===USER?K.ROSTERS[USER].name:best.team}`);
-      if(mine&&best.team!==USER) send('단장','📉',`${x.p.n} 영입 실패`,`${x.p.n}은(는) ${K.ROSTERS[best.team].name}을 택했습니다.`,[]); }
+      if(mine&&best.team!==USER) send('단장','📉',`${x.p.n} 영입 실패`,`${x.p.n}은(는) ${K.ROSTERS[best.team].name}을(를) 택했습니다.`,[]); }
   });
   if(Math.random()<0.25){ try{ maybeTradeOffer(userGamesPlayed()); }catch(e){} }
   const ev={1:'재계약 협상을 마무리하세요.',2:'FA 시장이 열렸습니다.',4:'외국인 선수 계약이 본격화됩니다.',10:'남은 FA 몸값이 30% 내려갔습니다.',12:'이번 주가 지나면 스프링캠프로 떠납니다.'}[w];

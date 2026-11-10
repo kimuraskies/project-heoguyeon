@@ -17,7 +17,9 @@ function userGamesPlayed(){ return state.schedule.filter(g=>g.played&&(g.home===
 function median(a){ const s=a.slice().sort((x,y)=>x-y); return s.length? s[Math.floor(s.length/2)] : 0; }
 
 // In-page replacements for alert()/confirm(), which embedded viewers block.
-function notify(msg, ms){
+// picks the right particle after a Korean word: 김도영을(를) -> 김도영을, 페라자을(를) -> 페라자를
+function josa(s){ return String(s==null?'':s).replace(/([가-힣])(을\(를\)|이\(가\)|은\(는\)|와\(과\)|과\(와\))/g,(m,c,j)=>{ const tail=(c.charCodeAt(0)-0xAC00)%28>0, p={'을(를)':['을','를'],'이(가)':['이','가'],'은(는)':['은','는'],'와(과)':['과','와'],'과(와)':['과','와']}[j]; return c+(tail?p[0]:p[1]); }); }
+function notify(msg, ms){ msg=josa(msg);
   let box=document.getElementById('toasts');
   if(!box){ box=document.createElement('div'); box.id='toasts';
     box.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;'+
@@ -228,7 +230,7 @@ function mergeReport(m){
   o.body=o.body+'\n\n────────\n\n'+m.subject+'\n'+m.body;
   return o;
 }
-function send(from, icon, subject, body, actions){
+function send(from, icon, subject, body, actions){ subject=josa(subject); body=josa(body);
   const f=fm();
   const m={id:f.nextId++, ug:userGamesPlayed(), year:state.year, from, icon, subject, body, read:false, actions:actions||[], done:false};
   stamp(m);
@@ -294,7 +296,7 @@ function act(id, i){
   const m=fm().inbox.find(x=>x.id===id); if(!m||m.done) return;
   const a=m.actions[i]; const res=ACTIONS[a.fn](m,a.arg||{});
   if(String(res).startsWith('❌')){ notify(res.replace(/^❌ /,'')); return; } // stays open
-  m.done=true; m.result=res; m.read=true; render();
+  m.done=true; m.result=josa(res); m.read=true; render();
 }
 
 // ---------- manager & club identity ----------
@@ -336,7 +338,7 @@ function teamPitch(t){
   const r=K.ROSTERS[t];
   const bat=r.batters.slice().sort((a,b)=>K.ovr(b)-K.ovr(a))[0];
   const sp=r.pitchers.filter(p=>p.role==='SP').sort((a,b)=>K.ovr(b)-K.ovr(a)).slice(0,2);
-  return `${bat?bat.n+'을(를) 중심으로 한 타선과 ':''}${sp.map(p=>p.n).join('·')} 원투펀치로 가을야구에 도전!`;
+  return josa(`${bat?bat.n+'을(를) 중심으로 한 타선과 ':''}${sp.map(p=>p.n).join('·')} 원투펀치로 가을야구에 도전!`);
 }
 
 // ---------- new career: manager profile + club selection ----------
@@ -1389,7 +1391,8 @@ function stoveStep(){
       const bestSame=(x.p.type==='B'?r.batters.filter(p=>p.pos===x.p.pos):r.pitchers.filter(p=>p.role===x.p.role)).map(K.ovr).sort((a,b)=>b-a)[0]||50;
       const need=ov>bestSame?1:ov>bestSame-6?0.45:0.12, money=payroll(t)<190?1:0.3, pull=clampN((ov-58)/25,0.1,1);
       if(Math.random()<0.22*need*money*pull){ const mine=x.bids.find(b=>b.team===USER), sal=Math.round(x.ask*(0.95+Math.random()*0.2)*10)/10;
-        x.bids.push({team:t,sal,yrs:x.yrs}); if(mine&&sal>mine.sal) send('단장','📣',`${x.p.n} 경쟁 입찰`,`다른 구단이 ${x.p.n}에게 우리보다 높은 조건을 제시한 것으로 보입니다. 구단 탭 FA 목록에서 다시 제안할 수 있습니다.`,[]); } });
+        x.bids.push({team:t,sal,yrs:x.yrs}); if(mine&&sal>mine.sal){ const room=w<STOVE_WEEKS; if(room) x.decide=Math.max(x.decide||0,w+1);
+          send('단장','📣',`${x.p.n} 경쟁 입찰`,`다른 구단이 ${x.p.n}에게 우리보다 높은 조건을 제시한 것으로 보입니다. `+(room?'선수는 다음 주에 결정합니다. 그 전에 구단 탭 FA 목록에서 다시 제안할 수 있습니다.':'스토브리그 마지막 주라 다시 제안할 시간이 없습니다.'),[]); } } });
     if(x.bids.length&&x.decide==null) x.decide=Math.min(STOVE_WEEKS,w+(ov>=75?R(2,3):R(1,2)));
     // a bid that can't be honored any more (budget, foreign quota) drops out before the player decides
     x.bids=x.bids.filter(b=>{ const fx=x.p.f&&foreignOf(b.team).length>=FX_MAX, money=b.team===USER&&payroll(USER)+b.sal>f.fin.budget*1.1;
@@ -1397,7 +1400,7 @@ function stoveStep(){
       return !(fx||money); });
     if(x.bids.length&&(w>=x.decide||w>=STOVE_WEEKS)){ const best=x.bids.slice().sort((a,b)=>faScore(x,b)-faScore(x,a))[0], mine=x.bids.find(b=>b.team===USER);
       faSign(x,best); news.push(`${x.p.n} → ${best.team===USER?K.ROSTERS[USER].name:best.team}`);
-      if(mine&&best.team!==USER) send('단장','📉',`${x.p.n} 영입 실패`,`${x.p.n}은(는) ${K.ROSTERS[best.team].name}을 택했습니다.`,[]); }
+      if(mine&&best.team!==USER) send('단장','📉',`${x.p.n} 영입 실패`,`${x.p.n}은(는) ${K.ROSTERS[best.team].name}을(를) 택했습니다.`,[]); }
   });
   if(Math.random()<0.25){ try{ maybeTradeOffer(userGamesPlayed()); }catch(e){} }
   const ev={1:'재계약 협상을 마무리하세요.',2:'FA 시장이 열렸습니다.',4:'외국인 선수 계약이 본격화됩니다.',10:'남은 FA 몸값이 30% 내려갔습니다.',12:'이번 주가 지나면 스프링캠프로 떠납니다.'}[w];
@@ -1818,12 +1821,14 @@ function coachEdge(t){ return {run:(coachA('run','tac',t)-10.5)*0.002, arm:(coac
 // advice belongs to the coach who gave it, wherever he works now
 function coachMood(role,d,ok,n){ const s=staffOf(USER), c=(n&&Object.values(s).find(x=>x.n===n))||s[role]; if(!c) return; coachInit(c); c.sat=clampN(c.sat+d,0,100); if(ok) c.okN++; else c.noN++; }
 ACTIONS.coachYes=(m,a)=>{ coachMood(a.role,4,true,a.n); const f=fm();
+  if(a.rest&&userGamesPlayed()-(m.ug||0)>5) return '보고를 받은 지 오래돼 상황이 달라졌습니다. 휴식은 적용하지 않았습니다.';
   if(a.rest) a.rest.forEach(n=>{ if(f.restNext.indexOf(n)<0) f.restNext.push(n); });
   if(a.mor) allPlayers(USER).forEach(p=>{ p.mor=clampN(p.mor+a.mor,5,99); });
   return a.done||'건의를 받아들였습니다.'; };
 ACTIONS.coachNo=(m,a)=>{ coachMood(a.role,-5,false,a.n); return '건의를 보류했습니다.'; };
 function coachSay(role,icon,subject,body,yes,done,extra){
   const c=staffOf(USER)[role]; if(!c) return;
+  fm().inbox.forEach(m=>{ if(!m.done&&m.actions.some(a=>a.fn==='coachYes'&&a.arg&&a.arg.n===c.n)){ m.done=true; m.read=true; m.result='답을 받지 못한 채 새 보고로 바뀌었습니다.'; coachMood(role,-2,false,c.n); } });
   send(`${c.n} ${Object.fromEntries(COACH_ROLES)[role]}`,icon,subject,body,[
     {label:yes,fn:'coachYes',arg:Object.assign({role,n:c.n,done},extra||{})},{label:'보류',fn:'coachNo',arg:{role,n:c.n}}]);
 }
@@ -1938,6 +1943,7 @@ function diagnose(team,p,s,env){ const out=[], mine=team===USER, act=(l,fn)=>min
     if((s.LC_PA||0)>=12){ const o=((s.LC_H||0)+(s.LC_BB||0))/s.LC_PA+((s.LC_AB)?(s.LC_TB||0)/s.LC_AB:0); if(o<0.55) out.push(['수석코치',`7회 이후 접전 OPS ${o.toFixed(3)}로 부진합니다.`,act('다음 경기 휴식',`FM.restOne('${n}')`)]); }
     const lo=(s.vL_PA||0)>=20&&(s.vR_PA||0)>=20? [(s.vL_H+s.vL_BB)/s.vL_PA,(s.vR_H+s.vR_BB)/s.vR_PA] : null;
     if(lo&&Math.abs(lo[0]-lo[1])>=0.09) out.push(['전력분석팀장',`${lo[0]>lo[1]?'좌투':'우투'} 상대 출루가 눈에 띄게 좋습니다. 상대 선발에 맞춰 타순을 바꿔 볼 만합니다.`,act('라인업으로',`App.closeModal();App.tab('lineup')`)]);
+    if(out.some(x=>x[2]&&/restOne/.test(x[2].fn))) out.forEach(x=>{ x[1]=x[1].replace(' 기용을 유지해도 됩니다.',''); });
   } else { const m=pitMetrics(s,env); if(s.OUT<45) return out;
     if(m.era-m.fip>=0.8) out.push(['투수코치',`ERA ${f2(m.era)}가 FIP ${f2(m.fip)}보다 높습니다. 내용은 결과보다 낫습니다.`,null]);
     if(m.fip-m.era>=0.8) out.push(['투수코치',`ERA ${f2(m.era)}가 FIP ${f2(m.fip)}보다 낮습니다. 결과가 내용보다 좋은 구간입니다.`,null]);

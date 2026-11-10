@@ -69,6 +69,7 @@ function diagnose(team,p,s,env){ const out=[], mine=team===USER, act=(l,fn)=>min
     if((s.LC_PA||0)>=12){ const o=((s.LC_H||0)+(s.LC_BB||0))/s.LC_PA+((s.LC_AB)?(s.LC_TB||0)/s.LC_AB:0); if(o<0.55) out.push(['수석코치',`7회 이후 접전 OPS ${o.toFixed(3)}로 부진합니다.`,act('다음 경기 휴식',`FM.restOne('${n}')`)]); }
     const lo=(s.vL_PA||0)>=20&&(s.vR_PA||0)>=20? [(s.vL_H+s.vL_BB)/s.vL_PA,(s.vR_H+s.vR_BB)/s.vR_PA] : null;
     if(lo&&Math.abs(lo[0]-lo[1])>=0.09) out.push(['전력분석팀장',`${lo[0]>lo[1]?'좌투':'우투'} 상대 출루가 눈에 띄게 좋습니다. 상대 선발에 맞춰 타순을 바꿔 볼 만합니다.`,act('라인업으로',`App.closeModal();App.tab('lineup')`)]);
+    if(out.some(x=>x[2]&&/restOne/.test(x[2].fn))) out.forEach(x=>{ x[1]=x[1].replace(' 기용을 유지해도 됩니다.',''); });
   } else { const m=pitMetrics(s,env); if(s.OUT<45) return out;
     if(m.era-m.fip>=0.8) out.push(['투수코치',`ERA ${f2(m.era)}가 FIP ${f2(m.fip)}보다 높습니다. 내용은 결과보다 낫습니다.`,null]);
     if(m.fip-m.era>=0.8) out.push(['투수코치',`ERA ${f2(m.era)}가 FIP ${f2(m.fip)}보다 낮습니다. 결과가 내용보다 좋은 구간입니다.`,null]);

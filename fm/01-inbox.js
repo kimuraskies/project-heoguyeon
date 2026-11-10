@@ -93,7 +93,7 @@ function mergeReport(m){
   o.body=o.body+'\n\n────────\n\n'+m.subject+'\n'+m.body;
   return o;
 }
-function send(from, icon, subject, body, actions){
+function send(from, icon, subject, body, actions){ subject=josa(subject); body=josa(body);
   const f=fm();
   const m={id:f.nextId++, ug:userGamesPlayed(), year:state.year, from, icon, subject, body, read:false, actions:actions||[], done:false};
   stamp(m);
@@ -159,6 +159,6 @@ function act(id, i){
   const m=fm().inbox.find(x=>x.id===id); if(!m||m.done) return;
   const a=m.actions[i]; const res=ACTIONS[a.fn](m,a.arg||{});
   if(String(res).startsWith('❌')){ notify(res.replace(/^❌ /,'')); return; } // stays open
-  m.done=true; m.result=res; m.read=true; render();
+  m.done=true; m.result=josa(res); m.read=true; render();
 }
 

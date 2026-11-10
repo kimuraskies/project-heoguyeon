@@ -37,7 +37,7 @@ function teamPitch(t){
   const r=K.ROSTERS[t];
   const bat=r.batters.slice().sort((a,b)=>K.ovr(b)-K.ovr(a))[0];
   const sp=r.pitchers.filter(p=>p.role==='SP').sort((a,b)=>K.ovr(b)-K.ovr(a)).slice(0,2);
-  return `${bat?bat.n+'을(를) 중심으로 한 타선과 ':''}${sp.map(p=>p.n).join('·')} 원투펀치로 가을야구에 도전!`;
+  return josa(`${bat?bat.n+'을(를) 중심으로 한 타선과 ':''}${sp.map(p=>p.n).join('·')} 원투펀치로 가을야구에 도전!`);
 }
 
 // ---------- new career: manager profile + club selection ----------

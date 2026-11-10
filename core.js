@@ -1029,7 +1029,7 @@ IP.prepareAB=function(){
   if(v==='steal'||v==='delay'||v==='steal3'||v==='dsteal'||v==='shome'){
     this.cmd[off]=null; this.cmd[def]=null;
     var fs=this._signSteal(off,def,v,dcall);
-    if(fs){ this._pending={kind:'steal',variant:fs.variant,off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:fs.oc,runner:fs.runner,pitches:[makePitch(pit,dcall==='pitchout'||rnd()<0.6?'B':'S')],slot:slot}; return this._pending; }
+    if(fs){ this._pending={kind:'steal',variant:fs.variant,off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:fs.oc,runner:fs.runner,pitches:[makePitch(pit,dcall==='pitchout'||rnd()<0.6?'B':'S')],slot:slot,po:dcall==='pitchout'}; return this._pending; }
   } else if(!sign){
     var st=this._stealTry(off,def,false);
     if(st){ this.cmd[def]=null; this._pending={kind:'steal',variant:'steal',off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:st.oc,runner:st.runner,pitches:[makePitch(pit, rnd()<0.6?'B':'S')],slot:slot}; return this._pending; }
@@ -1048,7 +1048,7 @@ IP.prepareAB=function(){
   if(dcall==='pitchout'&&oc!=='BB') pitches.unshift(makePitch(pit,'B'));
   if(sign&&(hr||sign==='buster')) this._log(off,sign,oc!=='K');
   this.cmd[off]=null; this.cmd[def]=null;
-  this._pending={off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:oc,pitches:pitches,slot:slot,hr:hr};
+  this._pending={off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:oc,pitches:pitches,slot:slot,hr:hr,po:dcall==='pitchout'};
   return this._pending;
 };
 IP.commitAB=function(){
@@ -1133,7 +1133,7 @@ IP.commitAB=function(){
     if(this.bases[2]&&this.outs<2&&rnd()<(this.tac[def].shift==="infieldIn"?0.14+0.16*(1-this.ex(def,"shift")):0.30+(this.tac[off].adv==="aggr"?0.06*this.ex(off,"adv"):this.tac[off].adv==="hold"?-0.06:0))){ var runner=this.bases[2]; this.bases[2]=null; bs.RBI++; bs.SF++; this._out(def); this._run(off,def,runner,false); ev.oc='SF'; ev.runs=1; ev.desc='희생플라이 (1타점)'; }
     else {
       bs.AB++; this._out(def); ev.desc='범타 아웃';
-      if(p.hr&&this.outs<3&&this.bases[0]&&!this.bases[1]){ this.bases[1]=this.bases[0]; this.bases[0]=null; ev.adv=true; ev.desc='범타, 주자는 2루로'; }
+      if(p.hr&&this.outs<3&&this.bases[0]&&!this.bases[1]){ this.bases[1]=this.bases[0]; this.bases[0]=null; ev.adv=true; ev.hr=true; ev.desc='범타, 주자는 2루로'; }
       // productive out: a runner on second moves up to third
       if(this.outs<3 && this.bases[1] && !this.bases[2] && rnd()<(this.tac[off].teamBat?0.35+0.35*this.ex(off,"teamBat"):0.35)){ this.bases[2]=this.bases[1]; this.bases[1]=null; ev.adv=true; }
     }
