@@ -64,3 +64,17 @@ select count(*) filter (where opened) as opened, count(*) filter (where picked_c
   count(*) filter (where finished_game) as finished_game, count(*) filter (where used_quick_start) as used_quick_start,
   count(*) filter (where skipped_guide) as skipped_guide from s;
 revoke all on public.usage_funnel from anon, authenticated;
+
+-- 2026-11-10: track usage by invite code (e.g. '스하리')
+create or replace view public.usage_by_code with (security_invoker = true) as
+select coalesce(data->>'code', '(none)') as invite_code,
+       count(distinct device) as players,
+       count(*) filter (where kind = 'open') as opens,
+       count(distinct device) filter (where kind = 'career') as new_careers,
+       count(*) filter (where kind = 'play') as play_pings,
+       max(case when jsonb_typeof(data->'gp') = 'number' then (data->>'gp')::numeric end) as most_games,
+       min(created_at) as first_seen,
+       max(created_at) as last_seen
+from public.events
+group by 1 order by 2 desc;
+revoke all on public.usage_by_code from anon, authenticated;

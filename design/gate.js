@@ -31,6 +31,7 @@
     render(null, s && s.token ? s : null);
   }
   function enter() { const s = load(); if (s && s.token) finish(s); else render(); }
+  function code() { const s = load(); return (s && s.code) ? s.code : null; }
   function finish(s) {
     document.body.classList.remove('gate-on');
     const el = document.getElementById('gate'); if (el) el.remove();
@@ -61,7 +62,7 @@
       const r = await rpc('gate_enter', {p_code: code});
       busy = false;
       if (!r || !r.ok) return render(r && r.err || '다시 시도해 주세요.');
-      const s = {token: r.token, id: r.id || null}; save(s); finish(s);
+      const s = {token: r.token, id: r.id || null, code: code.trim().toUpperCase()}; save(s); finish(s);
     } catch (e) { busy = false; render('서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.'); }
   }
   async function logout() {
@@ -69,5 +70,5 @@
     if (s && s.token) { try { await rpc('gate_logout', {p_token: s.token}); } catch (e) {} }
     location.reload();
   }
-  window.Gate = {required, ensure, submit, logout, enter};
+  window.Gate = {required, ensure, submit, logout, enter, code};
 })();

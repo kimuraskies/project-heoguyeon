@@ -27,13 +27,33 @@
       return d;
     } catch (e) { return null; }
   }
+  function inviteCode() {
+    try {
+      if (window.Gate && typeof window.Gate.code === 'function') {
+        const c = window.Gate.code();
+        if (c) return c;
+      }
+      const raw = localStorage.getItem('kbo-gate');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.code) return parsed.code;
+      }
+    } catch (e) {}
+    return null;
+  }
   // where this career stands: club, season, phase, games the club has played this season
   function snapshot() {
     const s = typeof state !== 'undefined' && state ? state : null;
-    if (!s) return {};
     const team = typeof USER !== 'undefined' ? USER : null;
     const gp = typeof teamGameCount !== 'undefined' && team ? teamGameCount[team] : null;
-    return {team, year: s.year, phase: s.phase, gp: typeof gp === 'number' ? gp : null};
+    const code = inviteCode();
+    const snap = {};
+    if (code) snap.code = code;
+    if (team) snap.team = team;
+    if (s && typeof s.year === 'number') snap.year = s.year;
+    if (s && s.phase) snap.phase = s.phase;
+    if (typeof gp === 'number') snap.gp = gp;
+    return snap;
   }
   function send(kind, extra) {
     if (!enabled() || seq >= MAX_EVENTS) return;
