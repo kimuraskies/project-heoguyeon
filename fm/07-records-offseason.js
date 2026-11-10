@@ -104,6 +104,7 @@ function onSeasonEnd(){
   const champ=state.champion===USER;
   let d = s.met? 15 : -(5+s.gap*3);
   if(champ) d+=25;
+  d+=offBoardAdj(s.met);   // the direction promised to the owner in the stove league
   b.conf=clampN(b.conf+d,0,100);
   pledgeReview();
   coachSeasonEnd();

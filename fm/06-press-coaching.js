@@ -303,7 +303,7 @@ function coachGrow(p, farm){
     : coachMult(coachQOf('bat'))*0.6+coachMult(coachQOf('fld'))*0.25+coachMult(coachQOf('run'))*0.15;
   if(farm) return coachMult(coachQOf('fut'));  // the Futures staff runs the farm
   const c=staffOf(USER)[p.type==='P'?'pit':'bat'];
-  return m*(c&&c.style==='육성형'&&p.age<=25?1.03:1);
+  return m*(c&&c.style==='육성형'&&p.age<=25?1.03:1)*offGrow(p);
 }
 function coachLearn(){ return 1+(coachQOf('head')-12)*0.03; }
 function coachStars(q){ const n=Math.max(1,Math.min(5,Math.round(q/4))); return '★'.repeat(n)+'☆'.repeat(5-n); }

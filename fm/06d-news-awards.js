@@ -33,7 +33,8 @@ function seasonAwards(){
 function seasonRecap(){ const f=fm(), s=state.season[USER], rank=standings().findIndex(x=>x.t===USER)+1, env=leagueEnv();
   const bats=K.ROSTERS[USER].batters.filter(p=>s.bat[p.n]&&s.bat[p.n].PA>=100).map(p=>({n:p.n,war:batWAR(USER,p,s.bat[p.n],env)})).sort((a,b)=>b.war-a.war);
   const grown=allPlayers(USER).map(p=>({n:p.n,g:(p.grow||[]).filter(g=>g[0]===state.year).length})).filter(x=>x.g>0).sort((a,b)=>b.g-a.g).slice(0,3);
-  return {rank,W:s.W,L:s.L,T:s.T,conf:f.board.conf,champ:state.champion===USER,best:bats[0]||null,grown}; }
+  const calls=(f.memo||[]).filter(m=>m.y===state.year).slice(0,3).map(m=>m.txt);
+  return {rank,W:s.W,L:s.L,T:s.T,conf:f.board.conf,champ:state.champion===USER,best:bats[0]||null,grown,calls}; }
 ACTIONS.openAwards=()=>{ setTimeout(showAwards,0); return '시상식장으로 이동했습니다.'; };
 function awardsAfterSeason(){ const f=fm(); try{ f.awards=f.awards||{}; f.awards[state.year]={a:seasonAwards(),r:seasonRecap()};
     const a=f.awards[state.year].a; send('KBO','🏆',`${state.year} 연말 시상식`,`MVP ${a.mvp?a.mvp.n+' ('+a.mvp.t+')':'-'} · 신인왕 ${a.roy?a.roy.n+' ('+a.roy.t+')':'-'}`,[{label:'시상식 보기',fn:'openAwards',arg:{}}]); }catch(e){ console.error('awards skipped',e); } }
@@ -43,7 +44,7 @@ function showAwards(y){ const f=fm(), yr=y||state.year, d=(f.awards||{})[yr]||(f
     <h4 class="st-group">타이틀</h4><div class="aw-list">${a.titles.map(x=>`<div><small>${x.l}</small><b>${esc(x.n)}</b><span>${esc(x.t)} · ${x.v}</span></div>`).join('')}</div>
     <h4 class="st-group">골든글러브</h4><div class="aw-list">${a.gg.map(x=>`<div><small>${x.pos}</small><b>${esc(x.n)}</b><span>${esc(x.t)}</span></div>`).join('')}</div>
     <h4 class="st-group">${esc(K.ROSTERS[USER].name)} 시즌 리캡</h4><p>${r.champ?'🏆 통합 우승 · ':''}정규시즌 ${r.rank}위 · ${r.W}승 ${r.L}패 ${r.T}무 · 이사회 신뢰 ${r.conf}</p>
-    ${r.best?`<p class="muted">팀 WAR 1위 ${esc(r.best.n)} (${r.best.war.toFixed(1)})</p>`:''}${r.grown.length?`<p class="muted">올해 가장 많이 성장: ${r.grown.map(x=>esc(x.n)+' +'+x.g).join(', ')}</p>`:''}`); }
+    ${r.best?`<p class="muted">팀 WAR 1위 ${esc(r.best.n)} (${r.best.war.toFixed(1)})</p>`:''}${r.calls&&r.calls.length?`<h4 class="st-group">올해의 결정</h4><ul class="ev-notes">${r.calls.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}${r.grown.length?`<p class="muted">올해 가장 많이 성장: ${r.grown.map(x=>esc(x.n)+' +'+x.g).join(', ')}</p>`:''}`); }
 function coachInterview(role,n){ const c=coachPool().find(x=>x.role===role&&x.n===n); if(!c) return; coachInit(c); closeModal();
   modal(`<span class="closeX" onclick="App.closeModal()" role="button" tabindex="0" aria-label="닫기">×</span><h2>${esc(n)} 면접</h2><p class="muted">우리 팀에서 가장 중요하게 볼 것을 물었습니다. 답에 따라 연봉 요구가 달라집니다.</p>
     <div class="grid" style="gap:8px;margin-top:8px">${COACH_STYLES.map(s=>`<button class="btn" onclick="FM.coachAnswer('${role}','${q(n)}','${s}')">${{'육성형':'어린 선수를 키워 주십시오','성적형':'올해 성적이 먼저입니다','데이터형':'데이터로 설득해 주십시오','올드스쿨':'기본기와 규율이 우선입니다'}[s]}</button>`).join('')}</div>`); }

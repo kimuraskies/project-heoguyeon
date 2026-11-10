@@ -110,6 +110,7 @@ class Runtime {
       this.counts[kind]++;this.audit?.box(this,r,kind);const out=finalize.call(this.ctx.Match);this.checkpoint('live finalize');return out;};
   }
   spring({live=false}={}){
+    this.action('offseason events',()=>this.FM.offAuto(true,true));
     this.action('set camp bal',()=>this.FM.setCamp('bal'));
     this.action('start spring',()=>this.FM.startSpring());
     if(live)this.liveNext();

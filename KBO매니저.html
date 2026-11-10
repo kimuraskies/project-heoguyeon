@@ -1198,14 +1198,13 @@ function heroInfo(rank){
   const pad=n=>String(n).padStart(3,'0');
   if(ph==="stove"){
     const ready=!!(FM.ensure(), state.fm&&state.fm.camp&&state.fm.camp.year===state.year&&state.fm.camp.focus);
-    const wk=FM.stoveWeek(), done=wk>FM.STOVE_WEEKS;
-    return {eyebrow:`${state.year} SEASON / PREPARATION`, title:done?"이제 캠프로 떠납니다.":`스토브리그 ${wk}주차`,
-      sub:`스토브리그 ${FM.STOVE_WEEKS}주 → 스프링캠프 4주 → 시범경기 ${FM.SPRING_GAMES}경기 → 개막`, m:null, tbd:"시범경기",
+    const oh=FM.offHero();
+    return {eyebrow:`${state.year} SEASON / PREPARATION`, title:oh.title,
+      sub:`스토브리그 ${oh.weeks}주 → 스프링캠프 4주 → 시범경기 ${FM.SPRING_GAMES}경기 → 개막`, m:null, tbd:"시범경기",
       starters:`<p>다음 경기 · 시범경기</p><strong>선발 미정 <span class="muted">vs</span> 선발 미정</strong><p>캠프를 마치면 시범경기 대진이 정해집니다.</p>`,
-      cta: !done? `<button class="btn primary hero-cta" onclick="FM.stoveNext()">${I('play')}다음 소식까지</button>`
-           : `<button class="btn primary hero-cta" onclick="FM.campPicker()">${I('camp')}스프링캠프 계획</button>`,
-      hint: !done? '매주 다른 구단도 FA에 입찰합니다. 구단 탭에서 FA에게 제안을 넣을 수 있어요.' : (ready? '주간 훈련을 확인하고 출발하세요.' : '훈련 방향을 고르면 캠프를 시작할 수 있어요.'),
-      more: (FM.canQuickStart()?FM.quickBtn():'')+(!done? `<button class="btn" onclick="FM.stoveSkip()">캠프까지 건너뛰기</button>` : (ready? `<button class="btn" onclick="FM.startSpring()">남은 캠프 한 번에 진행</button>` : ''))};
+      cta:`<button class="btn primary hero-cta" onclick="FM.offOpen()">${I('play')}${oh.cta}</button>`,
+      hint:oh.hint,
+      more:(FM.canQuickStart()?FM.quickBtn():'')+(oh.auto?`<button class="btn" onclick="FM.offAuto()">단장에게 맡기기</button>`:'')};
   }
   if(ph==="spring"){
     const n=FM.springNext(), sp=state.spring;
@@ -1217,7 +1216,8 @@ function heroInfo(rank){
     const g0=userGames[0];
     return {eyebrow:`${state.year} SEASON / OPENING DAY`, title:"개막이 다가왔다.",
       sub:`시범경기를 ${sp?sp.W:0}승 ${sp?sp.L:0}패 ${sp?sp.T:0}무로 마쳤습니다.`, m:g0?{home:g0.home,away:g0.away,label:'정규시즌 개막전'}:null, noSP:true,
-      cta:`<button class="btn primary hero-cta" onclick="FM.openSeason()">${I('trophy')}${state.year} 정규시즌 개막</button>`, more:''};
+      cta: FM.offHasBattles()? `<button class="btn primary hero-cta" onclick="FM.offRoster()">${I('lineup')}개막 엔트리 확정</button>` : `<button class="btn primary hero-cta" onclick="FM.openSeason()">${I('trophy')}${state.year} 정규시즌 개막</button>`,
+      hint: FM.offHasBattles()? '주전 경쟁의 승자를 정하면 정규시즌이 개막합니다.' : '', more:''};
   }
   if(ph==="regular"){
     if(!next) return {eyebrow:`${state.year} SEASON / FINAL`, title:"정규시즌 종료", sub:"우리 팀 일정은 끝났습니다. 남은 다른 구단 경기를 마치면 포스트시즌이 시작됩니다.", m:null,

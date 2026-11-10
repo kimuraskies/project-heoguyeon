@@ -61,14 +61,11 @@ function prepareCfg(team, cfg){
   while(r.batters.filter(p=>!K.isInjured(p)).length<10) callUp(team,'B');
   while(r.pitchers.filter(p=>!K.isInjured(p)).length<8) callUp(team,'P','RP');
   const isUser=team===USER;
-  const opts={ restBelow: (!isUser||f.autoRest)? 70 : 0, forceRest: isUser? f.restNext.concat(state.phase==='spring'?springRest():[]) : [] };
+  const opts={ restBelow: (!isUser||f.autoRest)? 70 : 0, forceRest: isUser? f.restNext : [] };
+  if(isUser&&state.phase==='spring') cfg=springBattleCfg(cfg);   // job candidates take turns
   // relievers who joined after the bullpen was set (rookies, call-ups, trades) go to the back of it
   const extraRP=r.pitchers.filter(p=>p.role!=='SP' && p.n!==cfg.closer && (cfg.bullpen||[]).indexOf(p.n)<0).map(p=>p.n);
-  const extra=Object.assign({edge:coachEdge(team)}, isUser? {tacFam:execTable(), scoutKnow:knowTable(), splits:true, plans:userPlan(), sharp:state.phase==='regular'&&userGamesPlayed()<18} : {tacFam:aiExecTable(team), scoutKnow:aiKnowTable(team)});
-  // an exhibition starter marked 안 씀 hands the ball to the next one who is
-  if(isUser&&state.phase==='spring'&&opts.forceRest.indexOf(cfg.spName)>=0){
-    const alt=state.cfgs[USER].rotation.concat(r.pitchers.map(p=>p.n)).find(n=>opts.forceRest.indexOf(n)<0&&(()=>{ const p=findPlayer(USER,n); return p&&!K.isInjured(p); })());
-    if(alt) cfg=Object.assign({},cfg,{spName:alt}); }
+  const extra=Object.assign({edge:coachEdge(team)}, isUser? {tacFam:execTable(), scoutKnow:knowTable(), splits:true, plans:userPlan()} : {tacFam:aiExecTable(team), scoutKnow:aiKnowTable(team)});
   return K.restAdjust(team, Object.assign({}, cfg, extra, {rotation: state.cfgs[team].rotation, bullpen:(cfg.bullpen||[]).concat(extraRP)}), opts);
 }
 // what prepareCfg will change for the user's next game, for the preview screen
@@ -110,6 +107,7 @@ function afterGame(res){
     maybeTradeOffer(ug);
     coachReport(ug);
     coachDesk(ug);
+    offCallbacks();
     maybeMedia(ug);
     maybePress(ug);
     checkForeignForm(ug);
@@ -188,7 +186,7 @@ function maybeTradeOffer(ug){
   const want=pool[Math.floor(Math.random()*pool.length)]; if(!want) return;
   const teams=K.TEAM_IDS.filter(t=>t!==USER); const team=teams[Math.floor(Math.random()*teams.length)];
   const v=playerValue(want);
-  const give=allPlayers(team).filter(p=>!K.isInjured(p) && p.type===want.type && playerValue(p)>=v-4 && playerValue(p)<=v+1)
+  const give=allPlayers(team).filter(p=>!K.isInjured(p) && p.type===want.type && (p.type==='B'||(p.role==='SP')===(want.role==='SP')) && playerValue(p)>=v-4 && playerValue(p)<=v+1)
     .sort((a,b)=>playerValue(b)-playerValue(a))[0];
   if(!give) return;
   f.lastOffer=ug;
