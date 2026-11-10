@@ -88,8 +88,10 @@
   // pitcher with his pitch count, the batting side's hitter with his season AVG, bases, inning, count, outs
   function bug(game, ctx) {
     const {offId, defId, batName, pitName, slot, cnt, ptot} = ctx, S = state, h = game.h, a = game.a;
-    const bs = S.season[offId].bat[batName];
-    const sub = t => t === defId ? `<i>P</i>${esc(pitName)}<em>${ptot}구</em>` : `<i>${slot}</i>${esc(batName)}<em>${bs ? avg3(bs.H, bs.AB) : '.---'}</em>`;
+    // the hitter's line today, the way a broadcast shows it: at-bats and hits in this game
+    const td = game.box[offId] && game.box[offId].bat[batName];
+    const today = td && td.PA ? `${td.AB}타수 ${td.H}안타` : '첫 타석';
+    const sub = t => t === defId ? `<i>P</i>${esc(pitName)}<em>${ptot}구</em>` : `<i>${slot}</i>${esc(batName)}<em>${today}</em>`;
     const team = t => `<div class="bug-t" style="--c:${K.ROSTERS[t].color}"><div class="bug-n"><b>${esc(t)}</b><strong>${game.score[t]}</strong></div><div class="bug-p">${sub(t)}</div></div>`;
     const base = (on, x, y) => `<rect x="${x}" y="${y}" width="9" height="9" transform="rotate(45 ${x + 4.5} ${y + 4.5})" class="${on ? 'on' : ''}"/>`;
     const outs = [0, 1].map(i => `<i class="${i < game.outs ? 'on' : ''}"></i>`).join('');

@@ -583,6 +583,8 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
   play(){ if(this._ended)return; this.paused=false; this.renderLive(); this._tick(); },
   pause(){ this.paused=true; clearTimeout(this.timer); this.renderLive(); },
   stepOne(){ this.paused=true; clearTimeout(this.timer); this._do(); while(!this._ended&&this.ab&&(this.ab.pre||(this.ab.susp&&!this.ab.committed))) this._do(); },
+  // plays the rest of this at-bat (or the next one, if this one is finished) and stops on its result
+  stepPA(){ this.paused=true; clearTimeout(this.timer); let g=0; while(!this._ended&&g++<5&&(!this.ab||this.ab.committed)) this._do(); while(!this._ended&&g++<80&&this.ab&&!this.ab.committed) this._do(); this.renderLive(); },
   toEnd(){ this.paused=true; clearTimeout(this.timer);
     if(this.ab && !this.ab.committed){ const ev=this.game.commitAB(); if(ev)this.feed.unshift(ev); }
     this.ab=null; this._flush();
@@ -878,7 +880,7 @@ function relayHTML(game,feed,M){
     <div style="${userBatting?'box-shadow:inset 0 0 0 1px var(--accent)':''}">시즌 타율 ${matchAvg}${bSeason&&bSeason.AB>0?` · ${bSeason.HR}홈런 ${bSeason.RBI}타점`:''}<br>오늘 ${bToday&&bToday.PA?`${bToday.AB}타수 ${bToday.H}안타${bToday.HR?' '+bToday.HR+'홈런':''}${bToday.RBI?' '+bToday.RBI+'타점':''}`:'첫 타석'}</div>
   </div>`;
   const cm=M.comm||[], cur=cm[0];
-  const caption = cur ? `<div class="cm-now cm-${cur.k||'call'}">${cur.t}</div>${cm.slice(1,3).map(l=>`<div class="cm-prev">${l.t}</div>`).join('')}` : (game.over?'경기 종료':'플레이볼!');
+  const caption = cur ? `<div class="cm-now cm-${cur.k||'call'}">${cur.t}</div>${cm.slice(1,2).map(l=>`<div class="cm-prev">${l.t}</div>`).join('')}` : (game.over?'경기 종료':'플레이볼!');
   const paResult=PitchView.result(ab,shown[shown.length-1],PITCHLABEL);
   const paName=ab&&ab.steal ? ab.runner : batName;
   const paSummary=`<div class="pv-summary"><div class="pv-summary-meta"><span>${ab&&ab.committed?'플레이 결과':'현재 타석'}</span><span>${slot}번 · ${batSide(batName,pitName)}타</span></div><div class="pv-result"><b>${PitchView.escape(paName)}</b><span class="pv-result-colon">:</span><strong>${PitchView.escape(paResult)}</strong></div></div>`;
@@ -894,9 +896,10 @@ function relayHTML(game,feed,M){
   const wpBox=`<div class="wp"><div class="wp-line"><span><b>${USER}</b> 승리 확률 <small>추정</small></span><strong>${(wpU*100).toFixed(1)}<small>%</small></strong></div><div class="wp-bar" role="meter" aria-label="${USER} 승리 확률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${(wpU*100).toFixed(1)}"><span style="width:${(wpU*100).toFixed(1)}%"></span></div><div class="pv-wp-note">${wpDelta}</div></div>`;
 
   const ctrl = game.over ? `<button class="btn primary" onclick="Match.finalize()">✅ 경기 결과 보기</button>${M._ended?'<span class="muted" style="font-size:12px;margin-left:8px">결과는 저장됐어요</span>':''}`
-    : `<div class="row" style="gap:6px;flex-wrap:wrap">
+    : `<div class="live-row live-play">
         ${M.paused?`<button class="btn primary" onclick="Match.play()"><span class="ic">▶</span> 재생</button>`:`<button class="btn" onclick="Match.pause()"><span class="ic">⏸</span> 일시정지</button>`}
         <button class="btn" onclick="Match.stepOne()"><span class="ic">⏭</span> 한 구</button>
+        <button class="btn" onclick="Match.stepPA()"><span class="ic">⏭</span> 한 타자</button>
         <button class="btn" onclick="Match.toEnd()"><span class="ic">⏩</span> 끝까지</button>
         <select onchange="Match.setSpeed(this.value)">
           <option value="1900" ${M.speed==1900?'selected':''}>느리게</option>
@@ -906,13 +909,13 @@ function relayHTML(game,feed,M){
         </select>
       </div>`;
 
-  let interv='';
+  let interv='', mgrRow='';
   if(!game.over){
     const btns=[];
-    if(userPitching) btns.push(`<button class="btn" onclick="Match.togglePanel('sub')"><span class="ic">🔄</span> 투수 교체</button>`);
-    if(userBatting) btns.push(`<button class="btn" onclick="Match.togglePanel('pinch')"><span class="ic">🏏</span> 대타</button>`);
-    btns.push(`<button class="btn" onclick="Match.togglePanel('tac')"><span class="ic">🎯</span> 작전</button>`);
-    interv = btns.length? `<div class="row" style="margin-top:8px;gap:6px">${btns.join('')}</div>`:'';
+    btns.push(`<button class="btn${M.panel==='sub'?' primary':''}" ${userPitching?'':'disabled title="수비 중에만 바꿀 수 있어요"'} onclick="Match.togglePanel('sub')"><span class="ic">🔄</span> 투수 교체</button>`);
+    btns.push(`<button class="btn${M.panel==='pinch'?' primary':''}" onclick="Match.togglePanel('pinch')"><span class="ic">🏏</span> 야수 교체</button>`);
+    btns.push(`<button class="btn${M.panel==='tac'?' primary':''}" onclick="Match.togglePanel('tac')"><span class="ic">🎯</span> 작전</button>`);
+    mgrRow=`<div class="live-row live-mgr">${btns.join('')}</div>`;
     if(M.panel==='sub'&&userPitching){
       const avail=game.availPitchers(USER).sort((x,y)=>K.ovr(y)-K.ovr(x));
       interv += `<div class="card" style="margin-top:8px;background:var(--panel2)"><div class="muted" style="margin-bottom:6px">교체할 투수 (현재: ${pitName})</div>
@@ -933,7 +936,7 @@ function relayHTML(game,feed,M){
       interv += `<div class="card" style="margin-top:8px;background:var(--panel2)"><div class="muted" style="margin-bottom:6px">대주자</div>
         ${[0,1,2].filter(i=>game.bases[i]).map(i=>`<div class="sign-group"><span>${i+1}루 ${game.bases[i].n}</span><div>${fast.map(p=>`<button class="btn" onclick="Match.doRun(${i},'${p.n}')">${p.n} <span class="muted">주력 ${p.spd}</span></button>`).join('')||'<span class="muted">없음</span>'}</div></div>`).join('')}</div>`;
     }
-    if(M.panel==='sub'&&userPitching){
+    if(M.panel==='pinch'&&userPitching){
       const gl=game.bench(USER).sort((x,y)=>y.fld-x.fld).slice(0,5), worst=game.lineup[USER].map((n,i)=>({n,i,p:K.ROSTERS[USER].batters.find(b=>b.n===n)})).filter(x=>x.p&&game.pos[USER][x.i]!=='DH'&&game.pos[USER][x.i]!=='C').sort((a,b)=>a.p.fld-b.p.fld)[0];
       if(worst&&gl.length) interv += `<div class="card" style="margin-top:8px;background:var(--panel2)"><div class="muted" style="margin-bottom:6px">수비 강화 (${worst.n} 대신)</div><div class="row" style="gap:6px;flex-wrap:wrap">${gl.map(p=>`<button class="btn" onclick="Match.doDef(${worst.i},'${p.n}')">${p.n} <span class="muted">수비 ${p.fld}</span></button>`).join('')}</div></div>`;
     }
@@ -950,7 +953,7 @@ function relayHTML(game,feed,M){
     for(let i=0;i<maxInn;i++){ const v=game.line[t][i]; r+=`<td>${v===undefined?'·':v}</td>`; }
     r+=`<td><b>${game.score[t]}</b></td><td>${game.hits[t]}</td>`; return `<tr>${r}</tr>`; };
 
-  const feedHtml = feed.slice(0,40).map(e=>{
+  const feedRow = e=>{
     if(e.sysmsg) return `<div style="padding:5px 8px;border-bottom:1px solid var(--line);color:var(--accent2);font-size:12px">⚙ ${e.sysmsg}</div>`;
     const tcolor = e.off===USER?'var(--accent)':'var(--dim)';
     const big = (e.oc==='HR'||e.runs>0)?'font-weight:700;':'';
@@ -959,7 +962,10 @@ function relayHTML(game,feed,M){
       <span style="color:${tcolor}">[${e.off}]</span> ${e.steal?e.runner:e.batter} — ${e.call||e.desc}
       ${e.walkoff?'<span style="color:var(--accent2)"> 끝내기!</span>':''}
       <span class="muted" style="float:right">${e.score[a]}:${e.score[h]}</span></div>`;
-  }).join('');
+  };
+  // the latest three plays stay in view; the rest fold away
+  const older=feed.slice(3,40);
+  const feedHtml = feed.slice(0,3).map(feedRow).join('') + (older.length? `<details class="pv-log-more" ${M.logMore?'open':''} ontoggle="Match.logMore=this.open"><summary>이전 기록 ${older.length}개</summary>${older.map(feedRow).join('')}</details>` : '');
 
   const lastP=shown[shown.length-1];
   const pitchInfo=`<div class="pv-pitchinfo"><span>${lastP? `${shown.length}구 · ${PITCHLABEL[lastP.res]||(lastP.res==='IBB'?'고의4구':lastP.res)}` : (game.over?'경기 종료':'투구 위치')}</span><b>${lastP? (lastP.res==='IBB'?'고의4구':`${lastP.velo||'—'} km/h · ${lastP.type}`) : '첫 투구 대기'}</b></div>`;
@@ -975,7 +981,7 @@ function relayHTML(game,feed,M){
       ${Scoreboard.board(game,M,{offId,defId,batName,pitName,slot,shown,cnt,ptot,pstr,pball})}
       <div class="live-main">
         ${resultBanner}
-        <div class="bc pv-broadcast">${relayScene(game,shown,offId,defId,batName,pitName).replace(/(<div class="pv-scene"[^>]*>)/,m=>m+Scoreboard.bug(game,{offId,defId,batName,pitName,slot,cnt,ptot}))}<div class="live-ctrl">${ctrl}${interv}</div>${pitchInfo}<div class="bc-cap pv-live-cap"><div aria-live="polite">${caption}</div><div class="pv-log" aria-label="중계 로그">${feedHtml||'<div class="muted" style="padding:8px">경기 시작!</div>'}</div></div></div>
+        <div class="bc pv-broadcast">${relayScene(game,shown,offId,defId,batName,pitName).replace(/(<div class="pv-scene"[^>]*>)/,m=>m+Scoreboard.bug(game,{offId,defId,batName,pitName,slot,cnt,ptot}))}<div class="live-ctrl">${mgrRow}${ctrl}${interv}</div>${pitchInfo}<div class="bc-cap pv-live-cap"><div aria-live="polite">${caption}</div><div class="pv-log" aria-label="중계 로그">${feedHtml||'<div class="muted" style="padding:8px">경기 시작!</div>'}</div></div></div>
       </div>
     </div>
   `;
