@@ -1,8 +1,10 @@
 /* Options, notices and the information pages: what this project is, what it records, where the
    data comes from, and how saves work. Opened from the header (공지, 설정 → 옵션 · 정보). */
 (function () {
-  const TRACK_OFF = 'kbo-track-off', SEEN = 'kbo-notice-seen';
+  const TRACK_OFF = 'kbo-track-off', SEEN = 'kbo-notice-seen', ASKED = 'kbo-ask-feedback', ASK_ID = '2026-11-12';
   const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  // read before the gate or the game writes anything: a save or an earlier entry means this visitor has been here before
+  const RETURNING = !!(get('kbo_manager_autosave') || get('kbo_manager_save') || get('kbo-gate'));
   const set = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
   // newest first. id is the date; the header dot shows until the newest one has been opened
   const NOTICES = [
@@ -56,6 +58,19 @@
       <div class="opt-links"><button class="btn" onclick="Info.page('about')">프로젝트 소개</button><button class="btn" onclick="Info.page('privacy')">이용 기록과 개인정보</button><button class="btn" onclick="Info.page('data')">데이터와 라이선스</button></div>
       <p class="hint" style="margin-top:12px">KBO 매니저는 비영리 팬 프로젝트이며 KBO와 구단의 공식 게임이 아니에요.</p>`);
   }
-  window.Info = {notices, options, page, setTrack, trackOn, dot};
+  // once per visitor who has played before: ask how the current version feels before the next update lands
+  function askFeedback(tries) {
+    if (!RETURNING || get(ASKED) === ASK_ID) return;
+    if (document.querySelector('.modal-bg') || document.body.classList.contains('gate-on')) { if ((tries || 0) < 20) setTimeout(() => askFeedback((tries || 0) + 1), 1500); return; }
+    set(ASKED, ASK_ID);
+    if (window.Track) Track.action('askfb_show');
+    show(`${X}<h2>다시 찾아 주셔서 고마워요!</h2>
+      <div class="info-page"><p>곧 업데이트가 있어요. 그 전에 <b>지금 버전을 플레이해 보신 느낌</b>을 들려 주세요.</p>
+      <p>좋았던 점, 불편했던 점, 헷갈렸던 화면, 있었으면 하는 기능 모두 좋아요. 한 줄만 남겨 주셔도 다음 업데이트에 큰 도움이 돼요.</p></div>
+      <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="Info.askOpen()">의견 보내기</button><button class="btn" onclick="Info.askClose()">다음에 할게요</button></div>`);
+  }
+  function askOpen() { if (window.Track) Track.action('askfb_open'); App.closeModal(); Feedback.open('return-popup'); }
+  function askClose() { if (window.Track) Track.action('askfb_close'); App.closeModal(); }
+  window.Info = {notices, options, page, setTrack, trackOn, dot, askFeedback, askOpen, askClose};
   if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('DOMContentLoaded', dot);
 })();
