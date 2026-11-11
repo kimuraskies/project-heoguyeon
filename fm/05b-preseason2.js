@@ -33,7 +33,7 @@ function offFill(o){ o.q=[];
 // other clubs sign a few free agents every week
 function offAiWeek(){ const f=fm(); (f.fa||[]).slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).forEach(x=>{ if(K.ovr(x.p)>=64&&Math.random()<0.22) offAiSign(x); }); }
 function offAiSign(x){ const f=fm(), p=x.p, t=K.TEAM_IDS.filter(t=>t!==USER).sort((a,b)=>teamStrength(a)-teamStrength(b))
-    .find(t=>(p.type==='B'?K.ROSTERS[t].batters.length<15:K.ROSTERS[t].pitchers.length<13)&&!(p.f&&foreignOf(t).length>=FX_MAX));
+    .find(t=>(p.type==='B'?K.ROSTERS[t].batters.length<15:K.ROSTERS[t].pitchers.length<13)&&!(p.f&&!fxRoom(t,p)));
   const i=f.fa.indexOf(x); if(i<0||!t) return null; f.fa.splice(i,1);
   p.sal=x.ask; p.yrs=x.yrs; ensurePlayer(p); (p.type==='B'?K.ROSTERS[t].batters:K.ROSTERS[t].pitchers).push(p); return t; }
 function faSign(x,b){ const f=fm(), p=x.p; f.fa.splice(f.fa.indexOf(x),1);
@@ -106,6 +106,7 @@ function campRunWeek(){
     const hurtNow=K.isInjured(p); let tot=0;
     if(!hurtNow) keys.forEach(k=>{ if(Math.random()>=chance) return; if(bumpWithin(p,k,1)){ tot++; const g=c.gain[p.n]||(c.gain[p.n]={}); g[k]=(g[k]||0)+1; } });
     if(p.type==='P'&&!hurtNow&&Math.random()<0.02*pl.fit*(p.age<=30?1:0.5)) bumpWithin(p,'sta',1);
+    if(!hurtNow&&p.type==='P') (pitTrainStep(p,c.focus==='pit'?2:1)||[]).forEach(x=>c.notes.push(x.jobDone? `${p.n}: ${JOB_L[x.jobDone]} 보직 숙련` : `${p.n}: ${x.pitchDone} 습득`));
     if(!hurtNow&&p.pt){ const ps=posTrainStep(p,c.focus==='def'?2:1); if(ps&&ps.done) c.notes.push(`${p.n}: ${ps.pos} 수비 습득`); }
     if(tot) gains.push(`${p.n} +${tot}`);
     const inj=0.004*Math.max(0,pl.fit+pl.skill-5)*(p.age>=30?1.5:1)*(1-pl.rest*0.25)*wear.inj*(mod.inj||1);
@@ -193,7 +194,7 @@ function offBoardAdj(met){ const o=fm().off; if(!o||o.year!==state.year) return 
 
 // ----- events -----
 const byOvr=(a,b)=>K.ovr(b)-K.ovr(a);
-function faTalk(o){ const f=fm(), room=budgetRoom(); const x=(f.fa||[]).filter(x=>o.talked.indexOf(x.p.n)<0&&!(x.p.f&&foreignOf(USER).length>=FX_MAX)).sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).find(x=>x.ask<=room+2)||null;
+function faTalk(o){ const f=fm(), room=budgetRoom(); const x=(f.fa||[]).filter(x=>o.talked.indexOf(x.p.n)<0&&!(x.p.f&&!fxRoom(USER,x.p))).sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).find(x=>x.ask<=room+2)||null;
   if(!x) return null; o.talked.push(x.p.n); const p=x.p, want=p.type==='B'? ['money','start','term'][hash(p.n)%3] : ['money','term','term'][hash(p.n)%3];
   const wl={money:'가장 좋은 대우를 원합니다',start:'주전 자리를 보장받고 싶어 합니다',term:'긴 계약 기간을 원합니다'}[want];
   const alt=want==='money'? {l:`연봉을 올려 확실히 잡는다 (${x.yrs}년 ${eok(x.ask*1.12)}억)`,d:'수락 가능성 높음 · 예산 부담'} : want==='start'? {l:`주전 보장을 약속한다 (${x.yrs}년 ${eok(x.ask*0.9)}억)`,d:'연봉 10% 절감 · 약속을 어기면 선수단 신뢰 하락'} : {l:`계약 기간을 늘려 준다 (${x.yrs+1}년 ${eok(x.ask*0.95)}억)`,d:'연봉 5% 절감 · 나이 들수록 부담'};

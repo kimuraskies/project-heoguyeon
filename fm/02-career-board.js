@@ -128,6 +128,7 @@ function onCareerStart(){
   ensure();
   { const f0=fm(); f0.firstYear=state.year; f0.guide={step:0, done:false}; }
   seedFAs();
+  K.TEAM_IDS.forEach(t=>fxQuotaFix(t));   // real records include mid-season replacements: extras start in the 2군
   send('구단 사무국','💾','세이브는 이 브라우저에만 저장됩니다','커리어는 자동으로 저장되지만, 이 기기의 이 브라우저 안에만 있습니다.\n브라우저 데이터를 지우거나 기기를 바꾸면 사라집니다.\n\n설정 → 세이브 관리에서 세이브 파일을 받아 두면 다른 기기에서도 이어서 할 수 있습니다.',[]);
   send('단장','🔥',`${state.year} 스토브리그가 시작됐습니다`, `개막까지 준비할 시간이 있습니다.\n\n• FA 시장과 외국인 선수 후보는 구단 탭에서\n• 트레이드는 트레이드 탭에서\n• 타순·로테이션은 라인업 탭, 팀 기본 전술은 팀 전술 탭에서\n• 전지훈련 방향을 정하면 스프링캠프 → 시범경기 ${SPRING_GAMES}경기 → 정규시즌 개막 순서로 진행됩니다.`, []);
   const bonus=(MGR_BG[state.user.bg]||MGR_BG.coach).mor;

@@ -140,9 +140,16 @@ function entryProblem(t, outP, inP, who){
   return '';
 }
 // a new signing joins the 1군 when there is room, otherwise the farm
+// squad tab: the 1군's foreign slots at a glance
+function fxCard(){ const on=allPlayers(USER).filter(p=>p.f), off=farmOf(USER).filter(p=>p.f);
+  const slot=(p,lab)=>p? `<div class="fx-slot"><small>${lab}</small><b><a href="javascript:void(0)" onclick="FM.showProfile('${USER}','${q(p.n)}')">${esc(p.n)}</a></b><span>${posFull(p.pos||p.role)} · OVR ${K.ovr(p)}</span></div>` : `<div class="fx-slot empty"><small>${lab}</small><b>빈 자리</b><span>구단 탭에서 영입</span></div>`;
+  const F=on.filter(p=>!p.aq), A=on.filter(p=>p.aq);
+  return `<div class="card fx-card"><h3>🌏 1군 보유 외국인 선수 <span class="tag">외국인 ${F.length}/${FX_F} · 아시아쿼터 ${A.length}/${FX_AQ}</span></h3>
+    <div class="fx-slots">${[0,1,2].map(i=>slot(F[i],'외국인 '+(i+1))).join('')}${slot(A[0],'아시아쿼터')}</div>
+    ${off.length?`<p class="hint" style="margin:8px 0 0">2군: ${off.map(p=>`${esc(p.n)}(${fxLabel(p)})`).join(', ')}. 1군 자리가 비어야 올릴 수 있습니다.</p>`:''}</div>`; }
 function joinClub(t,p){
   const r=K.ROSTERS[t];
-  if(entryCount(t)<ENTRY_MAX){ (p.type==='B'?r.batters:r.pitchers).push(p); return '1군'; }
+  if(entryCount(t)<ENTRY_MAX && !(p.f&&!fxEntryRoom(t,p))){ (p.type==='B'?r.batters:r.pitchers).push(p); return '1군'; }
   farmOf(t).push(p); return '2군';
 }
 // an injured player goes off the entry to make room for a call-up
@@ -171,6 +178,9 @@ function fillFarm(t){
 function seedFarm(t){
   const used=allNames(), f=farmOf(t);
   ((window.KBO_FARM||{})[t]||[]).forEach(row=>{ if(used.has(row[0])) return; f.push(farmFromRow(row)); used.add(row[0]); });
+  // the club's real 2026 draft class; a draftee already in the farm data just gets his draft info, a namesake elsewhere is skipped
+  (DRAFT_2026[t]||[]).forEach(row=>{ const had=f.find(p=>p.n===row[1]); if(had){ Object.assign(had,{rookie:true, dy:2026, dr:{r:row[0], school:row[3], team:t}}); return; }
+    if(used.has(row[1])) return; f.push(draftee(t,row)); used.add(row[1]); });
   fillFarm(t);
 }
 // a Futures club needs nine healthy bats, five healthy arms and a healthy starter; the
@@ -222,6 +232,7 @@ function promoteBlock(p){
   if(K.isInjured(p)) return `부상 중인 선수는 1군에 등록할 수 없습니다 (회복 ${p.inj}경기).`;
   if(entryCount(USER)>=ENTRY_MAX) return `1군 엔트리가 가득 찼습니다 (${ENTRY_MAX}명). 먼저 다른 선수를 2군으로 내리세요.`;
   const left=downLeft(p); if(left) return `말소 후 ${DOWN_GAMES}경기가 지나야 다시 등록할 수 있습니다 (${left}경기 남음).`;
+  if(p.f&&!fxEntryRoom(USER,p)) return `1군 ${fxLabel(p)} 자리(${fxCap(p)}명)가 찼습니다. 먼저 다른 ${fxLabel(p)} 선수를 2군으로 내리세요.`;
   return '';
 }
 function doPromote(t,p){
@@ -297,7 +308,9 @@ function offseasonFarm(t){
   while(r.batters.length<MIN_1B) lift('B');
   while(r.pitchers.filter(p=>p.role==='SP').length<5) lift('P','SP');
   while(r.pitchers.length<MIN_1P) lift('P');
-  const cut=[]; while(f.length>FARM_CAP){ let w=0; f.forEach((p,i)=>{ if(playerValue(p)<playerValue(f[w])) w=i; }); cut.push(f.splice(w,1)[0].n); }
+  // a draftee gets his first two seasons before he can be cut
+  const cut=[], keep=p=>p.dy&&state.year-p.dy<2;
+  while(f.length>FARM_CAP){ const pool=f.filter(p=>!keep(p)); if(!pool.length) break; let w=pool[0]; pool.forEach(p=>{ if(playerValue(p)<playerValue(w)) w=p; }); f.splice(f.indexOf(w),1); cut.push(w.n); }
   fillFarm(t);
   return {draft:draft.filter(p=>f.indexOf(p)>=0), up, retired, cut};
 }
@@ -335,14 +348,23 @@ function posGain(p,pos,mult){ const base=K.posFitBase? K.posFitBase(p,pos) : 10,
 function posTrainStep(p,mult){ const pos=p.pt; if(!pos||p.type!=='B'||pos===p.pos) return null; p.pp=p.pp||{};
   const was=p.pp[pos]||0; p.pp[pos]=Math.min(100,was+posGain(p,pos,mult));
   if(p.pp[pos]>=100){ p.pt=null; return {n:p.n,pos,done:true}; } return {n:p.n,pos,pct:p.pp[pos]}; }
+// pitchers: work toward another job (p.rt: SP/RP/CL, progress in p.rs) or a new pitch (p.pq={k,pct})
+const JOB_L={SP:'선발',RP:'중계',CL:'마무리'};
+function pitGain(p,mult,hard){ const ageF=p.age<=25?1.3:p.age<=30?1:0.6; return Math.max(1,Math.round((hard?9:12)*ageF*coachMult(coachQOf('pit'))*(mult||1))); }
+function pitTrainStep(p,mult){ if(p.type!=='P') return null; const out=[];
+  if(p.rt&&p.rt!==p.role){ p.rs=p.rs||{}; const was=K.roleSkill(p,p.rt); p.rs[p.rt]=Math.min(100,was+pitGain(p,mult)); if(p.rs[p.rt]>=100){ out.push({n:p.n, jobDone:p.rt}); p.rt=null; } }
+  if(p.pq&&p.pq.k){ p.pq.pct=Math.min(100,(p.pq.pct||0)+pitGain(p,mult,true));
+    if(p.pq.pct>=100){ const k=p.pq.k; p.np=(p.np||[]).concat([k]); p.pq=null; bumpWithin(p,'mov',2); out.push({n:p.n, pitchDone:k}); } }
+  return out; }
 function trainingTick(){
   const f=fm(); f.trLog=f.trLog||[];
   allPlayers(USER).concat(farmOf(USER)).forEach(p=>{
     if(K.isInjured(p)) return;
     const tr=trOf(p), I=TR_INT[tr.i], keys=TR_FOCUS[p.type][tr.f].k;
     const ps=posTrainStep(p,I.g); if(ps&&ps.done) f.trLog.push({n:p.n, posDone:ps.pos, farm:isFarm(USER,p)});
+    (pitTrainStep(p,I.g)||[]).forEach(x=>f.trLog.push(Object.assign(x,{farm:isFarm(USER,p)})));
     // a focused plan puts every gain into its attributes and lands a little more often; position work takes some of the time
-    if(Math.random()<growChance(USER,p)*(tr.f==='bal'?1:1.15)*(p.pt?0.8:1)){
+    if(Math.random()<growChance(USER,p)*(tr.f==='bal'?1:1.15)*(p.pt||p.rt||(p.pq&&p.pq.k)?0.8:1)){
       const room=keys.filter(k=>p[k]<99), k=room[Math.floor(Math.random()*room.length)], was=K.ovr(p);
       if(k){ p[k]++; }
       // potential is a ceiling: a point that would carry him past it doesn't stick
@@ -357,20 +379,30 @@ function trainingReport(){
   const f=fm(), log=f.trLog||[]; f.trLog=[];
   if(!log.length) return;
   const by={}; log.filter(x=>x.k).forEach(x=>{ (by[x.n]=by[x.n]||{farm:x.farm,ks:[]}).ks.push(ATTR_KO[x.k]); });
-  const hurt=log.filter(x=>x.hurt), learned=log.filter(x=>x.posDone);
+  const hurt=log.filter(x=>x.hurt), learned=log.filter(x=>x.posDone), jobs=log.filter(x=>x.jobDone), pitches=log.filter(x=>x.pitchDone);
   const lines=Object.entries(by).map(([n,v])=>`• ${n}${v.farm?' (2군)':''}: ${v.ks.map(k=>k+' +1').join(', ')}`);
   const busy=allPlayers(USER).concat(farmOf(USER)).filter(p=>p.pt).map(p=>`${p.n} ${p.pt} ${Math.round((p.pp&&p.pp[p.pt])||0)}%`);
   send('육성 코치','📈',`훈련 리포트: ${Object.keys(by).length}명 성장${learned.length?` · 포지션 습득 ${learned.length}명`:''}${hurt.length?` · 훈련 중 부상 ${hurt.length}명`:''}`,
     `최근 ${TR_REPORT}경기 동안의 훈련 성과입니다.\n\n${lines.join('\n')||'눈에 띄는 성장 없음'}`+
     (learned.length? `\n\n포지션 습득: ${learned.map(x=>`${x.n} → ${x.posDone}`).join(', ')}. 이제 그 자리에서도 수비 페널티가 거의 없습니다.` : '')+
     (busy.length? `\n\n포지션 훈련 중: ${busy.join(', ')}` : '')+
+    (jobs.length? `\n\n보직 숙련 완료: ${jobs.map(x=>`${x.n} → ${JOB_L[x.jobDone]}`).join(', ')}` : '')+
+    (pitches.length? `\n\n새 구종 습득: ${pitches.map(x=>`${x.n} ${x.pitchDone}`).join(', ')}` : '')+
     (hurt.length? `\n\n강도 높은 훈련 중 부상: ${hurt.map(x=>`${x.n} (${x.hurt}경기)`).join(', ')}` : '')+
     `\n\n훈련 탭에서 선수별 초점과 강도를 바꿀 수 있습니다.`, []);
 }
 function setTrain(n,key,v){ const p=findPlayer(USER,n); if(!p) return; p.tr=Object.assign(trOf(p),{[key]:v}); render(); }
 const POS_LIST=['C','1B','2B','3B','SS','LF','CF','RF'];
 function setPosTrain(n,pos){ const p=findPlayer(USER,n); if(!p||p.type!=='B') return; p.pt=pos||null; if(pos) notify(josa(`${n}이(가) ${pos} 수비 훈련을 시작합니다. 지금 숙련 ${Math.round((p.pp&&p.pp[pos])||0)}%`)); render(); }
-function posTrainCell(p){ if(p.type!=='B'||p.pos==='DH') return '<span class="muted">-</span>';
+function setJobTrain(n,job){ const p=findPlayer(USER,n); if(!p||p.type!=='P') return; p.rt=job||null; if(job) notify(josa(`${n}이(가) ${JOB_L[job]} 보직 훈련을 시작합니다. 지금 숙련 ${K.roleSkill(p,job)}%`)); render(); }
+function setPitchTrain(n,k){ const p=findPlayer(USER,n); if(!p||p.type!=='P') return; p.pq=k? {k, pct:(p.pq&&p.pq.k===k? p.pq.pct : 0)} : null; if(k) notify(josa(`${n}이(가) ${k} 연마를 시작합니다`)); render(); }
+function jobTrainCell(p){ const cur=p.rt||'', jobs=['SP','RP','CL'].filter(j=>j!==p.role&&K.roleSkill(p,j)<100);
+  const opts=jobs.map(j=>`<option value="${j}" ${j===cur?'selected':''}>${JOB_L[j]} (${K.roleSkill(p,j)}%)</option>`).join('');
+  return `<select aria-label="${esc(p.n)} 보직 훈련" onchange="FM.setJobTrain('${q(p.n)}',this.value)"><option value="">없음</option>${opts}</select>${cur?`<div class="pt-bar"><i style="width:${K.roleSkill(p,cur)}%"></i></div><small class="muted">${JOB_L[cur]} 숙련 ${K.roleSkill(p,cur)}%</small>`:''}`; }
+function pitchTrainCell(p){ if(p.type!=='P') return '<span class="muted">-</span>';
+  const have=K.repertoire(p).map(t=>t.k), cur=p.pq&&p.pq.k||'', opts=K.PITCH_TYPES.map(t=>t.k).filter(k=>have.indexOf(k)<0).map(k=>`<option value="${k}" ${k===cur?'selected':''}>${k}</option>`).join('');
+  return `<select aria-label="${esc(p.n)} 신규 구종" onchange="FM.setPitchTrain('${q(p.n)}',this.value)"><option value="">없음</option>${opts}</select>${cur?`<div class="pt-bar"><i style="width:${p.pq.pct||0}%"></i></div><small class="muted">${cur} ${p.pq.pct||0}%</small>`:''}`; }
+function posTrainCell(p){ if(p.type==='P') return jobTrainCell(p); if(p.pos==='DH') return '<span class="muted">-</span>';
   const cur=p.pt||'', pct=k=>Math.round((p.pp&&p.pp[k])||0), done=k=>p.alt===k||pct(k)>=100;
   const opts=POS_LIST.filter(k=>k!==p.pos&&!done(k)).map(k=>`<option value="${k}" ${k===cur?'selected':''}>${k}${pct(k)?` (${pct(k)}%)`:''}</option>`).join('');
   const learned=POS_LIST.filter(k=>k!==p.pos&&done(k));
@@ -401,6 +433,7 @@ function renderTraining(){
       <td><select aria-label="${esc(p.n)} 훈련 초점" onchange="FM.setTrain('${q(p.n)}','f',this.value)">${opt(TR_FOCUS[p.type],tr.f)}</select></td>
       <td><select aria-label="${esc(p.n)} 훈련 강도" onchange="FM.setTrain('${q(p.n)}','i',this.value)">${opt(TR_INT,tr.i)}</select></td>
       <td class="pt-cell">${posTrainCell(p)}</td>
+      <td class="pt-cell">${pitchTrainCell(p)}</td>
       <td>${g?`<b class="win">+${g}</b>`:'<span class="muted">-</span>'}</td></tr>`; }).join('');
   const recent=allPlayers(USER).concat(farmOf(USER)).flatMap(p=>(p.grow||[]).filter(g=>g[0]===state.year).map(g=>[p,g[1]]));
   const top=Object.values(recent.reduce((a,[p,k])=>{ (a[p.n]=a[p.n]||{p,n:0}).n++; return a; },{})).sort((a,b)=>b.n-a.n).slice(0,5);
@@ -409,10 +442,10 @@ function renderTraining(){
     <div class="section-head"><div><p class="eyebrow">Player development</p><h2>육성 · 훈련</h2></div>
       <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn btn-sm" onclick="FM.setTrainAll('f')">약점 보완 자동 설정</button>
         <button class="btn btn-sm" onclick="FM.setTrainAll('i','light')">전원 가볍게</button><button class="btn btn-sm" onclick="FM.setTrainAll('i','normal')">전원 보통</button><button class="btn btn-sm" onclick="FM.setTrainAll('i','hard')">전원 강하게</button></div></div>
-    <p class="hint" style="margin:10px 0 0">정규시즌 ${TR_EVERY}경기마다 훈련 효과가 반영되고, ${TR_REPORT}경기마다 육성 코치가 리포트를 보냅니다. 성장 가능성은 <b>나이</b>, <b>잠재력까지 남은 여유</b>, <b>출전 기회</b>(2군에서 매일 뛰면 ↑, 1군 벤치에 오래 있으면 ↓), <b>훈련 강도</b>로 정해집니다. 강하게 하면 빨리 크지만 컨디션이 떨어지고 가끔 다칩니다. 야수는 <b>포지션 훈련</b>으로 다른 자리 수비를 익힐 수 있습니다. 숙련이 오를수록 그 자리 수비 페널티가 줄고, 100%가 되면 제2 포지션이 됩니다(포수가 가장 오래 걸리고, 젊을수록·수비 코치가 좋을수록 빠름).</p>
+    <p class="hint" style="margin:10px 0 0">정규시즌 ${TR_EVERY}경기마다 훈련 효과가 반영되고, ${TR_REPORT}경기마다 육성 코치가 리포트를 보냅니다. 성장 가능성은 <b>나이</b>, <b>잠재력까지 남은 여유</b>, <b>출전 기회</b>(2군에서 매일 뛰면 ↑, 1군 벤치에 오래 있으면 ↓), <b>훈련 강도</b>로 정해집니다. 강하게 하면 빨리 크지만 컨디션이 떨어지고 가끔 다칩니다. 야수는 <b>포지션 훈련</b>으로 다른 자리 수비를 익힐 수 있습니다. 숙련이 오를수록 그 자리 수비 페널티가 줄고, 100%가 되면 제2 포지션이 됩니다(포수가 가장 오래 걸리고, 젊을수록·수비 코치가 좋을수록 빠름). 투수는 <b>보직 훈련</b>(선발·중계·마무리 숙련도)과 <b>신규 구종</b>을 익힐 수 있습니다. 숙련이 낮은 보직에 쓰면 그만큼 공이 덜 위력적이고, 새 구종을 익히면 무브먼트가 오릅니다.</p>
     ${top.length? `<div class="brief-line" style="flex-wrap:wrap">${icon('morale-up')}<span>${state.year} 성장 TOP: ${top.map(x=>`<b>${esc(x.p.n)}</b> +${x.n}`).join(' · ')}</span></div>` : ''}
     <div class="tabsm" style="margin-top:14px">${filt.map(([k,l])=>`<button class="${trFilter===k?'active':''}" onclick="FM.setTrFilter('${k}')">${l}</button>`).join('')}</div>
-    <div style="overflow-x:auto"><table class="stat-table"><thead><tr><th>선수</th><th>소속</th><th>POS</th><th>나이</th><th>OVR</th><th>잠재력</th><th>성장 가능성</th><th>훈련 초점</th><th>강도</th><th>포지션 훈련</th><th>${state.year} 성장</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="overflow-x:auto"><table class="stat-table"><thead><tr><th>선수</th><th>소속</th><th>POS</th><th>나이</th><th>OVR</th><th>잠재력</th><th>성장 가능성</th><th>훈련 초점</th><th>강도</th><th>포지션·보직 훈련</th><th>신규 구종</th><th>${state.year} 성장</th></tr></thead><tbody>${rows}</tbody></table></div>
   </div>`;
 }
 // squad tab, 2군 view
@@ -432,7 +465,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,

@@ -187,7 +187,7 @@ function stoveTasks(){
   return [
     {done:!renew, t:'재계약 협상', d: renew? `미결 ${renew}건 (받은편지함)` : '완료', go:"App.tab('inbox')"},
     {done:false, opt:true, t:'FA 시장', d:`${(f.fa||[]).length}명 시장에 있음`, go:"App.tab('club')"},
-    {done:false, opt:true, t:'외국인 선수', d:`${foreignOf(USER).length}/${FX_MAX}명 · 스토브리그엔 교체 횟수 차감 없음`, go:"App.tab('club')"},
+    {done:false, opt:true, t:'외국인 선수', d:`외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 스토브리그엔 교체 횟수 차감 없음`, go:"App.tab('club')"},
     {done:false, opt:true, t:'트레이드', d:'다른 구단과 협상', go:"App.tab('trade')"},
     {done:!!(f.camp&&f.camp.year===state.year&&f.camp.focus), t:'이번 주 결정', d: offHero().title, go:"FM.offOpen()"},
     {done:!!state.cfgs[USER].tac, opt:true, t:'팀 기본 전술', d: state.cfgs[USER].tac? '설정됨' : '팀 전술 탭', go:"App.tab('tactics')"}

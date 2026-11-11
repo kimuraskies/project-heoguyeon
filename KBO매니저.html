@@ -293,8 +293,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
     <div class="teaminfo" id="teaminfo"></div>
     <div class="headctrl">
       <span id="nextStep" class="next-step"></span>
-      <button type="button" class="btn notice-btn" onclick="Info.notices()" aria-label="공지사항" title="공지사항"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h3l6 4V6l-6 4H4z M17 9c1.2 1.6 1.2 4.400 0 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span class="lbl">공지</span><i id="notice-dot" hidden></i></button>
-      <button type="button" class="btn" onclick="Info.options()" aria-label="설정" title="설정"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg><span class="lbl">설정</span></button>
+      <button type="button" class="btn set-btn" id="setBtn" onclick="Info.menu()" aria-label="설정" aria-haspopup="menu" aria-expanded="false" title="설정"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg><span class="lbl">설정</span><i class="notice-dot" hidden></i></button>
     </div>
   </header>
   <div class="shell">
@@ -650,7 +649,7 @@ function recordFinished(fin){
 // one page after a watched game: result, who won it, and the button to the next thing
 function showMatchResult(res,kind){
   const info=heroInfo(standings().findIndex(x=>x.t===USER)+1);
-  const next=(info.cta||'').replace('onclick="','onclick="Match.closeResult();').replace('hero-cta','result-cta');
+  const next=FM.gateCta((info.cta||'').replace('onclick="','onclick="Match.closeResult();')).replace('hero-cta','result-cta');
   let o=$('result');
   if(!o){ o=el('<div id="result" class="matchpage"></div>'); document.body.appendChild(o); }
   o.innerHTML=FM.resultHTML(res,kind,info,next);
@@ -1147,7 +1146,7 @@ function render(){
   $("brandName").textContent = `${K.ROSTERS[USER].name} 감독실`;
   $("brandSub").textContent = `${state.year} / CLUB MANAGEMENT`;
   { const st=standings(), info=heroInfo(st.findIndex(x=>x.t===USER)+1);
-    $("nextStep").innerHTML = (info.cta||"").replace("btn primary hero-cta","btn primary next-cta"); }
+    $("nextStep").innerHTML = FM.gateCta((info.cta||"").replace("btn primary hero-cta","btn primary next-cta")); }
   $("teaminfo").innerHTML = `${FM.mgrAvatar(26)} ${FM.esc(state.user.name)} 감독 · <span class="chip team">${phaseLabel()}</span>`;
   // tabs
   $("tabs").innerHTML = TABS.map(([id,ic,lbl])=>`<button class="${currentTab===id?'active':''}" ${currentTab===id?'aria-current="page"':''} onclick="App.tab('${id}')">${FM.icon(ic)}${lbl}${FM.tabBadge(id)}</button>`).join("");
@@ -1271,9 +1270,9 @@ function renderDash(){
     <div class="hero-top"><p class="eyebrow">${h.eyebrow}</p><span class="chip team">${phaseLabel()}</span></div>
     <h1 class="hero-title" id="heroTitle">${FM.esc(h.title)}</h1><p class="hero-sub">${h.sub}</p>
     ${matchup?`<div class="matchup">${matchup}</div>`:'<div style="height:18px"></div>'}
-    <div class="hero-bottom"><div>${starters}</div><div class="hero-actions">${h.cta}</div></div>
+    <div class="hero-bottom"><div>${starters}</div></div>
     ${h.hint?`<p class="hero-hint">${h.hint}</p>`:''}
-    ${h.more?`<div class="hero-more">${h.more}</div>`:''}
+    <div class="hero-more">${FM.gateCta(h.cta)}${h.more||''}</div>
     ${h.progress!=null?`<div class="progress" title="정규시즌 진행률 ${h.progress}%"><i style="width:${h.progress}%"></i></div>`:''}
   </section>`;
 
@@ -1362,7 +1361,7 @@ function renderSquad(){
       <th>구위</th><th>제구</th><th>무브</th><th>체력</th>
       <th>G</th><th>GS</th><th>W</th><th>L</th><th>SV</th><th>HD</th><th>IP</th><th>SO</th><th>BB</th><th>ERA</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   }
-  return `<div class="card"><h3>${r.name} 스쿼드 <span class="tag">1군 엔트리 ${FM.entryCount(USER)}/${FM.ENTRY_MAX} · 능력치 1~20 (FM 스케일) · 선수 이름 클릭 시 상세 프로필</span></h3>${tabs}${body}</div>`;
+  return `${FM.fxCard()}<div class="card"><h3>${r.name} 스쿼드 <span class="tag">1군 엔트리 ${FM.entryCount(USER)}/${FM.ENTRY_MAX} · 능력치 1~20 (FM 스케일) · 선수 이름 클릭 시 상세 프로필</span></h3>${tabs}${body}</div>`;
 }
 
 const POS_OPTS=['C','1B','2B','3B','SS','LF','CF','RF','DH'];

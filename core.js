@@ -715,13 +715,20 @@ function restAdjust(teamId, cfg, opts){
 var PITCH_TYPES=[
   {k:'직구',base:147,sp:5},{k:'투심',base:144,sp:4},
   {k:'슬라이더',base:135,sp:5},{k:'커브',base:121,sp:5},
-  {k:'체인지업',base:130,sp:4},{k:'포크',base:132,sp:4}
+  {k:'체인지업',base:130,sp:4},{k:'포크',base:132,sp:4},
+  {k:'커터',base:140,sp:4},{k:'스위퍼',base:128,sp:4},{k:'스플리터',base:134,sp:4}
 ];
 function repertoire(pit){
   var seed=0; for(var i=0;i<pit.n.length;i++) seed+=pit.n.charCodeAt(i);
   var pool=[PITCH_TYPES[1],PITCH_TYPES[2],PITCH_TYPES[3],PITCH_TYPES[4],PITCH_TYPES[5]];
-  return [PITCH_TYPES[0], pool[seed%pool.length], pool[(seed+2)%pool.length]];
+  var r=[PITCH_TYPES[0], pool[seed%pool.length], pool[(seed+2)%pool.length]];
+  // pitches learned in training (p.np: names) join the mix
+  (pit.np||[]).forEach(function(k){ var t=PITCH_TYPES.filter(function(x){return x.k===k;})[0]; if(t&&r.indexOf(t)<0) r.push(t); });
+  return r;
 }
+// 보직 숙련도 0..100: his own role is 100; training (p.rs) raises the others
+var ROLE_BASE={SP:{SP:100,RP:60,CL:50}, RP:{SP:45,RP:100,CL:70}, CL:{SP:40,RP:90,CL:100}};
+function roleSkill(p,job){ var own=ROLE_BASE[p.role]||ROLE_BASE.RP, v=p.rs&&p.rs[job]; return Math.max(own[job]||50, v||0); }
 function pickType(pit){ var r=repertoire(pit); return rnd()<0.5? r[0] : r[1+Math.floor(rnd()*(r.length-1))]; }
 function pitchVelo(pit,t){ return Math.round(t.base + (pit.stu-70)*0.32 + (rnd()*2-1)*t.sp); }
 function locFor(res){
@@ -1043,6 +1050,9 @@ IP.prepareAB=function(){
   var mods=platoon(scoutMods(paMods(this.tac[off],this.tac[def],this.bases,this.outs,this.ex.bind(this,off),this.ex.bind(this,def)),this.know[off],this.know[def]),batName,this.pitcher[def]);
   mods=planMods(mods,(this.cfg[off].plans||{})[def],(this.cfg[def].plans||{})[off],batName,this.pitcher[def],bat,pit,this.know[off],this.know[def]);
   if(this.cfg[off].sharp){ var sb=clamp(((bat.sharp==null?70:bat.sharp)-70)/30,-1,1); mods.K-=0.006*sb; mods.HR+=0.001*sb; mods.BIP+=0.004*sb; }
+  // a pitcher working a job he isn't trained for (a reliever starting, a starter closing) pitches a little worse
+  { var job=this.pitcher[def]===this.sp[def]? 'SP' : this.pitcher[def]===this.cfg[def].closer? 'CL' : 'RP', rpen=(100-roleSkill(pit,job))/100;
+    if(rpen>0){ mods.K-=0.03*rpen; mods.BB+=0.02*rpen; mods.HR+=0.004*rpen; } }
   if(this.cfg[def].sharp){ var sp2=clamp(((pit.sharp==null?70:pit.sharp)-70)/30,-1,1); mods.K+=0.006*sp2; mods.HR-=0.001*sp2; mods.BIP-=0.004*sp2; }
   if(hr==='hitrun'){ mods.K-=0.012; mods.BIP+=0.012; mods.HR-=0.002; }
   else if(hr==='runhit'){ mods.K-=0.004; }
@@ -1173,7 +1183,9 @@ IP.result=function(){
 };
 
 // foreign-player flag for the quota (FOREIGN comes from the roster build; signings set p.f themselves)
-TEAM_IDS.forEach(function(t){ ROSTERS[t].batters.concat(ROSTERS[t].pitchers).forEach(function(p){ if(FOREIGN.indexOf(p.n)>=0) p.f=1; }); });
+// Asia quota (2026~): one player from Asia/Australia per club on top of the three foreign players
+var ASIA_Q = ["데일","웰스","왕옌청","타케다","오러클린","토다","스기모토","이이무라","타카다","유토"];
+TEAM_IDS.forEach(function(t){ ROSTERS[t].batters.concat(ROSTERS[t].pitchers).forEach(function(p){ if(FOREIGN.indexOf(p.n)>=0) p.f=1; if(ASIA_Q.indexOf(p.n)>=0) p.aq=1; }); });
 
 global.KBO = {
   ROSTERS:ROSTERS, TEAM_IDS:TEAM_IDS, LEAGUE:LEAGUE, ovr:ovr, simPA:simPA, simGame:simGame,
@@ -1181,7 +1193,7 @@ global.KBO = {
   newBatStat:newBatStat, newPitStat:newPitStat,
   getB:getB, getP:getP, InteractiveGame:InteractiveGame,
   cond:cond, mor:mor, isInjured:isInjured, applyFatigue:applyFatigue, restAdjust:restAdjust,
-  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf, handsOf:handsOf, posFitBase:posFitBase, SIGNS:SIGNS, planMods:planMods,
+  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf, handsOf:handsOf, repertoire:repertoire, roleSkill:roleSkill, PITCH_TYPES:PITCH_TYPES, ASIA_Q:ASIA_Q, posFitBase:posFitBase, SIGNS:SIGNS, planMods:planMods,
   POS_LIST:POS_LIST, posFit:posFit, fieldVal:fieldVal, teamDefense:teamDefense, autoPositions:autoPositions, positionIssues:positionIssues
 };
 

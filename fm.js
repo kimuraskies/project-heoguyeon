@@ -132,6 +132,7 @@ function ensure(){
   }
   if(state.fm.fans==null) state.fm.fans=50;
   if(!state.fm.farmV){ K.TEAM_IDS.forEach(seedFarm); state.fm.farmV=1; }
+  if(!state.fm.aqV){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(p=>{ if(p.f&&K.ASIA_Q.indexOf(p.n)>=0) p.aq=1; })); state.fm.aqV=1; }   // saves from before the Asia quota
   if(!state.fm.farmPayV){ const fin=state.fm.fin; if(fin) fin.budget=Math.round(fin.budget+farmOf(USER).reduce((a,p)=>a+(p.sal||0),0)*1.06); state.fm.farmPayV=1; }
 }
 
@@ -429,6 +430,7 @@ function onCareerStart(){
   ensure();
   { const f0=fm(); f0.firstYear=state.year; f0.guide={step:0, done:false}; }
   seedFAs();
+  K.TEAM_IDS.forEach(t=>fxQuotaFix(t));   // real records include mid-season replacements: extras start in the 2군
   send('구단 사무국','💾','세이브는 이 브라우저에만 저장됩니다','커리어는 자동으로 저장되지만, 이 기기의 이 브라우저 안에만 있습니다.\n브라우저 데이터를 지우거나 기기를 바꾸면 사라집니다.\n\n설정 → 세이브 관리에서 세이브 파일을 받아 두면 다른 기기에서도 이어서 할 수 있습니다.',[]);
   send('단장','🔥',`${state.year} 스토브리그가 시작됐습니다`, `개막까지 준비할 시간이 있습니다.\n\n• FA 시장과 외국인 선수 후보는 구단 탭에서\n• 트레이드는 트레이드 탭에서\n• 타순·로테이션은 라인업 탭, 팀 기본 전술은 팀 전술 탭에서\n• 전지훈련 방향을 정하면 스프링캠프 → 시범경기 ${SPRING_GAMES}경기 → 정규시즌 개막 순서로 진행됩니다.`, []);
   const bonus=(MGR_BG[state.user.bg]||MGR_BG.coach).mor;
@@ -544,7 +546,7 @@ function rtColor(r){ return r>=7.5?'#36c275':r>=6.8?'#9fd26b':r>=6.2?'#d6e2c4':r
 function callUp(t,type,pos){
   const f=farmOf(t);
   const off=entryCount(t)>=ENTRY_MAX? clearSpot(t,type) : null;
-  let p=f.filter(x=>x.type===type&&!K.isInjured(x)&&!(t===USER&&downLeft(x)))
+  let p=f.filter(x=>x.type===type&&!K.isInjured(x)&&!(t===USER&&downLeft(x))&&!(x.f&&!fxEntryRoom(t,x)))
     .filter(x=>x!==off).sort((a,b)=>(pos? (b.role===pos)-(a.role===pos) : 0) || K.ovr(b)-K.ovr(a))[0];
   if(p) doPromote(t,p);
   else { p=makeRookie(type,pos); ensurePlayer(p); if(type==='B') K.ROSTERS[t].batters.push(p); else K.ROSTERS[t].pitchers.push(p); }
@@ -822,7 +824,7 @@ function faYears(p){ return p.age>=34? 1 : p.age>=30? 2 : 3; }
 function addFA(p, from){ const f=fm(); f.fa=f.fa||[]; delete p.leaving; p.expiring=false; f.fa.push({p, ask:faAsk(p), yrs:faYears(p), from}); }
 function signFA(i){
   const f=fm(), x=(f.fa||[])[i]; if(!x) return;
-  if(x.p.f && foreignOf(USER).length>=FX_MAX){ notify('외국인 선수 정원(4명)이 찼습니다.'); return; }
+  if(x.p.f && !fxRoom(USER,x.p)){ notify(`${fxLabel(x.p)} 선수 정원(${fxCap(x.p)}명)이 찼습니다.`); return; }
   const limit=f.fin.budget*1.1, after=payroll(USER)+x.ask, bonus=Math.round(x.ask*x.yrs*0.25*10)/10;
   if(after>limit){ notify(`연봉 총액이 한도를 넘습니다 (${after.toFixed(1)}억 > ${limit.toFixed(1)}억). 다른 선수를 정리하거나 예산 범위의 선수를 찾으세요.`); return; }
   const p=x.p;
@@ -848,13 +850,29 @@ function aiSignFAs(){
   return gone;
 }
 
-// ---------- foreign players (quota 4 incl. Asian quota, two replacements a season) ----------
+// ---------- foreign players: 3 foreign + 1 Asia quota on the 1군, two replacements a season ----------
 const FX_NAMES=['로페즈','마르테','브리토','오도넬','헤이워드','카펜터','레예스','몬테로','갈비스','스탠튼','라미레스','클라크','파울러','밀러','앤더슨','톰슨','로저스','하퍼','크루즈','벨트레','마차도','가르시아','소토','베탄코트','플로레스','에반스','콜','브룩스','그레이','토레스'];
-const FX_MAX=4, FX_SWAPS=2;
+const FX_MAX=4, FX_F=3, FX_AQ=1, FX_SWAPS=2;
+const AQ_NAMES=['나카무라','야마다','사토','후지타','린','천','장','오카다','모리','쿡','왓슨','하라'];
 function foreignOf(t){ return allPlayers(t).concat(farmOf(t)).filter(p=>p.f); }
+function fxKind(p){ return p.aq? 'aq' : 'f'; }
+function fxLabel(p){ return p.aq? '아시아쿼터' : '외국인'; }
+function fxCap(p){ return p.aq? FX_AQ : FX_F; }
+// how many of each kind a club holds (whole club) or has on the 1군
+function fxCount(t,onEntry){ const L=onEntry? allPlayers(t).filter(p=>p.f) : foreignOf(t); return {f:L.filter(p=>!p.aq).length, aq:L.filter(p=>p.aq).length}; }
+// signing: room in that kind once `out` (if any) leaves. Real records can leave a club over the cap
+// (mid-season replacements); those extras sit in the 2군 and block new signings of that kind.
+function fxRoom(t,p,out){ const c=fxCount(t), k=fxKind(p); return c[k]-(out&&fxKind(out)===k?1:0) < fxCap(p); }
+function fxEntryRoom(t,p){ const c=fxCount(t,true); return c[fxKind(p)] < fxCap(p); }
+// keep the 1군 within 3 + 1: the weakest extras go down to the 2군
+function fxQuotaFix(t){ const r=K.ROSTERS[t], moved=[];
+  ['f','aq'].forEach(k=>{ const cap=k==='aq'?FX_AQ:FX_F, on=allPlayers(t).filter(p=>p.f&&fxKind(p)===k).sort((a,b)=>K.ovr(b)-K.ovr(a));
+    on.slice(cap).forEach(p=>{ if(entryProblem(t,[p],[])) return; const arr=p.type==='B'?r.batters:r.pitchers; arr.splice(arr.indexOf(p),1); farmOf(t).push(p); moved.push(p.n); }); });
+  if(moved.length&&state.cfgs&&state.cfgs[t]) repairCfg(t);
+  return moved; }
 // `used` is shared across one batch of candidates so two of them never get the same name
-function makeForeign(type, used, boost){
-  used=used||allNames(); let n=FX_NAMES.find(x=>!used.has(x)&&Math.random()<0.3)||FX_NAMES.find(x=>!used.has(x));
+function makeForeign(type, used, boost, aq){
+  used=used||allNames(); const NM=aq?AQ_NAMES:FX_NAMES; let n=NM.find(x=>!used.has(x)&&Math.random()<0.3)||NM.find(x=>!used.has(x));
   for(let i=0;!n||used.has(n);i++) n='외국인'+R(10,99)+(i>50?i:'');
   used.add(n);
   const age=R(25,32);
@@ -863,14 +881,15 @@ function makeForeign(type, used, boost){
     p={n, pos, age, con:R(66,84), pow:R(70,92), eye:R(60,80), spd:R(48,80), fld:R(58,80), arm:R(60,82), type:'B'}; }
   else { p={n, role:'SP', age, stu:R(70,86), ctl:R(64,82), mov:R(66,80), sta:R(72,88), type:'P'}; }
   if(boost) ['con','pow','eye','fld','stu','ctl','mov'].forEach(k=>{ if(p[k]) p[k]=Math.min(99,p[k]+boost); });
-  Object.assign(p,{f:1, yrs:1, mor:70, cond:100, inj:0, bench:0, pers:hash(n)%PERS.length});
-  p.sal=clampN(Math.round((4+Math.max(0,K.ovr(p)-70)*0.7+Math.random()*3)*10)/10, 5, 18);
+  if(aq){ ['con','pow','eye','fld','stu','ctl','mov'].forEach(k=>{ if(p[k]) p[k]=Math.max(40,p[k]-5); }); if(type==='P'&&Math.random()<0.5) p.role='RP'; }
+  Object.assign(p,{f:1, aq:aq?1:0, yrs:1, mor:70, cond:100, inj:0, bench:0, pers:hash(n)%PERS.length});
+  p.sal=aq? clampN(Math.round((1.5+Math.random()*1.4)*10)/10, 1, 3) : clampN(Math.round((4+Math.max(0,K.ovr(p)-70)*0.7+Math.random()*3)*10)/10, 5, 18);   // Asia quota pay is capped low
   return p;
 }
 function scoutList(){
   const f=fm(), ug=userGamesPlayed();
   if(!f.scout || f.scout.year!==state.year || ug-f.scout.ug>=20) { const used=allNames(); (f.fa||[]).forEach(x=>used.add(x.p.n));
-    f.scout={year:state.year, ug, list:(mgrBg().fx6?['P','P','P','B','B','B']:['P','P','B','B']).map(t=>makeForeign(t,used,mgrBg().fx6?3:0))}; }
+    f.scout={year:state.year, ug, list:(mgrBg().fx6?['P','P','P','B','B','B']:['P','P','B','B']).map(t=>makeForeign(t,used,mgrBg().fx6?3:0)).concat([makeForeign(Math.random()<0.6?'P':'B',used,mgrBg().fx6?3:0,true)])}; }
   return f.scout.list;
 }
 function fxWindowOpen(){ return state.phase==='stove' || (state.phase==='regular' && userGamesPlayed()<108); }
@@ -879,20 +898,19 @@ function fxPick(i){
   const cand=scoutList()[i]; if(!cand) return;
   if(!fxWindowOpen()){ notify('외국인 선수 교체는 스토브리그와 정규시즌 108경기 전까지만 가능합니다.'); return; }
   if(state.phase==='regular' && fxSwapsLeft()<=0){ notify('이번 시즌 외국인 선수 교체 횟수(2회)를 모두 썼습니다.'); return; }
-  const mine=foreignOf(USER);
+  const mine=foreignOf(USER).filter(p=>fxKind(p)===fxKind(cand)), room=fxRoom(USER,cand);
   const btn=p=>`<button class="btn" onclick="FM.fxSign(${i},'${q(p.n)}')">${esc(p.n)} 방출 <span class="muted">(${p.pos||p.role}·OVR ${K.ovr(p)}·잔여 위약금 ${Math.round(p.sal*0.5*10)/10}억)</span></button>`;
-  modal(`<span class="closeX" onclick="App.closeModal()">×</span><h2>🌏 ${esc(cand.n)} 영입</h2>
+  modal(`<span class="closeX" onclick="App.closeModal()">×</span><h2>🌏 ${esc(cand.n)} 영입 <span class="pill pos">${fxLabel(cand)}</span></h2>
     <div class="muted">${posFull(cand.pos||cand.role)} · ${cand.age}세 · OVR ${K.ovr(cand)} · 연봉 ${cand.sal}억 (계약금 ${Math.round(cand.sal*0.2*10)/10}억)</div>
-    <div class="hint" style="margin:10px 0">외국인 선수는 최대 ${FX_MAX}명입니다. 누구를 내보낼까요?</div>
-    <div class="grid" style="gap:8px">${mine.map(btn).join('')}
-    ${mine.length<FX_MAX?`<button class="btn primary" onclick="FM.fxSign(${i},'')">방출 없이 영입 (${mine.length}/${FX_MAX}명)</button>`:''}</div>`);
+    <div class="hint" style="margin:10px 0">외국인은 ${FX_F}명, 아시아쿼터는 ${FX_AQ}명까지 둘 수 있습니다. ${room?'자리가 있어 그대로 영입할 수 있습니다.':`${fxLabel(cand)} 자리가 찼습니다. 누구를 내보낼까요?`}</div>
+    <div class="grid" style="gap:8px">${room?`<button class="btn primary" onclick="FM.fxSign(${i},'')">방출 없이 영입</button>`:''}${mine.map(btn).join('')}</div>`);
 }
 function fxSign(i,outName){
   const f=fm(), cand=scoutList()[i]; if(!cand) return;
   const out=outName? findPlayer(USER,outName) : null;
   const limit=f.fin.budget*1.1, after=payroll(USER)-(out?out.sal:0)+cand.sal;
   if(after>limit){ notify(`연봉 총액이 한도를 넘습니다 (${after.toFixed(1)}억 > ${limit.toFixed(1)}억).`); return; }
-  if(!out && foreignOf(USER).length>=FX_MAX){ notify('외국인 선수 정원이 찼습니다.'); return; }
+  if(!fxRoom(USER,cand,out)){ notify(`${fxLabel(cand)} 자리가 찼습니다. 같은 구분의 선수를 내보내야 합니다.`); return; }
   const fee=Math.round((cand.sal*0.2 + (out?out.sal*0.5:0))*10)/10;
   if(allNames().has(cand.n)){ notify(`같은 이름의 선수(${cand.n})가 이미 리그에 있습니다. 다른 후보를 고르세요.`); return; }
   const r=K.ROSTERS[USER], onEntry=!!out && allPlayers(USER).indexOf(out)>=0;
@@ -1163,7 +1181,7 @@ function stoveTasks(){
   return [
     {done:!renew, t:'재계약 협상', d: renew? `미결 ${renew}건 (받은편지함)` : '완료', go:"App.tab('inbox')"},
     {done:false, opt:true, t:'FA 시장', d:`${(f.fa||[]).length}명 시장에 있음`, go:"App.tab('club')"},
-    {done:false, opt:true, t:'외국인 선수', d:`${foreignOf(USER).length}/${FX_MAX}명 · 스토브리그엔 교체 횟수 차감 없음`, go:"App.tab('club')"},
+    {done:false, opt:true, t:'외국인 선수', d:`외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 스토브리그엔 교체 횟수 차감 없음`, go:"App.tab('club')"},
     {done:false, opt:true, t:'트레이드', d:'다른 구단과 협상', go:"App.tab('trade')"},
     {done:!!(f.camp&&f.camp.year===state.year&&f.camp.focus), t:'이번 주 결정', d: offHero().title, go:"FM.offOpen()"},
     {done:!!state.cfgs[USER].tac, opt:true, t:'팀 기본 전술', d: state.cfgs[USER].tac? '설정됨' : '팀 전술 탭', go:"App.tab('tactics')"}
@@ -1321,7 +1339,7 @@ function offFill(o){ o.q=[];
 // other clubs sign a few free agents every week
 function offAiWeek(){ const f=fm(); (f.fa||[]).slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).forEach(x=>{ if(K.ovr(x.p)>=64&&Math.random()<0.22) offAiSign(x); }); }
 function offAiSign(x){ const f=fm(), p=x.p, t=K.TEAM_IDS.filter(t=>t!==USER).sort((a,b)=>teamStrength(a)-teamStrength(b))
-    .find(t=>(p.type==='B'?K.ROSTERS[t].batters.length<15:K.ROSTERS[t].pitchers.length<13)&&!(p.f&&foreignOf(t).length>=FX_MAX));
+    .find(t=>(p.type==='B'?K.ROSTERS[t].batters.length<15:K.ROSTERS[t].pitchers.length<13)&&!(p.f&&!fxRoom(t,p)));
   const i=f.fa.indexOf(x); if(i<0||!t) return null; f.fa.splice(i,1);
   p.sal=x.ask; p.yrs=x.yrs; ensurePlayer(p); (p.type==='B'?K.ROSTERS[t].batters:K.ROSTERS[t].pitchers).push(p); return t; }
 function faSign(x,b){ const f=fm(), p=x.p; f.fa.splice(f.fa.indexOf(x),1);
@@ -1394,6 +1412,7 @@ function campRunWeek(){
     const hurtNow=K.isInjured(p); let tot=0;
     if(!hurtNow) keys.forEach(k=>{ if(Math.random()>=chance) return; if(bumpWithin(p,k,1)){ tot++; const g=c.gain[p.n]||(c.gain[p.n]={}); g[k]=(g[k]||0)+1; } });
     if(p.type==='P'&&!hurtNow&&Math.random()<0.02*pl.fit*(p.age<=30?1:0.5)) bumpWithin(p,'sta',1);
+    if(!hurtNow&&p.type==='P') (pitTrainStep(p,c.focus==='pit'?2:1)||[]).forEach(x=>c.notes.push(x.jobDone? `${p.n}: ${JOB_L[x.jobDone]} 보직 숙련` : `${p.n}: ${x.pitchDone} 습득`));
     if(!hurtNow&&p.pt){ const ps=posTrainStep(p,c.focus==='def'?2:1); if(ps&&ps.done) c.notes.push(`${p.n}: ${ps.pos} 수비 습득`); }
     if(tot) gains.push(`${p.n} +${tot}`);
     const inj=0.004*Math.max(0,pl.fit+pl.skill-5)*(p.age>=30?1.5:1)*(1-pl.rest*0.25)*wear.inj*(mod.inj||1);
@@ -1481,7 +1500,7 @@ function offBoardAdj(met){ const o=fm().off; if(!o||o.year!==state.year) return 
 
 // ----- events -----
 const byOvr=(a,b)=>K.ovr(b)-K.ovr(a);
-function faTalk(o){ const f=fm(), room=budgetRoom(); const x=(f.fa||[]).filter(x=>o.talked.indexOf(x.p.n)<0&&!(x.p.f&&foreignOf(USER).length>=FX_MAX)).sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).find(x=>x.ask<=room+2)||null;
+function faTalk(o){ const f=fm(), room=budgetRoom(); const x=(f.fa||[]).filter(x=>o.talked.indexOf(x.p.n)<0&&!(x.p.f&&!fxRoom(USER,x.p))).sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).find(x=>x.ask<=room+2)||null;
   if(!x) return null; o.talked.push(x.p.n); const p=x.p, want=p.type==='B'? ['money','start','term'][hash(p.n)%3] : ['money','term','term'][hash(p.n)%3];
   const wl={money:'가장 좋은 대우를 원합니다',start:'주전 자리를 보장받고 싶어 합니다',term:'긴 계약 기간을 원합니다'}[want];
   const alt=want==='money'? {l:`연봉을 올려 확실히 잡는다 (${x.yrs}년 ${eok(x.ask*1.12)}억)`,d:'수락 가능성 높음 · 예산 부담'} : want==='start'? {l:`주전 보장을 약속한다 (${x.yrs}년 ${eok(x.ask*0.9)}억)`,d:'연봉 10% 절감 · 약속을 어기면 선수단 신뢰 하락'} : {l:`계약 기간을 늘려 준다 (${x.yrs+1}년 ${eok(x.ask*0.95)}억)`,d:'연봉 5% 절감 · 나이 들수록 부담'};
@@ -2562,9 +2581,17 @@ function dueLeft(m){ return m.due==null? null : m.due-clock(); }
 function dueTag(m){ const d=dueLeft(m); if(d==null||m.done) return '';
   if(state.phase==='stove') return '<span class="pill" style="background:var(--panel2);color:var(--dim)">시즌 중 기한</span>';
   return `<span class="pill" style="${d<=1?'background:rgba(224,85,106,.22);color:var(--bad)':'background:rgba(240,160,32,.2);color:var(--warn)'}">${d<=0?'오늘 마감':'D-'+d}</span>`; }
-function inboxCounts(){ const L=fm().inbox; return {decide:L.filter(m=>!m.done&&isDecision(m)).length, report:L.filter(m=>!isDecision(m)&&!m.read).length, auto:L.filter(m=>m.auto&&!m.read).length}; }
-function inboxLists(){ const f=fm(); return {decide:f.inbox.filter(m=>!m.done&&isDecision(m)).sort((x,y)=>(x.due==null?1e9:x.due)-(y.due==null?1e9:y.due)),
-    report:f.inbox.filter(m=>!isDecision(m)), auto:f.inbox.filter(m=>m.auto), all:f.inbox}; }
+function pendingDecisions(){ return fm().inbox.filter(m=>!m.done&&isDecision(m)).sort((x,y)=>(x.due==null?1e9:x.due)-(y.due==null?1e9:y.due)); }
+function inboxCounts(){ const L=fm().inbox; return {decide:pendingDecisions().length, unread:L.filter(m=>!m.read).length}; }
+// 전체 keeps unanswered decisions on top so they can't get lost under news
+function inboxLists(){ const f=fm(), open=pendingDecisions(); return {all:open.concat(f.inbox.filter(m=>open.indexOf(m)<0)), unread:f.inbox.filter(m=>!m.read||m.id===selMsg)}; }
+// the main progress buttons stop at an unanswered decision and open it instead
+function gate(){ if(!fm()) return false; const open=pendingDecisions(); if(!open.length) return false;
+  if(typeof Match!=='undefined'&&Match.closeResult) try{ Match.closeResult(); }catch(e){}
+  closeModal(); selMsg=open[0].id; inboxFilter='all'; open[0].read=true;
+  if(typeof App!=='undefined') App.tab('inbox'); else render();
+  notify(`결정이 필요한 메시지가 ${open.length}건 있습니다. 먼저 답해 주세요.`); return true; }
+function gateCta(html){ return (html||'').replace(/onclick="/,'onclick="if(FM.gate())return;'); }
 function renderInbox(){
   ensure();
   const f=fm(), c=inboxCounts(), lists=inboxLists();
@@ -2573,7 +2600,7 @@ function renderInbox(){
   if((selMsg==null||!list.some(m=>m.id===selMsg)) && list.length) selMsg=list[0].id;
   const sel=list.find(m=>m.id===selMsg);
   if(sel&&!sel.read) sel.read=true;
-  const empty={decide:'지금 결정할 메시지가 없습니다. 👍', report:'피드가 없습니다.', auto:'아직 담당자가 처리한 메시지가 없습니다.', all:'메시지가 없습니다.'}[inboxFilter];
+  const empty={unread:'읽지 않은 메시지가 없습니다. 👍', all:'메시지가 없습니다.'}[inboxFilter];
   const items=list.map(m=>`<div onclick="FM.openMsg(${m.id})" style="padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;${m.id===selMsg?'background:var(--panel2);':''}${m.read?'':'font-weight:700;'}">
       <div class="row" style="gap:6px;flex-wrap:nowrap"><span>${m.icon}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.subject)}</span>
       ${!m.done&&isDecision(m)? (dueTag(m)||'<span class="pill" style="background:rgba(240,160,32,.2);color:var(--warn)">결정</span>') : m.auto? '<span class="pill" style="background:var(--panel2);color:var(--dim)">🤖 자동</span>' : ''}</div>
@@ -2588,7 +2615,7 @@ function renderInbox(){
   const ft=(id,l,n)=>`<button class="${inboxFilter===id?'active':''}" onclick="FM.setInboxFilter('${id}')">${l}${n?` <b>${n}</b>`:''}</button>`;
   return `<div class="grid" style="grid-template-columns:minmax(260px,380px) 1fr;gap:14px" id="inboxgrid">
     <div class="card" style="padding:10px"><h3>📥 받은편지함 <span class="tag"><a href="javascript:void(0)" onclick="FM.delegPicker()" style="color:var(--dim)">⚙ 업무 분담</a> · <a href="javascript:void(0)" onclick="FM.markAllRead()" style="color:var(--dim)">모두 읽음</a></span></h3>
-      <div class="tabsm">${ft('all','전체')}${ft('report','피드',c.report)}${ft('decide','결정 필요',c.decide)}${ft('auto','자동 처리')}</div>
+      <div class="tabsm">${ft('all','전체',c.decide)}${ft('unread','읽지 않은 메시지',c.unread)}</div>
       <div style="max-height:620px;overflow:auto">${items}</div></div>
     <div class="card">${detail}</div></div>
     <style>@media(max-width:820px){#inboxgrid{grid-template-columns:1fr!important}}</style>`;
@@ -2659,7 +2686,7 @@ function dashTasks(){
   if(tired.length && !f.autoRest) out.push({ic:'lineup', t:`지친 주전 ${tired.length}명`, d:'수석코치 · '+tired.map(p=>p.n).join(', ')+' · 휴식 권장', a:'라인업 확인', go:"App.tab('lineup')"});
   if(state.phase==='stove'){
     if(!c.tac) out.push({ic:'settings', t:'팀 기본 전술 정하기', d:'팀 전술 탭 · 공격·수비·배터리 기본값', a:'전술 설정', go:"App.tab('tactics')"});
-    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 외국인 ${foreignOf(USER).length}/${FX_MAX}명 · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
+    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
   }
   if(!out.length && inj.length) out.push({ic:'injury', t:`부상자 ${inj.length}명 회복 중`, d:'의무팀 · '+inj.map(p=>`${p.n} (${p.inj})`).join(', '), a:'선수단 보기', go:"App.tab('squad')"});
   return out;
@@ -2720,15 +2747,8 @@ function renderTacticsTab(){
   return banner + `<div class="hint" style="margin-bottom:10px">여기서 정한 전술이 매 경기의 기본값입니다. 같은 전술을 오래 쓸수록 선수단 숙련도가 올라 효과가 커집니다.</div>`
     + tacticsCard('team');
 }
-function lineupCard(){
-  ensure();
-  const f=fm();
-  return `<div class="card" style="margin-top:14px"><h3>🩺 휴식 관리 <span class="tag">FM 스타일</span></h3>
-    <label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" ${f.autoRest?'checked':''} onchange="FM.setAutoRest(this.checked)">
-      코칭스태프에게 휴식 관리 맡기기 (컨디션 70% 미만 선수 자동 휴식, 부상자 자동 제외)</label>
-    <div class="hint" style="margin-top:6px">끄면 지친 선수도 그대로 출전합니다. 대신 수석코치가 받은편지함으로 경고를 보냅니다. 부상자는 항상 제외됩니다.
-      선수 프로필에서 "다음 경기 휴식"을 직접 지정할 수도 있습니다.${f.restNext.length?`<br>다음 경기 휴식 예정: <b>${f.restNext.join(', ')}</b>`:''}</div></div>`;
-}
+// rest management lives in 업무 분담 (수석코치); the lineup tab no longer repeats it
+function lineupCard(){ return ''; }
 
 // ---------- UI: club tab (board, finances, contracts) ----------
 function renderClub(){
@@ -2768,7 +2788,7 @@ function renderClub(){
 
 function marketCards(){
   const f=fm(), out=[];
-  const pRow=(p,extra,btn)=>`<tr><td class="name">${esc(p.n)}${p.f?' <span class="pill pos">외국인</span>':''}</td><td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td>
+  const pRow=(p,extra,btn)=>`<tr><td class="name">${esc(p.n)}${p.f?` <span class="pill pos">${fxLabel(p)}</span>`:''}</td><td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td>
     <td><span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span></td><td>${p.type==='B'?`컨${attrNum(p.con)} 파${attrNum(p.pow)} 선${attrNum(p.eye)} 수${attrNum(p.fld)}`:`구${attrNum(p.stu)} 제${attrNum(p.ctl)} 무${attrNum(p.mov)} 체${attrNum(p.sta)}`}</td><td>${extra}</td><td>${btn}</td></tr>`;
   if((f.fa||[]).length){
     const list=f.fa.map((x,i)=>({x,i})).sort((a,b)=>K.ovr(b.x.p)-K.ovr(a.x.p));
@@ -2777,8 +2797,8 @@ function marketCards(){
       ${list.map(({x,i})=>pRow(x.p, `${x.yrs}년 ${x.ask}억 <span class="muted">(전 ${esc(x.from)})</span>`, `<button class="btn" onclick="FM.signFA(${i})">계약</button>`)).join('')}</tbody></table></div></div>`);
   }
   const mine=foreignOf(USER), open=fxWindowOpen(), left=fxSwapsLeft();
-  out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">${mine.length}/${FX_MAX}명${mine.length>FX_MAX?' (실제 기록의 대체 선수 포함 · 영입 시 1명 방출)':''} · 교체 ${Math.max(0,left)}회 남음 · 108경기 전까지</span></h3>
-    <div class="muted" style="margin-bottom:8px">현재: ${mine.map(p=>`${esc(p.n)}(${p.pos||p.role}·${K.ovr(p)}·${p.sal}억)`).join(', ')||'없음'}</div>
+  out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 교체 ${Math.max(0,left)}회 남음 · 108경기 전까지</span></h3>
+    <div class="muted" style="margin-bottom:8px">현재: ${mine.map(p=>`${esc(p.n)}(${p.aq?'아시아쿼터 · ':''}${p.pos||p.role}·${K.ovr(p)}·${p.sal}억${isFarm(USER,p)?' · 2군':''})`).join(', ')||'없음'}</div>
     ${open&&(left>0||state.phase==='stove')? `<div style="overflow-x:auto"><table><thead><tr><th class="name">후보</th><th>POS</th><th>나이</th><th>OVR</th><th>능력</th><th>연봉</th><th></th></tr></thead><tbody>
       ${scoutList().map((p,i)=>pRow(p, `${p.sal}억`, `<button class="btn" onclick="FM.fxPick(${i})">영입</button>`)).join('')}</tbody></table></div>
       <div class="hint" style="margin-top:6px">스카우트 후보는 20경기마다 바뀝니다. 영입 시 연봉의 20% 계약금, 방출 선수는 연봉 절반을 위약금으로 냅니다.</div>`
@@ -2797,8 +2817,13 @@ function radar(vals, labels, color){
     ${[0.25,0.5,0.75,1].map(f=>`<polygon points="${ring(f)}" fill="none" stroke="var(--line)"/>`).join('')}
     <polygon points="${poly}" fill="${color}" fill-opacity=".28" stroke="${color}" stroke-width="2"/>${lbl}</svg>`;
 }
+// pitcher profile: 보직 숙련도 bars, then the pitches he throws (and the one he's learning)
+function pitcherJobs(p){
+  const bars=['SP','RP','CL'].map(j=>{ const v=K.roleSkill(p,j); return `<div class="job-row"><span>${JOB_L[j]}${j===p.role?' <small>주 보직</small>':''}${p.rt===j?' <small>훈련 중</small>':''}</span><div class="pt-bar"><i style="width:${v}%"></i></div><b>${v}%</b></div>`; }).join('');
+  const pit=K.repertoire(p).map(t=>`<span class="pill pos">${t.k}${(p.np||[]).indexOf(t.k)>=0?' · 새로 익힘':''}</span>`).join(' ');
+  return `<div class="job-list">${bars}</div><div class="muted" style="font-weight:700;margin:14px 0 6px">보유 구종</div><div class="row" style="gap:4px;flex-wrap:wrap">${pit}${p.pq&&p.pq.k?` <span class="pill" style="background:var(--panel2);color:var(--dim)">연마 중: ${p.pq.k} ${p.pq.pct||0}%</span>`:''}</div>`; }
 function posStars(p){
-  if(p.type!=='B') return `<span class="pill pos">${posFull(p.role)} ★★★</span>`;
+  if(p.type!=='B') return pitcherJobs(p);
   return ['C','1B','2B','3B','SS','LF','CF','RF','DH'].map(x=>{
     const fit=K.posFit(p,x), s = x===p.pos?3 : x==='DH'?2 : fit<=6?2 : 1;
     return `<span class="pill" style="background:${s===3?'rgba(54,194,117,.25)':s===2?'rgba(127,208,255,.15)':'var(--panel2)'};color:${s===3?'var(--good)':s===2?'#7fd0ff':'var(--dim)'}">${x} ${'★'.repeat(s)}</span>`;
@@ -2869,7 +2894,7 @@ function showProfile(team,name){
       <div style="width:64px;height:64px;border-radius:50%;background:conic-gradient(${ratColor(o)} ${o}%, var(--panel2) 0);display:flex;align-items:center;justify-content:center">
         <div style="width:52px;height:52px;border-radius:50%;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:${ratColor(o)}">${o}</div></div>
       <div style="flex:1;min-width:200px"><h2 style="margin:0">${esc(name)}${p.rookie?' <span class="pill pos">신인</span>':''}</h2>
-        <div class="muted">${teamDot(team)} ${K.ROSTERS[team].name}${farm?' <span class="chip">2군</span>':''} · ${p.age}세 · ${posFull(p.pos||p.role)}</div>
+        <div class="muted">${teamDot(team)} ${K.ROSTERS[team].name}${farm?' <span class="chip">2군</span>':''} · ${p.age}세 · ${posFull(p.pos||p.role)}</div>${p.dr?`<div class="muted" style="font-size:12px;margin-top:2px">${p.dy} 신인 드래프트 ${p.dr.r}라운드 · ${esc(p.dr.school)}${p.dr.team!==team?` · ${esc(p.dr.team)} 지명`:''}</div>`:''}
         <div class="muted" style="font-size:12px;margin-top:2px">성격: <b style="color:var(--txt)">${pers(p).k}</b> — ${pers(p).d}</div></div>
     </div>
     <div class="kpi" style="margin:14px 0">
@@ -2886,12 +2911,42 @@ function showProfile(team,name){
       <div>${attrs}<div class="hint">능력치 1~20 (FM 스케일) · 16+ 최상급, 11~15 준수, 6~10 평범, 5 이하 약점</div></div>
       <div style="text-align:center">${rad}</div></div>
     <style>@media(max-width:640px){#profgrid{grid-template-columns:1fr!important}}</style>
-    <div class="muted" style="font-weight:700;margin:12px 0 6px">포지션 적합도</div><div class="row" style="gap:4px">${posStars(p)}</div>
+    <div class="muted" style="font-weight:700;margin:12px 0 6px">${p.type==='P'?'보직 숙련도':'포지션 적합도'}</div>${p.type==='P'? posStars(p) : `<div class="row" style="gap:4px">${posStars(p)}</div>`}
     <div class="muted" style="font-weight:700;margin:14px 0 6px">최근 5경기 평점</div><div class="row" style="gap:4px">${form}</div>
     <div class="muted" style="font-weight:700;margin:14px 0 6px">${state.year} 시즌 성적</div>${statLine}`}
     ${actions}`);
 }
 
+// ---------- 2026 KBO 신인 드래프트 (2025-09-17) ----------
+// Each club's real draft class joins its 2군 at the start of a new career; ratings are the
+// game's own estimate from the draft round (no professional record yet).
+// Source: 나무위키 "2026 KBO 신인 드래프트" (read 2026-11-11). Not checked against the KBO's
+// official release. NC's second 4R pick (possibly 김건, listed under SSG there) is left out.
+// row: [round, name, 투/포/내/외, school]
+const DRAFT_2026={
+  '키움':[[1,'박준현','투','북일고'],[1,'박한결','내','전주고'],[2,'김지석','내','인천고'],[3,'박지성','투','서울고'],[4,'정다훈','투','청주고'],[4,'최재영','내','휘문고'],[5,'이태양','투','인천고'],[6,'최현우','투','배명고'],[7,'김태언','투','세광고'],[8,'박준건','투','부산고'],[9,'유정택','내','덕수고-고려대'],[10,'김주영','포','마산용마고'],[11,'김유빈','투','대구고']],
+  'NC':[[1,'신재인','내','유신고'],[2,'이희성','포','원주고'],[3,'김요엘','투','휘문고'],[3,'최요한','투','용인시야구단'],[4,'고준휘','외','전주고'],[5,'정튼튼','투','효천고-고려대'],[6,'안지원','외','부산고'],[7,'허윤','내','충암고'],[8,'윤성환','투','경기항공고-연세대'],[9,'김명규','내','장충고'],[10,'윤서현','투','서울동산고'],[11,'손민서','투','장충고']],
+  '한화':[[1,'오재원','외','유신고'],[2,'강건우','투','북일고'],[4,'최유빈','내','전주고-경성대'],[5,'권현규','내','경북고'],[6,'하동준','투','라온고'],[7,'여현승','투','대구고'],[8,'김준수','내','야탑고'],[9,'이재환','외','물금고'],[10,'박주진','외','대전고'],[11,'황희성','투','공주고']],
+  '롯데':[[1,'신동건','투','동산고'],[2,'박정민','투','장충고-한일장신대'],[3,'이서준','내','부산고'],[4,'김화중','투','덕수고'],[5,'김한홀','외','휘문고'],[6,'김한결','투','성남고'],[7,'이준서','투','유신고'],[8,'남해담','투','물금고'],[9,'정문혁','포','경남고'],[10,'이로화','내','광주제일고'],[11,'김현수','투','장충고']],
+  'SSG':[[1,'김민준','투','대구고'],[2,'김요셉','내','세광고'],[3,'장재율','외','광남고BC'],[5,'조재우','투','IMG 아카데미-센트럴플로리다대'],[6,'이승빈','외','경북고'],[7,'오시후','외','덕수고'],[8,'신상연','투','경남고'],[9,'김태현','투','광주진흥고'],[10,'김재훈','투','한광BC'],[11,'안재연','내','장충고-고려대']],
+  'KT':[[1,'박지훈','투','전주고'],[2,'이강민','내','유신고'],[3,'김건휘','내','충암고'],[4,'임상우','내','경기고-단국대'],[5,'고준혁','투','중앙고-동원과학기술대'],[6,'이재원','내','마산고'],[7,'김경환','외','배재고'],[8,'정현우','투','인천고'],[9,'이민준','투','휘문고'],[10,'김휘연','투','장안고'],[11,'김유빈','포','전주고']],
+  '두산':[[1,'김주오','외','마산용마고'],[2,'최주형','투','마산고'],[3,'서준오','투','동산고-한양대'],[4,'신우열','외','배재고-마이애미 데이드 칼리지'],[5,'이주호','투','경기항공고'],[6,'엄지민','외','공주고-동의과학대'],[7,'임종훈','투','상동고'],[8,'임현철','내','제물포고'],[9,'심건보','내','소래고-한양대'],[10,'남태웅','내','대구상원고'],[11,'정성헌','투','대전제일고']],
+  'LG':[[1,'양우진','투','경기항공고'],[2,'박준성','투','인천고'],[3,'우명현','투','부산고'],[4,'권우준','투','제물포고'],[5,'강민기','포','부산고'],[6,'주정환','내','덕수고-신안산대'],[7,'박현우','외','마산고-부산과학기술대'],[8,'이지백','내','대구고'],[9,'윤형민','투','배재고'],[10,'박성진','투','휘문고'],[11,'김동현','투','광주제일고-부산과학기술대']],
+  '삼성':[[1,'이호범','투','서울고'],[2,'김상호','투','서울컨벤션고'],[3,'장찬희','투','경남고'],[4,'이서준','투','인천고'],[5,'박용재','투','공주고'],[6,'정재훈','투','전주고'],[7,'이서준','포','성남고'],[8,'임주찬','내','광주동성고-송원대'],[9,'한수동','투','서울고'],[10,'황정현','투','제물포고'],[11,'박주영','투','경북고']],
+  'KIA':[[2,'김현수','투','광남고BC'],[3,'김민규','외','휘문고'],[5,'정찬화','투','청담고'],[6,'지현','투','제물포고'],[7,'박종혁','내','덕수고'],[8,'최유찬','투','아산BC'],[9,'한준희','내','인천고'],[10,'김상범','투','광주제일고-송원대'],[11,'이도훈','포','광주동성고']]
+};
+// a real draftee for club t: makeRookie's body, shaped by the round he went in
+function draftee(t,[rd,n,kind,school]){
+  const type=kind==='투'?'P':'B', h=hash(n+school);
+  const pos= kind==='포'? 'C' : kind==='내'? ['SS','2B','3B','1B'][h%4] : kind==='외'? ['CF','LF','RF'][h%3] : (rd<=3||h%5<2? 'SP':'RP');
+  const p=makeRookie(type,pos);
+  const uni=/대$|대학|칼리지|센트럴/.test(school)||school.indexOf('-')>=0&&!/BC$/.test(school);
+  const bump=rd===1? 8 : rd===2? 5 : rd<=4? 3 : rd<=7? 1 : -1;
+  Object.assign(p,{n, age:uni?22:19, college:uni, rookie:true, dy:2026, dr:{r:rd, school, team:t}, sal:rd===1?0.3:0.3, yrs:3});
+  (type==='B'?['con','pow','eye','spd','fld','arm']:['stu','ctl','mov']).forEach(k=>p[k]=clampN(p[k]+bump+(uni?2:0),35,85));
+  ensurePlayer(p); p.pot=Math.max(K.ovr(p)+4,Math.min(95-Math.round(rd*1.4),p.pot+Math.max(0,bump)));   // later rounds: lower ceiling p.pers=hash(n)%PERS.length;
+  return p;
+}
 // ---------- 리그 달력: 트레이드 마감 · 올스타 휴식기 · 신인 드래프트 ----------
 // The schedule has no dates, so game days are laid on a calendar: opening day 3/28, six game
 // days a week, and a four-day All-Star break from 7/10. That puts the 7/31 trade deadline
@@ -3034,9 +3089,16 @@ function entryProblem(t, outP, inP, who){
   return '';
 }
 // a new signing joins the 1군 when there is room, otherwise the farm
+// squad tab: the 1군's foreign slots at a glance
+function fxCard(){ const on=allPlayers(USER).filter(p=>p.f), off=farmOf(USER).filter(p=>p.f);
+  const slot=(p,lab)=>p? `<div class="fx-slot"><small>${lab}</small><b><a href="javascript:void(0)" onclick="FM.showProfile('${USER}','${q(p.n)}')">${esc(p.n)}</a></b><span>${posFull(p.pos||p.role)} · OVR ${K.ovr(p)}</span></div>` : `<div class="fx-slot empty"><small>${lab}</small><b>빈 자리</b><span>구단 탭에서 영입</span></div>`;
+  const F=on.filter(p=>!p.aq), A=on.filter(p=>p.aq);
+  return `<div class="card fx-card"><h3>🌏 1군 보유 외국인 선수 <span class="tag">외국인 ${F.length}/${FX_F} · 아시아쿼터 ${A.length}/${FX_AQ}</span></h3>
+    <div class="fx-slots">${[0,1,2].map(i=>slot(F[i],'외국인 '+(i+1))).join('')}${slot(A[0],'아시아쿼터')}</div>
+    ${off.length?`<p class="hint" style="margin:8px 0 0">2군: ${off.map(p=>`${esc(p.n)}(${fxLabel(p)})`).join(', ')}. 1군 자리가 비어야 올릴 수 있습니다.</p>`:''}</div>`; }
 function joinClub(t,p){
   const r=K.ROSTERS[t];
-  if(entryCount(t)<ENTRY_MAX){ (p.type==='B'?r.batters:r.pitchers).push(p); return '1군'; }
+  if(entryCount(t)<ENTRY_MAX && !(p.f&&!fxEntryRoom(t,p))){ (p.type==='B'?r.batters:r.pitchers).push(p); return '1군'; }
   farmOf(t).push(p); return '2군';
 }
 // an injured player goes off the entry to make room for a call-up
@@ -3065,6 +3127,9 @@ function fillFarm(t){
 function seedFarm(t){
   const used=allNames(), f=farmOf(t);
   ((window.KBO_FARM||{})[t]||[]).forEach(row=>{ if(used.has(row[0])) return; f.push(farmFromRow(row)); used.add(row[0]); });
+  // the club's real 2026 draft class; a draftee already in the farm data just gets his draft info, a namesake elsewhere is skipped
+  (DRAFT_2026[t]||[]).forEach(row=>{ const had=f.find(p=>p.n===row[1]); if(had){ Object.assign(had,{rookie:true, dy:2026, dr:{r:row[0], school:row[3], team:t}}); return; }
+    if(used.has(row[1])) return; f.push(draftee(t,row)); used.add(row[1]); });
   fillFarm(t);
 }
 // a Futures club needs nine healthy bats, five healthy arms and a healthy starter; the
@@ -3116,6 +3181,7 @@ function promoteBlock(p){
   if(K.isInjured(p)) return `부상 중인 선수는 1군에 등록할 수 없습니다 (회복 ${p.inj}경기).`;
   if(entryCount(USER)>=ENTRY_MAX) return `1군 엔트리가 가득 찼습니다 (${ENTRY_MAX}명). 먼저 다른 선수를 2군으로 내리세요.`;
   const left=downLeft(p); if(left) return `말소 후 ${DOWN_GAMES}경기가 지나야 다시 등록할 수 있습니다 (${left}경기 남음).`;
+  if(p.f&&!fxEntryRoom(USER,p)) return `1군 ${fxLabel(p)} 자리(${fxCap(p)}명)가 찼습니다. 먼저 다른 ${fxLabel(p)} 선수를 2군으로 내리세요.`;
   return '';
 }
 function doPromote(t,p){
@@ -3191,7 +3257,9 @@ function offseasonFarm(t){
   while(r.batters.length<MIN_1B) lift('B');
   while(r.pitchers.filter(p=>p.role==='SP').length<5) lift('P','SP');
   while(r.pitchers.length<MIN_1P) lift('P');
-  const cut=[]; while(f.length>FARM_CAP){ let w=0; f.forEach((p,i)=>{ if(playerValue(p)<playerValue(f[w])) w=i; }); cut.push(f.splice(w,1)[0].n); }
+  // a draftee gets his first two seasons before he can be cut
+  const cut=[], keep=p=>p.dy&&state.year-p.dy<2;
+  while(f.length>FARM_CAP){ const pool=f.filter(p=>!keep(p)); if(!pool.length) break; let w=pool[0]; pool.forEach(p=>{ if(playerValue(p)<playerValue(w)) w=p; }); f.splice(f.indexOf(w),1); cut.push(w.n); }
   fillFarm(t);
   return {draft:draft.filter(p=>f.indexOf(p)>=0), up, retired, cut};
 }
@@ -3229,14 +3297,23 @@ function posGain(p,pos,mult){ const base=K.posFitBase? K.posFitBase(p,pos) : 10,
 function posTrainStep(p,mult){ const pos=p.pt; if(!pos||p.type!=='B'||pos===p.pos) return null; p.pp=p.pp||{};
   const was=p.pp[pos]||0; p.pp[pos]=Math.min(100,was+posGain(p,pos,mult));
   if(p.pp[pos]>=100){ p.pt=null; return {n:p.n,pos,done:true}; } return {n:p.n,pos,pct:p.pp[pos]}; }
+// pitchers: work toward another job (p.rt: SP/RP/CL, progress in p.rs) or a new pitch (p.pq={k,pct})
+const JOB_L={SP:'선발',RP:'중계',CL:'마무리'};
+function pitGain(p,mult,hard){ const ageF=p.age<=25?1.3:p.age<=30?1:0.6; return Math.max(1,Math.round((hard?9:12)*ageF*coachMult(coachQOf('pit'))*(mult||1))); }
+function pitTrainStep(p,mult){ if(p.type!=='P') return null; const out=[];
+  if(p.rt&&p.rt!==p.role){ p.rs=p.rs||{}; const was=K.roleSkill(p,p.rt); p.rs[p.rt]=Math.min(100,was+pitGain(p,mult)); if(p.rs[p.rt]>=100){ out.push({n:p.n, jobDone:p.rt}); p.rt=null; } }
+  if(p.pq&&p.pq.k){ p.pq.pct=Math.min(100,(p.pq.pct||0)+pitGain(p,mult,true));
+    if(p.pq.pct>=100){ const k=p.pq.k; p.np=(p.np||[]).concat([k]); p.pq=null; bumpWithin(p,'mov',2); out.push({n:p.n, pitchDone:k}); } }
+  return out; }
 function trainingTick(){
   const f=fm(); f.trLog=f.trLog||[];
   allPlayers(USER).concat(farmOf(USER)).forEach(p=>{
     if(K.isInjured(p)) return;
     const tr=trOf(p), I=TR_INT[tr.i], keys=TR_FOCUS[p.type][tr.f].k;
     const ps=posTrainStep(p,I.g); if(ps&&ps.done) f.trLog.push({n:p.n, posDone:ps.pos, farm:isFarm(USER,p)});
+    (pitTrainStep(p,I.g)||[]).forEach(x=>f.trLog.push(Object.assign(x,{farm:isFarm(USER,p)})));
     // a focused plan puts every gain into its attributes and lands a little more often; position work takes some of the time
-    if(Math.random()<growChance(USER,p)*(tr.f==='bal'?1:1.15)*(p.pt?0.8:1)){
+    if(Math.random()<growChance(USER,p)*(tr.f==='bal'?1:1.15)*(p.pt||p.rt||(p.pq&&p.pq.k)?0.8:1)){
       const room=keys.filter(k=>p[k]<99), k=room[Math.floor(Math.random()*room.length)], was=K.ovr(p);
       if(k){ p[k]++; }
       // potential is a ceiling: a point that would carry him past it doesn't stick
@@ -3251,20 +3328,30 @@ function trainingReport(){
   const f=fm(), log=f.trLog||[]; f.trLog=[];
   if(!log.length) return;
   const by={}; log.filter(x=>x.k).forEach(x=>{ (by[x.n]=by[x.n]||{farm:x.farm,ks:[]}).ks.push(ATTR_KO[x.k]); });
-  const hurt=log.filter(x=>x.hurt), learned=log.filter(x=>x.posDone);
+  const hurt=log.filter(x=>x.hurt), learned=log.filter(x=>x.posDone), jobs=log.filter(x=>x.jobDone), pitches=log.filter(x=>x.pitchDone);
   const lines=Object.entries(by).map(([n,v])=>`• ${n}${v.farm?' (2군)':''}: ${v.ks.map(k=>k+' +1').join(', ')}`);
   const busy=allPlayers(USER).concat(farmOf(USER)).filter(p=>p.pt).map(p=>`${p.n} ${p.pt} ${Math.round((p.pp&&p.pp[p.pt])||0)}%`);
   send('육성 코치','📈',`훈련 리포트: ${Object.keys(by).length}명 성장${learned.length?` · 포지션 습득 ${learned.length}명`:''}${hurt.length?` · 훈련 중 부상 ${hurt.length}명`:''}`,
     `최근 ${TR_REPORT}경기 동안의 훈련 성과입니다.\n\n${lines.join('\n')||'눈에 띄는 성장 없음'}`+
     (learned.length? `\n\n포지션 습득: ${learned.map(x=>`${x.n} → ${x.posDone}`).join(', ')}. 이제 그 자리에서도 수비 페널티가 거의 없습니다.` : '')+
     (busy.length? `\n\n포지션 훈련 중: ${busy.join(', ')}` : '')+
+    (jobs.length? `\n\n보직 숙련 완료: ${jobs.map(x=>`${x.n} → ${JOB_L[x.jobDone]}`).join(', ')}` : '')+
+    (pitches.length? `\n\n새 구종 습득: ${pitches.map(x=>`${x.n} ${x.pitchDone}`).join(', ')}` : '')+
     (hurt.length? `\n\n강도 높은 훈련 중 부상: ${hurt.map(x=>`${x.n} (${x.hurt}경기)`).join(', ')}` : '')+
     `\n\n훈련 탭에서 선수별 초점과 강도를 바꿀 수 있습니다.`, []);
 }
 function setTrain(n,key,v){ const p=findPlayer(USER,n); if(!p) return; p.tr=Object.assign(trOf(p),{[key]:v}); render(); }
 const POS_LIST=['C','1B','2B','3B','SS','LF','CF','RF'];
 function setPosTrain(n,pos){ const p=findPlayer(USER,n); if(!p||p.type!=='B') return; p.pt=pos||null; if(pos) notify(josa(`${n}이(가) ${pos} 수비 훈련을 시작합니다. 지금 숙련 ${Math.round((p.pp&&p.pp[pos])||0)}%`)); render(); }
-function posTrainCell(p){ if(p.type!=='B'||p.pos==='DH') return '<span class="muted">-</span>';
+function setJobTrain(n,job){ const p=findPlayer(USER,n); if(!p||p.type!=='P') return; p.rt=job||null; if(job) notify(josa(`${n}이(가) ${JOB_L[job]} 보직 훈련을 시작합니다. 지금 숙련 ${K.roleSkill(p,job)}%`)); render(); }
+function setPitchTrain(n,k){ const p=findPlayer(USER,n); if(!p||p.type!=='P') return; p.pq=k? {k, pct:(p.pq&&p.pq.k===k? p.pq.pct : 0)} : null; if(k) notify(josa(`${n}이(가) ${k} 연마를 시작합니다`)); render(); }
+function jobTrainCell(p){ const cur=p.rt||'', jobs=['SP','RP','CL'].filter(j=>j!==p.role&&K.roleSkill(p,j)<100);
+  const opts=jobs.map(j=>`<option value="${j}" ${j===cur?'selected':''}>${JOB_L[j]} (${K.roleSkill(p,j)}%)</option>`).join('');
+  return `<select aria-label="${esc(p.n)} 보직 훈련" onchange="FM.setJobTrain('${q(p.n)}',this.value)"><option value="">없음</option>${opts}</select>${cur?`<div class="pt-bar"><i style="width:${K.roleSkill(p,cur)}%"></i></div><small class="muted">${JOB_L[cur]} 숙련 ${K.roleSkill(p,cur)}%</small>`:''}`; }
+function pitchTrainCell(p){ if(p.type!=='P') return '<span class="muted">-</span>';
+  const have=K.repertoire(p).map(t=>t.k), cur=p.pq&&p.pq.k||'', opts=K.PITCH_TYPES.map(t=>t.k).filter(k=>have.indexOf(k)<0).map(k=>`<option value="${k}" ${k===cur?'selected':''}>${k}</option>`).join('');
+  return `<select aria-label="${esc(p.n)} 신규 구종" onchange="FM.setPitchTrain('${q(p.n)}',this.value)"><option value="">없음</option>${opts}</select>${cur?`<div class="pt-bar"><i style="width:${p.pq.pct||0}%"></i></div><small class="muted">${cur} ${p.pq.pct||0}%</small>`:''}`; }
+function posTrainCell(p){ if(p.type==='P') return jobTrainCell(p); if(p.pos==='DH') return '<span class="muted">-</span>';
   const cur=p.pt||'', pct=k=>Math.round((p.pp&&p.pp[k])||0), done=k=>p.alt===k||pct(k)>=100;
   const opts=POS_LIST.filter(k=>k!==p.pos&&!done(k)).map(k=>`<option value="${k}" ${k===cur?'selected':''}>${k}${pct(k)?` (${pct(k)}%)`:''}</option>`).join('');
   const learned=POS_LIST.filter(k=>k!==p.pos&&done(k));
@@ -3295,6 +3382,7 @@ function renderTraining(){
       <td><select aria-label="${esc(p.n)} 훈련 초점" onchange="FM.setTrain('${q(p.n)}','f',this.value)">${opt(TR_FOCUS[p.type],tr.f)}</select></td>
       <td><select aria-label="${esc(p.n)} 훈련 강도" onchange="FM.setTrain('${q(p.n)}','i',this.value)">${opt(TR_INT,tr.i)}</select></td>
       <td class="pt-cell">${posTrainCell(p)}</td>
+      <td class="pt-cell">${pitchTrainCell(p)}</td>
       <td>${g?`<b class="win">+${g}</b>`:'<span class="muted">-</span>'}</td></tr>`; }).join('');
   const recent=allPlayers(USER).concat(farmOf(USER)).flatMap(p=>(p.grow||[]).filter(g=>g[0]===state.year).map(g=>[p,g[1]]));
   const top=Object.values(recent.reduce((a,[p,k])=>{ (a[p.n]=a[p.n]||{p,n:0}).n++; return a; },{})).sort((a,b)=>b.n-a.n).slice(0,5);
@@ -3303,10 +3391,10 @@ function renderTraining(){
     <div class="section-head"><div><p class="eyebrow">Player development</p><h2>육성 · 훈련</h2></div>
       <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn btn-sm" onclick="FM.setTrainAll('f')">약점 보완 자동 설정</button>
         <button class="btn btn-sm" onclick="FM.setTrainAll('i','light')">전원 가볍게</button><button class="btn btn-sm" onclick="FM.setTrainAll('i','normal')">전원 보통</button><button class="btn btn-sm" onclick="FM.setTrainAll('i','hard')">전원 강하게</button></div></div>
-    <p class="hint" style="margin:10px 0 0">정규시즌 ${TR_EVERY}경기마다 훈련 효과가 반영되고, ${TR_REPORT}경기마다 육성 코치가 리포트를 보냅니다. 성장 가능성은 <b>나이</b>, <b>잠재력까지 남은 여유</b>, <b>출전 기회</b>(2군에서 매일 뛰면 ↑, 1군 벤치에 오래 있으면 ↓), <b>훈련 강도</b>로 정해집니다. 강하게 하면 빨리 크지만 컨디션이 떨어지고 가끔 다칩니다. 야수는 <b>포지션 훈련</b>으로 다른 자리 수비를 익힐 수 있습니다. 숙련이 오를수록 그 자리 수비 페널티가 줄고, 100%가 되면 제2 포지션이 됩니다(포수가 가장 오래 걸리고, 젊을수록·수비 코치가 좋을수록 빠름).</p>
+    <p class="hint" style="margin:10px 0 0">정규시즌 ${TR_EVERY}경기마다 훈련 효과가 반영되고, ${TR_REPORT}경기마다 육성 코치가 리포트를 보냅니다. 성장 가능성은 <b>나이</b>, <b>잠재력까지 남은 여유</b>, <b>출전 기회</b>(2군에서 매일 뛰면 ↑, 1군 벤치에 오래 있으면 ↓), <b>훈련 강도</b>로 정해집니다. 강하게 하면 빨리 크지만 컨디션이 떨어지고 가끔 다칩니다. 야수는 <b>포지션 훈련</b>으로 다른 자리 수비를 익힐 수 있습니다. 숙련이 오를수록 그 자리 수비 페널티가 줄고, 100%가 되면 제2 포지션이 됩니다(포수가 가장 오래 걸리고, 젊을수록·수비 코치가 좋을수록 빠름). 투수는 <b>보직 훈련</b>(선발·중계·마무리 숙련도)과 <b>신규 구종</b>을 익힐 수 있습니다. 숙련이 낮은 보직에 쓰면 그만큼 공이 덜 위력적이고, 새 구종을 익히면 무브먼트가 오릅니다.</p>
     ${top.length? `<div class="brief-line" style="flex-wrap:wrap">${icon('morale-up')}<span>${state.year} 성장 TOP: ${top.map(x=>`<b>${esc(x.p.n)}</b> +${x.n}`).join(' · ')}</span></div>` : ''}
     <div class="tabsm" style="margin-top:14px">${filt.map(([k,l])=>`<button class="${trFilter===k?'active':''}" onclick="FM.setTrFilter('${k}')">${l}</button>`).join('')}</div>
-    <div style="overflow-x:auto"><table class="stat-table"><thead><tr><th>선수</th><th>소속</th><th>POS</th><th>나이</th><th>OVR</th><th>잠재력</th><th>성장 가능성</th><th>훈련 초점</th><th>강도</th><th>포지션 훈련</th><th>${state.year} 성장</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="overflow-x:auto"><table class="stat-table"><thead><tr><th>선수</th><th>소속</th><th>POS</th><th>나이</th><th>OVR</th><th>잠재력</th><th>성장 가능성</th><th>훈련 초점</th><th>강도</th><th>포지션·보직 훈련</th><th>신규 구종</th><th>${state.year} 성장</th></tr></thead><tbody>${rows}</tbody></table></div>
   </div>`;
 }
 // squad tab, 2군 view
@@ -3326,7 +3414,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,

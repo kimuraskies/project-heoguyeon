@@ -26,9 +26,17 @@ function dueLeft(m){ return m.due==null? null : m.due-clock(); }
 function dueTag(m){ const d=dueLeft(m); if(d==null||m.done) return '';
   if(state.phase==='stove') return '<span class="pill" style="background:var(--panel2);color:var(--dim)">시즌 중 기한</span>';
   return `<span class="pill" style="${d<=1?'background:rgba(224,85,106,.22);color:var(--bad)':'background:rgba(240,160,32,.2);color:var(--warn)'}">${d<=0?'오늘 마감':'D-'+d}</span>`; }
-function inboxCounts(){ const L=fm().inbox; return {decide:L.filter(m=>!m.done&&isDecision(m)).length, report:L.filter(m=>!isDecision(m)&&!m.read).length, auto:L.filter(m=>m.auto&&!m.read).length}; }
-function inboxLists(){ const f=fm(); return {decide:f.inbox.filter(m=>!m.done&&isDecision(m)).sort((x,y)=>(x.due==null?1e9:x.due)-(y.due==null?1e9:y.due)),
-    report:f.inbox.filter(m=>!isDecision(m)), auto:f.inbox.filter(m=>m.auto), all:f.inbox}; }
+function pendingDecisions(){ return fm().inbox.filter(m=>!m.done&&isDecision(m)).sort((x,y)=>(x.due==null?1e9:x.due)-(y.due==null?1e9:y.due)); }
+function inboxCounts(){ const L=fm().inbox; return {decide:pendingDecisions().length, unread:L.filter(m=>!m.read).length}; }
+// 전체 keeps unanswered decisions on top so they can't get lost under news
+function inboxLists(){ const f=fm(), open=pendingDecisions(); return {all:open.concat(f.inbox.filter(m=>open.indexOf(m)<0)), unread:f.inbox.filter(m=>!m.read||m.id===selMsg)}; }
+// the main progress buttons stop at an unanswered decision and open it instead
+function gate(){ if(!fm()) return false; const open=pendingDecisions(); if(!open.length) return false;
+  if(typeof Match!=='undefined'&&Match.closeResult) try{ Match.closeResult(); }catch(e){}
+  closeModal(); selMsg=open[0].id; inboxFilter='all'; open[0].read=true;
+  if(typeof App!=='undefined') App.tab('inbox'); else render();
+  notify(`결정이 필요한 메시지가 ${open.length}건 있습니다. 먼저 답해 주세요.`); return true; }
+function gateCta(html){ return (html||'').replace(/onclick="/,'onclick="if(FM.gate())return;'); }
 function renderInbox(){
   ensure();
   const f=fm(), c=inboxCounts(), lists=inboxLists();
@@ -37,7 +45,7 @@ function renderInbox(){
   if((selMsg==null||!list.some(m=>m.id===selMsg)) && list.length) selMsg=list[0].id;
   const sel=list.find(m=>m.id===selMsg);
   if(sel&&!sel.read) sel.read=true;
-  const empty={decide:'지금 결정할 메시지가 없습니다. 👍', report:'피드가 없습니다.', auto:'아직 담당자가 처리한 메시지가 없습니다.', all:'메시지가 없습니다.'}[inboxFilter];
+  const empty={unread:'읽지 않은 메시지가 없습니다. 👍', all:'메시지가 없습니다.'}[inboxFilter];
   const items=list.map(m=>`<div onclick="FM.openMsg(${m.id})" style="padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;${m.id===selMsg?'background:var(--panel2);':''}${m.read?'':'font-weight:700;'}">
       <div class="row" style="gap:6px;flex-wrap:nowrap"><span>${m.icon}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.subject)}</span>
       ${!m.done&&isDecision(m)? (dueTag(m)||'<span class="pill" style="background:rgba(240,160,32,.2);color:var(--warn)">결정</span>') : m.auto? '<span class="pill" style="background:var(--panel2);color:var(--dim)">🤖 자동</span>' : ''}</div>
@@ -52,7 +60,7 @@ function renderInbox(){
   const ft=(id,l,n)=>`<button class="${inboxFilter===id?'active':''}" onclick="FM.setInboxFilter('${id}')">${l}${n?` <b>${n}</b>`:''}</button>`;
   return `<div class="grid" style="grid-template-columns:minmax(260px,380px) 1fr;gap:14px" id="inboxgrid">
     <div class="card" style="padding:10px"><h3>📥 받은편지함 <span class="tag"><a href="javascript:void(0)" onclick="FM.delegPicker()" style="color:var(--dim)">⚙ 업무 분담</a> · <a href="javascript:void(0)" onclick="FM.markAllRead()" style="color:var(--dim)">모두 읽음</a></span></h3>
-      <div class="tabsm">${ft('all','전체')}${ft('report','피드',c.report)}${ft('decide','결정 필요',c.decide)}${ft('auto','자동 처리')}</div>
+      <div class="tabsm">${ft('all','전체',c.decide)}${ft('unread','읽지 않은 메시지',c.unread)}</div>
       <div style="max-height:620px;overflow:auto">${items}</div></div>
     <div class="card">${detail}</div></div>
     <style>@media(max-width:820px){#inboxgrid{grid-template-columns:1fr!important}}</style>`;
@@ -123,7 +131,7 @@ function dashTasks(){
   if(tired.length && !f.autoRest) out.push({ic:'lineup', t:`지친 주전 ${tired.length}명`, d:'수석코치 · '+tired.map(p=>p.n).join(', ')+' · 휴식 권장', a:'라인업 확인', go:"App.tab('lineup')"});
   if(state.phase==='stove'){
     if(!c.tac) out.push({ic:'settings', t:'팀 기본 전술 정하기', d:'팀 전술 탭 · 공격·수비·배터리 기본값', a:'전술 설정', go:"App.tab('tactics')"});
-    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 외국인 ${foreignOf(USER).length}/${FX_MAX}명 · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
+    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
   }
   if(!out.length && inj.length) out.push({ic:'injury', t:`부상자 ${inj.length}명 회복 중`, d:'의무팀 · '+inj.map(p=>`${p.n} (${p.inj})`).join(', '), a:'선수단 보기', go:"App.tab('squad')"});
   return out;
@@ -184,15 +192,8 @@ function renderTacticsTab(){
   return banner + `<div class="hint" style="margin-bottom:10px">여기서 정한 전술이 매 경기의 기본값입니다. 같은 전술을 오래 쓸수록 선수단 숙련도가 올라 효과가 커집니다.</div>`
     + tacticsCard('team');
 }
-function lineupCard(){
-  ensure();
-  const f=fm();
-  return `<div class="card" style="margin-top:14px"><h3>🩺 휴식 관리 <span class="tag">FM 스타일</span></h3>
-    <label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" ${f.autoRest?'checked':''} onchange="FM.setAutoRest(this.checked)">
-      코칭스태프에게 휴식 관리 맡기기 (컨디션 70% 미만 선수 자동 휴식, 부상자 자동 제외)</label>
-    <div class="hint" style="margin-top:6px">끄면 지친 선수도 그대로 출전합니다. 대신 수석코치가 받은편지함으로 경고를 보냅니다. 부상자는 항상 제외됩니다.
-      선수 프로필에서 "다음 경기 휴식"을 직접 지정할 수도 있습니다.${f.restNext.length?`<br>다음 경기 휴식 예정: <b>${f.restNext.join(', ')}</b>`:''}</div></div>`;
-}
+// rest management lives in 업무 분담 (수석코치); the lineup tab no longer repeats it
+function lineupCard(){ return ''; }
 
 // ---------- UI: club tab (board, finances, contracts) ----------
 function renderClub(){
@@ -232,7 +233,7 @@ function renderClub(){
 
 function marketCards(){
   const f=fm(), out=[];
-  const pRow=(p,extra,btn)=>`<tr><td class="name">${esc(p.n)}${p.f?' <span class="pill pos">외국인</span>':''}</td><td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td>
+  const pRow=(p,extra,btn)=>`<tr><td class="name">${esc(p.n)}${p.f?` <span class="pill pos">${fxLabel(p)}</span>`:''}</td><td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td>
     <td><span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span></td><td>${p.type==='B'?`컨${attrNum(p.con)} 파${attrNum(p.pow)} 선${attrNum(p.eye)} 수${attrNum(p.fld)}`:`구${attrNum(p.stu)} 제${attrNum(p.ctl)} 무${attrNum(p.mov)} 체${attrNum(p.sta)}`}</td><td>${extra}</td><td>${btn}</td></tr>`;
   if((f.fa||[]).length){
     const list=f.fa.map((x,i)=>({x,i})).sort((a,b)=>K.ovr(b.x.p)-K.ovr(a.x.p));
@@ -241,8 +242,8 @@ function marketCards(){
       ${list.map(({x,i})=>pRow(x.p, `${x.yrs}년 ${x.ask}억 <span class="muted">(전 ${esc(x.from)})</span>`, `<button class="btn" onclick="FM.signFA(${i})">계약</button>`)).join('')}</tbody></table></div></div>`);
   }
   const mine=foreignOf(USER), open=fxWindowOpen(), left=fxSwapsLeft();
-  out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">${mine.length}/${FX_MAX}명${mine.length>FX_MAX?' (실제 기록의 대체 선수 포함 · 영입 시 1명 방출)':''} · 교체 ${Math.max(0,left)}회 남음 · 108경기 전까지</span></h3>
-    <div class="muted" style="margin-bottom:8px">현재: ${mine.map(p=>`${esc(p.n)}(${p.pos||p.role}·${K.ovr(p)}·${p.sal}억)`).join(', ')||'없음'}</div>
+  out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 교체 ${Math.max(0,left)}회 남음 · 108경기 전까지</span></h3>
+    <div class="muted" style="margin-bottom:8px">현재: ${mine.map(p=>`${esc(p.n)}(${p.aq?'아시아쿼터 · ':''}${p.pos||p.role}·${K.ovr(p)}·${p.sal}억${isFarm(USER,p)?' · 2군':''})`).join(', ')||'없음'}</div>
     ${open&&(left>0||state.phase==='stove')? `<div style="overflow-x:auto"><table><thead><tr><th class="name">후보</th><th>POS</th><th>나이</th><th>OVR</th><th>능력</th><th>연봉</th><th></th></tr></thead><tbody>
       ${scoutList().map((p,i)=>pRow(p, `${p.sal}억`, `<button class="btn" onclick="FM.fxPick(${i})">영입</button>`)).join('')}</tbody></table></div>
       <div class="hint" style="margin-top:6px">스카우트 후보는 20경기마다 바뀝니다. 영입 시 연봉의 20% 계약금, 방출 선수는 연봉 절반을 위약금으로 냅니다.</div>`
@@ -261,8 +262,13 @@ function radar(vals, labels, color){
     ${[0.25,0.5,0.75,1].map(f=>`<polygon points="${ring(f)}" fill="none" stroke="var(--line)"/>`).join('')}
     <polygon points="${poly}" fill="${color}" fill-opacity=".28" stroke="${color}" stroke-width="2"/>${lbl}</svg>`;
 }
+// pitcher profile: 보직 숙련도 bars, then the pitches he throws (and the one he's learning)
+function pitcherJobs(p){
+  const bars=['SP','RP','CL'].map(j=>{ const v=K.roleSkill(p,j); return `<div class="job-row"><span>${JOB_L[j]}${j===p.role?' <small>주 보직</small>':''}${p.rt===j?' <small>훈련 중</small>':''}</span><div class="pt-bar"><i style="width:${v}%"></i></div><b>${v}%</b></div>`; }).join('');
+  const pit=K.repertoire(p).map(t=>`<span class="pill pos">${t.k}${(p.np||[]).indexOf(t.k)>=0?' · 새로 익힘':''}</span>`).join(' ');
+  return `<div class="job-list">${bars}</div><div class="muted" style="font-weight:700;margin:14px 0 6px">보유 구종</div><div class="row" style="gap:4px;flex-wrap:wrap">${pit}${p.pq&&p.pq.k?` <span class="pill" style="background:var(--panel2);color:var(--dim)">연마 중: ${p.pq.k} ${p.pq.pct||0}%</span>`:''}</div>`; }
 function posStars(p){
-  if(p.type!=='B') return `<span class="pill pos">${posFull(p.role)} ★★★</span>`;
+  if(p.type!=='B') return pitcherJobs(p);
   return ['C','1B','2B','3B','SS','LF','CF','RF','DH'].map(x=>{
     const fit=K.posFit(p,x), s = x===p.pos?3 : x==='DH'?2 : fit<=6?2 : 1;
     return `<span class="pill" style="background:${s===3?'rgba(54,194,117,.25)':s===2?'rgba(127,208,255,.15)':'var(--panel2)'};color:${s===3?'var(--good)':s===2?'#7fd0ff':'var(--dim)'}">${x} ${'★'.repeat(s)}</span>`;
@@ -333,7 +339,7 @@ function showProfile(team,name){
       <div style="width:64px;height:64px;border-radius:50%;background:conic-gradient(${ratColor(o)} ${o}%, var(--panel2) 0);display:flex;align-items:center;justify-content:center">
         <div style="width:52px;height:52px;border-radius:50%;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:${ratColor(o)}">${o}</div></div>
       <div style="flex:1;min-width:200px"><h2 style="margin:0">${esc(name)}${p.rookie?' <span class="pill pos">신인</span>':''}</h2>
-        <div class="muted">${teamDot(team)} ${K.ROSTERS[team].name}${farm?' <span class="chip">2군</span>':''} · ${p.age}세 · ${posFull(p.pos||p.role)}</div>
+        <div class="muted">${teamDot(team)} ${K.ROSTERS[team].name}${farm?' <span class="chip">2군</span>':''} · ${p.age}세 · ${posFull(p.pos||p.role)}</div>${p.dr?`<div class="muted" style="font-size:12px;margin-top:2px">${p.dy} 신인 드래프트 ${p.dr.r}라운드 · ${esc(p.dr.school)}${p.dr.team!==team?` · ${esc(p.dr.team)} 지명`:''}</div>`:''}
         <div class="muted" style="font-size:12px;margin-top:2px">성격: <b style="color:var(--txt)">${pers(p).k}</b> — ${pers(p).d}</div></div>
     </div>
     <div class="kpi" style="margin:14px 0">
@@ -350,7 +356,7 @@ function showProfile(team,name){
       <div>${attrs}<div class="hint">능력치 1~20 (FM 스케일) · 16+ 최상급, 11~15 준수, 6~10 평범, 5 이하 약점</div></div>
       <div style="text-align:center">${rad}</div></div>
     <style>@media(max-width:640px){#profgrid{grid-template-columns:1fr!important}}</style>
-    <div class="muted" style="font-weight:700;margin:12px 0 6px">포지션 적합도</div><div class="row" style="gap:4px">${posStars(p)}</div>
+    <div class="muted" style="font-weight:700;margin:12px 0 6px">${p.type==='P'?'보직 숙련도':'포지션 적합도'}</div>${p.type==='P'? posStars(p) : `<div class="row" style="gap:4px">${posStars(p)}</div>`}
     <div class="muted" style="font-weight:700;margin:14px 0 6px">최근 5경기 평점</div><div class="row" style="gap:4px">${form}</div>
     <div class="muted" style="font-weight:700;margin:14px 0 6px">${state.year} 시즌 성적</div>${statLine}`}
     ${actions}`);

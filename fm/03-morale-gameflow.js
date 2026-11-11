@@ -43,7 +43,7 @@ function rtColor(r){ return r>=7.5?'#36c275':r>=6.8?'#9fd26b':r>=6.2?'#d6e2c4':r
 function callUp(t,type,pos){
   const f=farmOf(t);
   const off=entryCount(t)>=ENTRY_MAX? clearSpot(t,type) : null;
-  let p=f.filter(x=>x.type===type&&!K.isInjured(x)&&!(t===USER&&downLeft(x)))
+  let p=f.filter(x=>x.type===type&&!K.isInjured(x)&&!(t===USER&&downLeft(x))&&!(x.f&&!fxEntryRoom(t,x)))
     .filter(x=>x!==off).sort((a,b)=>(pos? (b.role===pos)-(a.role===pos) : 0) || K.ovr(b)-K.ovr(a))[0];
   if(p) doPromote(t,p);
   else { p=makeRookie(type,pos); ensurePlayer(p); if(type==='B') K.ROSTERS[t].batters.push(p); else K.ROSTERS[t].pitchers.push(p); }
