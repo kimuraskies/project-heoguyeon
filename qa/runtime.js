@@ -112,6 +112,7 @@ class Runtime {
   spring({live=false}={}){
     this.action('offseason events',()=>this.FM.offAuto(true,true));
     this.action('set camp bal',()=>this.FM.setCamp('bal'));
+    this.action('position training',()=>{const R=this.K.ROSTERS[this.state.user.team], P=['1B','LF','2B','CF','C'];R.batters.concat(R.farm||[]).filter(p=>p.pos!=='DH').slice(0,6).forEach((p,i)=>this.FM.setPosTrain(p.n,P[i%P.length]===p.pos?'RF':P[i%P.length]));});
     this.action('start spring',()=>this.FM.startSpring());
     if(live)this.liveNext();
     this.action('finish spring',()=>this.FM.springSimAll());

@@ -1128,7 +1128,7 @@ function nextSeason(){
       c.lineup=c.lineup.filter(n=>validB.includes(n)); while(c.lineup.length<9){ const add=d.lineup.find(n=>!c.lineup.includes(n)); if(!add)break; c.lineup.push(add);} c.lineup=c.lineup.slice(0,9);
       c.positions=K.autoPositions(t,c.lineup);
       c.rotation=c.rotation.filter(n=>validP.includes(n)); if(c.rotation.length<5){ d.rotation.forEach(n=>{if(!c.rotation.includes(n)&&c.rotation.length<5)c.rotation.push(n);}); }
-      c.bullpen=c.bullpen.filter(n=>validP.includes(n)); if(!validP.includes(c.closer))c.closer=d.closer;
+      c.bullpen=c.bullpen.filter(n=>validP.includes(n)&&!c.rotation.includes(n)); if(!validP.includes(c.closer)||c.rotation.includes(c.closer))c.closer=c.rotation.includes(d.closer)?c.bullpen[0]:d.closer;   // a starter moved up to fill the rotation leaves the bullpen
     }
   });
   teamGameCount={}; K.TEAM_IDS.forEach(t=>teamGameCount[t]=0);

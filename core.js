@@ -341,9 +341,14 @@ var POS_W={"C":1.0,"1B":0.5,"2B":1.1,"3B":0.9,"SS":1.3,"LF":0.7,"CF":1.2,"RF":0.
 // Lineup positions that can cover each other when a starter sits.
 var POS_GROUP={"C":"C","1B":"IF","2B":"IF","3B":"IF","SS":"IF","LF":"OF","CF":"OF","RF":"OF","DH":"DH"};
 // rating points a fielder loses away from his own position (0 = natural spot)
+// position training: p.pp[pos] is 0..100 progress toward playing pos like a second position (fit 3)
 function posFit(p,pos){
   if(pos==="DH"||!p||p.pos===pos) return 0;
   if(p.alt===pos) return 3;           // learned at camp
+  var base=posFitBase(p,pos), lp=p.pp&&p.pp[pos];
+  return lp? Math.round(base-(base-3)*Math.min(1,lp/100)) : base;
+}
+function posFitBase(p,pos){
   if(pos==="C") return 30;            // nobody catches without being a catcher
   if(p.pos==="DH") return 18;
   if(pos==="1B") return p.pos==="C"?8:4;
@@ -1176,7 +1181,7 @@ global.KBO = {
   newBatStat:newBatStat, newPitStat:newPitStat,
   getB:getB, getP:getP, InteractiveGame:InteractiveGame,
   cond:cond, mor:mor, isInjured:isInjured, applyFatigue:applyFatigue, restAdjust:restAdjust,
-  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf, handsOf:handsOf, SIGNS:SIGNS, planMods:planMods,
+  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf, handsOf:handsOf, posFitBase:posFitBase, SIGNS:SIGNS, planMods:planMods,
   POS_LIST:POS_LIST, posFit:posFit, fieldVal:fieldVal, teamDefense:teamDefense, autoPositions:autoPositions, positionIssues:positionIssues
 };
 

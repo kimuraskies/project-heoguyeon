@@ -106,6 +106,7 @@ function campRunWeek(){
     const hurtNow=K.isInjured(p); let tot=0;
     if(!hurtNow) keys.forEach(k=>{ if(Math.random()>=chance) return; if(bumpWithin(p,k,1)){ tot++; const g=c.gain[p.n]||(c.gain[p.n]={}); g[k]=(g[k]||0)+1; } });
     if(p.type==='P'&&!hurtNow&&Math.random()<0.02*pl.fit*(p.age<=30?1:0.5)) bumpWithin(p,'sta',1);
+    if(!hurtNow&&p.pt){ const ps=posTrainStep(p,c.focus==='def'?2:1); if(ps&&ps.done) c.notes.push(`${p.n}: ${ps.pos} 수비 습득`); }
     if(tot) gains.push(`${p.n} +${tot}`);
     const inj=0.004*Math.max(0,pl.fit+pl.skill-5)*(p.age>=30?1.5:1)*(1-pl.rest*0.25)*wear.inj*(mod.inj||1);
     if(!hurtNow&&Math.random()<inj){ p.inj=R(1,8); hurt.push(`${p.n}(${p.inj}경기)`); }
