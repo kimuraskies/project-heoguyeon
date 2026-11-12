@@ -154,8 +154,9 @@ function joinClub(t,p){
 }
 // an injured player goes off the entry to make room for a call-up
 function clearSpot(t,type){
-  const r=K.ROSTERS[t], hurt=(type==='B'?r.batters:r.pitchers).filter(p=>K.isInjured(p))
-    .concat((type==='B'?r.pitchers:r.batters).filter(p=>K.isInjured(p))).sort((a,b)=>b.inj-a.inj)[0];
+  // the longest injury of the same kind goes first; an injured starter stays while the 1군 has only five
+  const r=K.ROSTERS[t], sp=r.pitchers.filter(p=>p.role==='SP').length, ok=p=>K.isInjured(p)&&!(p.role==='SP'&&sp<=5), byInj=(a,b)=>b.inj-a.inj;
+  const hurt=(type==='B'?r.batters:r.pitchers).filter(ok).sort(byInj).concat((type==='B'?r.pitchers:r.batters).filter(ok).sort(byInj))[0];
   if(!hurt) return null;
   const arr=hurt.type==='B'?r.batters:r.pitchers; arr.splice(arr.indexOf(hurt),1); farmOf(t).push(hurt);
   if(t===USER){ hurt.downUg=userGamesAll(); hurt.downYear=state.year; }

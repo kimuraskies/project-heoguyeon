@@ -165,6 +165,14 @@ function fxEntryRoom(t,p){ const c=fxCount(t,true); return c[fxKind(p)] < fxCap(
 function fxQuotaFix(t){ const r=K.ROSTERS[t], moved=[];
   ['f','aq'].forEach(k=>{ const cap=k==='aq'?FX_AQ:FX_F, on=allPlayers(t).filter(p=>p.f&&fxKind(p)===k).sort((a,b)=>K.ovr(b)-K.ovr(a));
     on.slice(cap).forEach(p=>{ if(entryProblem(t,[p],[])) return; const arr=p.type==='B'?r.batters:r.pitchers; arr.splice(arr.indexOf(p),1); farmOf(t).push(p); moved.push(p.n); }); });
+  // a foreign starter sent down can leave four starters: swap the 2군's best starter up for the weakest reliever
+  const cl=state.cfgs&&state.cfgs[t]&&state.cfgs[t].closer;
+  while(moved.length && r.pitchers.filter(p=>p.role==='SP').length<5){
+    const up=farmOf(t).filter(p=>p.type==='P'&&p.role==='SP'&&!p.f&&!K.isInjured(p)).sort((a,b)=>K.ovr(b)-K.ovr(a))[0];
+    const down=r.pitchers.filter(p=>p.role!=='SP'&&p.n!==cl).sort((a,b)=>K.ovr(a)-K.ovr(b))[0];
+    if(!up||!down) break;
+    r.pitchers.splice(r.pitchers.indexOf(down),1,up); const fa=farmOf(t); fa.splice(fa.indexOf(up),1,down); moved.push(down.n);
+  }
   if(moved.length&&state.cfgs&&state.cfgs[t]) repairCfg(t);
   return moved; }
 // `used` is shared across one batch of candidates so two of them never get the same name
@@ -189,11 +197,12 @@ function scoutList(){
     f.scout={year:state.year, ug, list:(mgrBg().fx6?['P','P','P','B','B','B']:['P','P','B','B']).map(t=>makeForeign(t,used,mgrBg().fx6?3:0)).concat([makeForeign(Math.random()<0.6?'P':'B',used,mgrBg().fx6?3:0,true)])}; }
   return f.scout.list;
 }
-function fxWindowOpen(){ return state.phase==='stove' || (state.phase==='regular' && userGamesPlayed()<108); }
+// open all winter: stove league, the off-season and spring camp (a slot freed in the stove league can be filled at camp), then the first 108 games
+function fxWindowOpen(){ return state.phase==='stove' || state.phase==='offseason' || state.phase==='spring' || (state.phase==='regular' && userGamesPlayed()<108); }
 function fxSwapsLeft(){ const f=fm(); return FX_SWAPS-((f.fxSwaps&&f.fxSwaps.year===state.year)?f.fxSwaps.n:0); }
 function fxPick(i){
   const cand=scoutList()[i]; if(!cand) return;
-  if(!fxWindowOpen()){ notify('외국인 선수 교체는 스토브리그와 정규시즌 108경기 전까지만 가능합니다.'); return; }
+  if(!fxWindowOpen()){ notify('외국인 선수 영입은 비시즌(스토브리그·스프링캠프)과 정규시즌 108경기 전까지만 가능합니다.'); return; }
   if(state.phase==='regular' && fxSwapsLeft()<=0){ notify('이번 시즌 외국인 선수 교체 횟수(2회)를 모두 썼습니다.'); return; }
   const mine=foreignOf(USER).filter(p=>fxKind(p)===fxKind(cand)), room=fxRoom(USER,cand);
   const btn=p=>`<button class="btn" onclick="FM.fxSign(${i},'${q(p.n)}')">${esc(p.n)} 방출 <span class="muted">(${p.pos||p.role}·OVR ${K.ovr(p)}·잔여 위약금 ${Math.round(p.sal*0.5*10)/10}억)</span></button>`;

@@ -868,6 +868,14 @@ function fxEntryRoom(t,p){ const c=fxCount(t,true); return c[fxKind(p)] < fxCap(
 function fxQuotaFix(t){ const r=K.ROSTERS[t], moved=[];
   ['f','aq'].forEach(k=>{ const cap=k==='aq'?FX_AQ:FX_F, on=allPlayers(t).filter(p=>p.f&&fxKind(p)===k).sort((a,b)=>K.ovr(b)-K.ovr(a));
     on.slice(cap).forEach(p=>{ if(entryProblem(t,[p],[])) return; const arr=p.type==='B'?r.batters:r.pitchers; arr.splice(arr.indexOf(p),1); farmOf(t).push(p); moved.push(p.n); }); });
+  // a foreign starter sent down can leave four starters: swap the 2군's best starter up for the weakest reliever
+  const cl=state.cfgs&&state.cfgs[t]&&state.cfgs[t].closer;
+  while(moved.length && r.pitchers.filter(p=>p.role==='SP').length<5){
+    const up=farmOf(t).filter(p=>p.type==='P'&&p.role==='SP'&&!p.f&&!K.isInjured(p)).sort((a,b)=>K.ovr(b)-K.ovr(a))[0];
+    const down=r.pitchers.filter(p=>p.role!=='SP'&&p.n!==cl).sort((a,b)=>K.ovr(a)-K.ovr(b))[0];
+    if(!up||!down) break;
+    r.pitchers.splice(r.pitchers.indexOf(down),1,up); const fa=farmOf(t); fa.splice(fa.indexOf(up),1,down); moved.push(down.n);
+  }
   if(moved.length&&state.cfgs&&state.cfgs[t]) repairCfg(t);
   return moved; }
 // `used` is shared across one batch of candidates so two of them never get the same name
@@ -892,11 +900,12 @@ function scoutList(){
     f.scout={year:state.year, ug, list:(mgrBg().fx6?['P','P','P','B','B','B']:['P','P','B','B']).map(t=>makeForeign(t,used,mgrBg().fx6?3:0)).concat([makeForeign(Math.random()<0.6?'P':'B',used,mgrBg().fx6?3:0,true)])}; }
   return f.scout.list;
 }
-function fxWindowOpen(){ return state.phase==='stove' || (state.phase==='regular' && userGamesPlayed()<108); }
+// open all winter: stove league, the off-season and spring camp (a slot freed in the stove league can be filled at camp), then the first 108 games
+function fxWindowOpen(){ return state.phase==='stove' || state.phase==='offseason' || state.phase==='spring' || (state.phase==='regular' && userGamesPlayed()<108); }
 function fxSwapsLeft(){ const f=fm(); return FX_SWAPS-((f.fxSwaps&&f.fxSwaps.year===state.year)?f.fxSwaps.n:0); }
 function fxPick(i){
   const cand=scoutList()[i]; if(!cand) return;
-  if(!fxWindowOpen()){ notify('외국인 선수 교체는 스토브리그와 정규시즌 108경기 전까지만 가능합니다.'); return; }
+  if(!fxWindowOpen()){ notify('외국인 선수 영입은 비시즌(스토브리그·스프링캠프)과 정규시즌 108경기 전까지만 가능합니다.'); return; }
   if(state.phase==='regular' && fxSwapsLeft()<=0){ notify('이번 시즌 외국인 선수 교체 횟수(2회)를 모두 썼습니다.'); return; }
   const mine=foreignOf(USER).filter(p=>fxKind(p)===fxKind(cand)), room=fxRoom(USER,cand);
   const btn=p=>`<button class="btn" onclick="FM.fxSign(${i},'${q(p.n)}')">${esc(p.n)} 방출 <span class="muted">(${p.pos||p.role}·OVR ${K.ovr(p)}·잔여 위약금 ${Math.round(p.sal*0.5*10)/10}억)</span></button>`;
@@ -2797,12 +2806,12 @@ function marketCards(){
       ${list.map(({x,i})=>pRow(x.p, `${x.yrs}년 ${x.ask}억 <span class="muted">(전 ${esc(x.from)})</span>`, `<button class="btn" onclick="FM.signFA(${i})">계약</button>`)).join('')}</tbody></table></div></div>`);
   }
   const mine=foreignOf(USER), open=fxWindowOpen(), left=fxSwapsLeft();
-  out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 교체 ${Math.max(0,left)}회 남음 · 108경기 전까지</span></h3>
+  out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 시즌 중 교체 ${Math.max(0,left)}회 남음 · 비시즌은 제한 없음</span></h3>
     <div class="muted" style="margin-bottom:8px">현재: ${mine.map(p=>`${esc(p.n)}(${p.aq?'아시아쿼터 · ':''}${p.pos||p.role}·${K.ovr(p)}·${p.sal}억${isFarm(USER,p)?' · 2군':''})`).join(', ')||'없음'}</div>
-    ${open&&(left>0||state.phase==='stove')? `<div style="overflow-x:auto"><table><thead><tr><th class="name">후보</th><th>POS</th><th>나이</th><th>OVR</th><th>능력</th><th>연봉</th><th></th></tr></thead><tbody>
+    ${open&&(left>0||state.phase!=='regular')? `<div style="overflow-x:auto"><table><thead><tr><th class="name">후보</th><th>POS</th><th>나이</th><th>OVR</th><th>능력</th><th>연봉</th><th></th></tr></thead><tbody>
       ${scoutList().map((p,i)=>pRow(p, `${p.sal}억`, `<button class="btn" onclick="FM.fxPick(${i})">영입</button>`)).join('')}</tbody></table></div>
       <div class="hint" style="margin-top:6px">스카우트 후보는 20경기마다 바뀝니다. 영입 시 연봉의 20% 계약금, 방출 선수는 연봉 절반을 위약금으로 냅니다.</div>`
-    : `<div class="hint">${!open?'지금은 외국인 선수를 교체할 수 없습니다 (정규시즌 108경기 전까지).':'이번 시즌 교체 횟수를 모두 썼습니다.'}</div>`}</div>`);
+    : `<div class="hint">${!open?'지금은 외국인 선수를 영입할 수 없습니다 (비시즌과 정규시즌 108경기 전까지).':'이번 시즌 교체 횟수를 모두 썼습니다.'}</div>`}</div>`);
   return out.join('');
 }
 
@@ -3103,8 +3112,9 @@ function joinClub(t,p){
 }
 // an injured player goes off the entry to make room for a call-up
 function clearSpot(t,type){
-  const r=K.ROSTERS[t], hurt=(type==='B'?r.batters:r.pitchers).filter(p=>K.isInjured(p))
-    .concat((type==='B'?r.pitchers:r.batters).filter(p=>K.isInjured(p))).sort((a,b)=>b.inj-a.inj)[0];
+  // the longest injury of the same kind goes first; an injured starter stays while the 1군 has only five
+  const r=K.ROSTERS[t], sp=r.pitchers.filter(p=>p.role==='SP').length, ok=p=>K.isInjured(p)&&!(p.role==='SP'&&sp<=5), byInj=(a,b)=>b.inj-a.inj;
+  const hurt=(type==='B'?r.batters:r.pitchers).filter(ok).sort(byInj).concat((type==='B'?r.pitchers:r.batters).filter(ok).sort(byInj))[0];
   if(!hurt) return null;
   const arr=hurt.type==='B'?r.batters:r.pitchers; arr.splice(arr.indexOf(hurt),1); farmOf(t).push(hurt);
   if(t===USER){ hurt.downUg=userGamesAll(); hurt.downYear=state.year; }

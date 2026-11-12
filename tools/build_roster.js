@@ -123,7 +123,9 @@ function hitterRatings(p) {
   const totInn = rows.reduce((a, d) => a + d.inn, 0);
   const main = rows[0];
   let pos = main ? POS[main.pos] : 'DH';
-  if (!main || totInn < t.G * 2.5) pos = 'DH';
+  if (main && totInn < t.G * 2.5 && t.PA >= 120) pos = 'DH';
+  if (!main) { const g = raw.info[p.id] && raw.info[p.id].posGroup, h = +String(p.id).slice(-2);
+    pos = g === '포수' ? 'C' : g === '내야수' ? ['2B', '3B', 'SS', '1B'][h % 4] : g === '외야수' ? ['LF', 'CF', 'RF'][h % 3] : 'DH'; }
   let fld = FLD_BASE[pos], arm = ARM_BASE[pos];
   if (pos !== 'DH' && main) {
     const inn = main.inn, rf = (main.PO + main.A) / Math.max(1, inn) * 9, ep = main.E / Math.max(1, main.PO + main.A + main.E);
@@ -143,7 +145,10 @@ function hitterRatings(p) {
 const starts = id => (DEF[id] || []).filter(d => d.pos === '투수').reduce((a, d) => a + d.GS, 0);
 const SP_DIST = [], RP_DIST = [];
 for (const p of Object.values(PIT)) {
-  const gs = starts(p.id); p.gs = gs;
+  let gs = starts(p.id);
+  // no starts on record (a mid-season signing missing from the fielding table) but long outings: count him as a starter
+  if (!gs && p.tot.G >= 5 && p.tot.IP / p.tot.G >= 4) gs = Math.round(p.tot.IP / 5.5);
+  p.gs = gs;
   if (gs >= 8) SP_DIST.push(p.tot.IP / gs); else if (p.tot.G >= 15) RP_DIST.push(p.tot.IP / p.tot.G);
 }
 SP_DIST.sort((a, b) => a - b); RP_DIST.sort((a, b) => a - b);
@@ -207,6 +212,11 @@ for (const code of Object.keys(TEAMS)) {
   // pitchers: 5 starters by starts, the closer by saves, then relievers by innings
   const pp = pitchers.filter(p => p.code === code && !p.drop);
   const sp = pp.filter(p => p.role === 'SP').sort((a, b) => b.gs - a.gs || b.IP - a.IP).slice(0, ROSTER.SP);
+  // a mid-season signing (every game a start, under 20 starts) who rates above the weakest of those five takes his place
+  for (const p of pp.filter(p => p.role === 'SP' && !sp.includes(p) && p.gs >= 8 && p.gs < 20 && p.gs >= p.G * 0.8).sort((a, b) => ovrP(b) - ovrP(a))) {
+    const weak = sp.slice().sort((a, b) => ovrP(a) - ovrP(b))[0];
+    if (weak && ovrP(p) > ovrP(weak)) sp[sp.indexOf(weak)] = p;
+  }
   for (const p of pp.filter(p => p.role !== 'SP').sort((a, b) => b.gs - a.gs)) if (sp.length < ROSTER.SP) { p.role = 'SP'; sp.push(p); }
   const rest = pp.filter(p => !sp.includes(p));
   const cl = rest.slice().sort((a, b) => b.SV - a.SV || b.HLD - a.HLD)[0];
