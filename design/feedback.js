@@ -17,9 +17,10 @@
     const s = typeof state !== 'undefined' && state ? state : null;
     return {version: VERSION, screen: typeof currentTab !== 'undefined' ? currentTab : null,
       year: s && s.year, phase: s && s.phase, team: typeof USER !== 'undefined' ? USER : null,
-      viewport: innerWidth + 'x' + innerHeight, host: location.host};
+      viewport: innerWidth + 'x' + innerHeight, host: location.host, src: form.src || null};
   }
-  function open() {
+  function open(src) {
+    form.src = typeof src === 'string' ? src : null;
     if (window.Track) Track.action('feedback_open');
     try { const d = JSON.parse(store.get(DRAFT) || 'null'); if (d && d.text) form = Object.assign(form, d); } catch (e) {}
     render();
@@ -67,7 +68,7 @@
       if (!r.ok) throw new Error('HTTP ' + r.status);
       store.set(LAST, String(Date.now())); store.del(DRAFT);
       if (window.Track) Track.action('feedback_sent');
-      form = {kind: form.kind, stars: 0, text: '', nick: form.nick}; sending = false;
+      form = {kind: form.kind, stars: 0, text: '', nick: form.nick, src: form.src}; sending = false;
       render({ok: true, t: '고마워요! 피드백이 전달됐어요. 🙌'});
     } catch (e) {
       sending = false;

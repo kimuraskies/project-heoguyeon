@@ -1825,6 +1825,7 @@ function boot(){
 }
 function bootGame(){
   if(!K){ document.getElementById('view').innerHTML='<div class="card">엔진(core.js) 로드 실패. core.js가 같은 폴더에 있는지 확인하세요.</div>'; return; }
+  if(window.Info&&Info.askFeedback) setTimeout(()=>Info.askFeedback(),1200); // returning visitors: one feedback request
   if(restoreAutosave()){ if(window.Track) Track.open(true); render(); return; } // pick up where the last session left off (refresh, closed tab)
   if(window.Track) Track.open(false);
   FM.showSetup(); // new career: manager profile + club selection
