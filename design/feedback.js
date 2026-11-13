@@ -6,7 +6,7 @@
   // Supabase project (Project-KBOMANAGER). The publishable key is meant to ship in client code:
   // row-level security lets it insert feedback but never read it (supabase/feedback.sql).
   const CFG = {url: 'https://tshwgeczwwslsoeygajz.supabase.co', key: 'sb_publishable_5v5mTgm-G5IEotu5lojHRA_6fhQjxQ0'};
-  const VERSION = '2026.11.06';
+  const VERSION = '2026.11.14';
   const KINDS = [['bug', '🐞 버그'], ['idea', '💡 제안'], ['praise', '👏 칭찬'], ['etc', '💬 기타']];
   const DRAFT = 'kbo-feedback-draft', LAST = 'kbo-feedback-last';
   let form = {kind: 'idea', stars: 0, text: '', nick: ''}, sending = false;

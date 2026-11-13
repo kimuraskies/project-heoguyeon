@@ -100,7 +100,9 @@ nav.tabs button.active .icon{stroke-width:2.1}
 .tabsm button:first-child{border-radius:999px 0 0 999px;margin-left:0}
 .tabsm button:last-child{border-radius:0 999px 999px 0}
 .tabsm button:only-child{border-radius:999px}
-.tabsm button.active{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+/* the chosen option must read as chosen at a glance: filled with the club color, bold, with a check */
+.tabsm button.active{background:var(--md-primary);color:var(--md-on-primary);border-color:var(--md-primary);font-weight:700;position:relative;z-index:1}
+.tabsm button.active::before{content:"✓ "}
 
 /* ---- text fields & selects: outlined ---- */
 select,input{font-family:inherit;background:transparent;color:var(--md-on-surface);border:1px solid var(--md-outline);border-radius:4px;min-height:36px;padding:6px 10px;font-size:14px}
