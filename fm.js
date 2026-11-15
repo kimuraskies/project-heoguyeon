@@ -18,7 +18,9 @@ function median(a){ const s=a.slice().sort((x,y)=>x-y); return s.length? s[Math.
 
 // In-page replacements for alert()/confirm(), which embedded viewers block.
 // picks the right particle after a Korean word: 김도영을(를) -> 김도영을, 페라자을(를) -> 페라자를
-function josa(s){ return String(s==null?'':s).replace(/([가-힣])(을\(를\)|이\(가\)|은\(는\)|와\(과\)|과\(와\))/g,(m,c,j)=>{ const tail=(c.charCodeAt(0)-0xAC00)%28>0, p={'을(를)':['을','를'],'이(가)':['이','가'],'은(는)':['은','는'],'와(과)':['과','와'],'과(와)':['과','와']}[j]; return c+(tail?p[0]:p[1]); }); }
+// '(으)로' after a word: 으로 after a final consonant other than ㄹ, else 로 (a closing quote may sit between)
+function josaRo(s){ return s.replace(/([가-힣])(["'’”]?)\(으\)로/g,(m,c,q)=>{ const f=(c.charCodeAt(0)-0xAC00)%28; return c+q+(f>0&&f!==8?'으로':'로'); }); }
+function josa(s){ return josaRo(String(s==null?'':s)).replace(/([가-힣])(을\(를\)|이\(가\)|은\(는\)|와\(과\)|과\(와\))/g,(m,c,j)=>{ const tail=(c.charCodeAt(0)-0xAC00)%28>0, p={'을(를)':['을','를'],'이(가)':['이','가'],'은(는)':['은','는'],'와(과)':['과','와'],'과(와)':['과','와']}[j]; return c+(tail?p[0]:p[1]); }); }
 function notify(msg, ms){ msg=josa(msg);
   let box=document.getElementById('toasts');
   if(!box){ box=document.createElement('div'); box.id='toasts';
@@ -2583,23 +2585,25 @@ function tabBadge(id){
 
 // ---------- UI: inbox ----------
 let selMsg=null, inboxFilter='all';
-function openMsg(id){ selMsg=id; const m=fm().inbox.find(x=>x.id===id); if(m){ m.read=true; if(!inboxLists()[inboxFilter].includes(m)) inboxFilter='all'; } render(); }
+// phones stack the list above the message: bring the opened message into view
+function showMsg(){ const d=document.getElementById('inboxDetail'); if(d&&d.scrollIntoView&&window.innerWidth<820) d.scrollIntoView({block:'start'}); }
+function openMsg(id){ selMsg=id; const m=fm().inbox.find(x=>x.id===id); if(m){ m.read=true; if(!inboxLists()[inboxFilter].includes(m)) inboxFilter='all'; } render(); showMsg(); }
 function markAllRead(){ fm().inbox.forEach(m=>m.read=true); render(); }
 function setInboxFilter(f){ inboxFilter=f; selMsg=null; render(); }
 function dueLeft(m){ return m.due==null? null : m.due-clock(); }
 function dueTag(m){ const d=dueLeft(m); if(d==null||m.done) return '';
-  if(state.phase==='stove') return '<span class="pill" style="background:var(--panel2);color:var(--dim)">시즌 중 기한</span>';
+  if(state.phase==='stove') return '<span class="pill" style="background:var(--panel2);color:var(--dim)">개막 후 기한</span>';
   return `<span class="pill" style="${d<=1?'background:rgba(224,85,106,.22);color:var(--bad)':'background:rgba(240,160,32,.2);color:var(--warn)'}">${d<=0?'오늘 마감':'D-'+d}</span>`; }
 function pendingDecisions(){ return fm().inbox.filter(m=>!m.done&&isDecision(m)).sort((x,y)=>(x.due==null?1e9:x.due)-(y.due==null?1e9:y.due)); }
 function inboxCounts(){ const L=fm().inbox; return {decide:pendingDecisions().length, unread:L.filter(m=>!m.read).length}; }
 // 전체 keeps unanswered decisions on top so they can't get lost under news
 function inboxLists(){ const f=fm(), open=pendingDecisions(); return {all:open.concat(f.inbox.filter(m=>open.indexOf(m)<0)), unread:f.inbox.filter(m=>!m.read||m.id===selMsg)}; }
 // the main progress buttons stop at an unanswered decision and open it instead
-function gate(){ if(!fm()) return false; const open=pendingDecisions(); if(!open.length) return false;
+function gate(){ if(!fm()) return false; const open=pendingDecisions().filter(m=>m.due!=null&&dueLeft(m)<=0); if(!open.length) return false;
   if(typeof Match!=='undefined'&&Match.closeResult) try{ Match.closeResult(); }catch(e){}
   closeModal(); selMsg=open[0].id; inboxFilter='all'; open[0].read=true;
   if(typeof App!=='undefined') App.tab('inbox'); else render();
-  notify(`결정이 필요한 메시지가 ${open.length}건 있습니다. 먼저 답해 주세요.`); return true; }
+  setTimeout(showMsg,0); notify(`오늘 마감인 결정이 ${open.length}건 있어요. 답하면 계속 진행돼요.`); return true; }
 function gateCta(html){ return (html||'').replace(/onclick="/,'onclick="if(FM.gate())return;'); }
 function renderInbox(){
   ensure();
@@ -2613,20 +2617,23 @@ function renderInbox(){
   const items=list.map(m=>`<div onclick="FM.openMsg(${m.id})" style="padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;${m.id===selMsg?'background:var(--panel2);':''}${m.read?'':'font-weight:700;'}">
       <div class="row" style="gap:6px;flex-wrap:nowrap"><span>${m.icon}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.subject)}</span>
       ${!m.done&&isDecision(m)? (dueTag(m)||'<span class="pill" style="background:rgba(240,160,32,.2);color:var(--warn)">결정</span>') : m.auto? '<span class="pill" style="background:var(--panel2);color:var(--dim)">🤖 자동</span>' : ''}</div>
-      <div class="muted" style="font-size:11px;margin-top:2px">${esc(m.from)} · ${m.year} · ${m.ug}경기차</div></div>`).join('') || `<div class="muted" style="padding:12px">${empty}</div>`;
-  const defLine = sel&&!sel.done&&sel.due!=null&&sel.actions[sel.def]? `<div class="hint" style="margin-top:10px">⏳ ${state.phase==='stove'?'시즌이 시작되면 ':''}${Math.max(0,dueLeft(sel))}경기 안에 결정하지 않으면 "${esc(sel.actions[sel.def].label)}"(으)로 처리됩니다.</div>` : '';
-  const detail = sel? `<div class="muted" style="font-size:12px">${sel.icon} ${esc(sel.from)} · ${sel.year} 시즌 ${sel.ug}경기차</div>
+      <div class="muted" style="font-size:11px;margin-top:2px">${esc(m.from)} · ${m.year} · ${m.ug?m.ug+"경기차":"개막 전"}</div></div>`).join('') || `<div class="muted" style="padding:12px">${empty}</div>`;
+  const defLabel = sel&&sel.actions[sel.def]? String(sel.actions[sel.def].label).replace(/^["“]|["”]$/g,'') : '';
+  const defLine = sel&&!sel.done&&sel.due!=null&&defLabel? `<div class="hint" style="margin-top:10px">${josa(`${state.phase==='stove'?`답하지 않으면 개막 ${Math.max(1,dueLeft(sel))}경기째에`:`${Math.max(0,dueLeft(sel))}경기 안에 답하지 않으면`} ‘${esc(defLabel)}’(으)로 정해져요.`)}</div>` : '';
+  const nextOpen = sel&&sel.done? pendingDecisions().find(m=>m.id!==sel.id) : null;
+  const after = sel&&sel.done&&sel.actions.length? (nextOpen? `<button class="btn primary" style="margin-top:12px" onclick="FM.openMsg(${nextOpen.id})">다음 결정 · ${esc(nextOpen.subject)}</button>` : `<button class="btn primary" style="margin-top:12px" onclick="App.tab('dash')">감독실로</button>`) : '';
+  const detail = sel? `<div class="muted" style="font-size:12px">${sel.icon} ${esc(sel.from)} · ${sel.year} 시즌 ${sel.ug?sel.ug+"경기차":"개막 전"}</div>
       <h3 style="margin:6px 0 12px;font-size:17px">${esc(sel.subject)}</h3>
       <div style="white-space:pre-wrap;line-height:1.7">${esc(sel.body)}</div>
-      ${sel.actions.length? (sel.done? `<div class="deal-result deal-ok" style="margin-top:14px">${esc(sel.result||'처리됨')}</div>`
-        : `<div class="row" style="margin-top:16px;gap:8px">${sel.actions.map((a,i)=>`<button class="btn ${i===0?'primary':''}" onclick="FM.act(${sel.id},${i})">${esc(a.label)}</button>`).join('')}</div>${defLine}`) : ''}`
+      ${sel.actions.length? (sel.done? `<div class="deal-result deal-ok" style="margin-top:14px">${esc(sel.result||'처리됨')}</div>${after}`
+        : `<div class="msg-acts">${sel.actions.map((a,i)=>`<button class="btn" onclick="FM.act(${sel.id},${i})">${esc(a.label)}</button>`).join('')}</div>${defLine}`) : ''}`
     : '<div class="muted">메시지를 선택하세요.</div>';
   const ft=(id,l,n)=>`<button class="${inboxFilter===id?'active':''}" onclick="FM.setInboxFilter('${id}')">${l}${n?` <b>${n}</b>`:''}</button>`;
   return `<div class="grid" style="grid-template-columns:minmax(260px,380px) 1fr;gap:14px" id="inboxgrid">
-    <div class="card" style="padding:10px"><h3>📥 받은편지함 <span class="tag"><a href="javascript:void(0)" onclick="FM.delegPicker()" style="color:var(--dim)">⚙ 업무 분담</a> · <a href="javascript:void(0)" onclick="FM.markAllRead()" style="color:var(--dim)">모두 읽음</a></span></h3>
+    <div class="card" style="padding:10px"><h3>받은편지함 <span class="tag"><a href="javascript:void(0)" onclick="FM.delegPicker()" style="color:var(--dim)">⚙ 업무 분담</a> · <a href="javascript:void(0)" onclick="FM.markAllRead()" style="color:var(--dim)">모두 읽음</a></span></h3>
       <div class="tabsm">${ft('all','전체',c.decide)}${ft('unread','읽지 않은 메시지',c.unread)}</div>
       <div style="max-height:620px;overflow:auto">${items}</div></div>
-    <div class="card">${detail}</div></div>
+    <div class="card" id="inboxDetail">${detail}</div></div>
     <style>@media(max-width:820px){#inboxgrid{grid-template-columns:1fr!important}}</style>`;
 }
 
@@ -2727,7 +2734,7 @@ function dashCards0(){
   const inj=allPlayers(USER).filter(K.isInjured), tired=allPlayers(USER).filter(p=>!K.isInjured(p)&&K.cond(p)<60), sad=allPlayers(USER).filter(p=>K.mor(p)<35);
   const confCol=b.conf>=60?'var(--good)':b.conf>=35?'var(--warn)':'var(--bad)';
   return `<div class="grid cols3" style="margin-top:14px">
-    <div class="card"><h3>📥 받은편지함 <span class="tag">${unread()}개 안 읽음</span></h3>
+    <div class="card"><h3>받은편지함 <span class="tag">${unread()}개 안 읽음</span></h3>
       ${latest.length? latest.map(m=>`<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0;cursor:pointer;flex-wrap:nowrap" onclick="App.tab('inbox');FM.openMsg(${m.id})">
         <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.icon} ${esc(m.subject)}</span>${!m.done&&m.actions.length?'<span class="pill" style="background:rgba(240,160,32,.2);color:var(--warn)">결정</span>':''}</div>`).join('') : '<div class="muted">새 메시지가 없습니다.</div>'}
       <button class="btn" style="margin-top:10px" onclick="App.tab('inbox')">받은편지함 열기</button></div>
@@ -2751,7 +2758,7 @@ function renderTacticsTab(){
   ensure();
   const pm = state.pendingGame!=null && typeof pendingMatch==='function' ? pendingMatch() : null;
   const banner = pm? `<div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between;gap:8px">
-      <div><b>⚾ 경기 대기 중</b> — 경기별 전술은 경기 전 "라인업·전략" 화면에서 따로 바꿀 수 있습니다.</div>
+      <div><b>경기 대기 중</b> — 경기별 전술은 경기 전 "라인업·전략" 화면에서 따로 바꿀 수 있습니다.</div>
       <button class="btn primary" onclick="App.startMatch()">경기 준비 화면</button></div></div>` : '';
   return banner + `<div class="hint" style="margin-bottom:10px">여기서 정한 전술이 매 경기의 기본값입니다. 같은 전술을 오래 쓸수록 선수단 숙련도가 올라 효과가 커집니다.</div>`
     + tacticsCard('team');

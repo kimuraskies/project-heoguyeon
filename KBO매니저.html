@@ -249,6 +249,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
 .stack{display:grid;gap:16px;align-content:start;min-width:0}
 </style>
 <link rel="stylesheet" href="design/material.css"><!-- Material 3 layer -->
+<link rel="stylesheet" href="design/stageshow.css"><!-- Stageshow: neutral surface steps, one club accent, phone bottom bar, tablet rail -->
 </head>
 <body>
 <!-- design/icons.svg, inlined once so <use href="#i-…"> works from file:// too -->
@@ -285,6 +286,7 @@ nav.tabs button:hover:not(.active){background:var(--panel);color:var(--txt);}
 <symbol id="i-camp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20L12 3l10 17z M8 20l4-7 4 7"/></symbol>
 <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18v16H3z M7 3v4 M17 3v4 M3 10h18 M8 15l3 3 5-5"/></symbol>
 <symbol id="i-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 21h20z M12 9v5 M12 18h.01"/></symbol>
+<symbol id="i-ball" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M7.5 5.2c1.8 3.3 1.8 10.3 0 13.6 M16.5 5.2c-1.8 3.3-1.8 10.3 0 13.6"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></symbol>
 </svg>
 <div id="app">
@@ -531,8 +533,8 @@ function openPreview(){
     ${FM.previewNote()}
     ${FM.briefingCard()}${FM.tacticsCard('match')}
     <div class="mp-foot">
-      <button class="btn" onclick="App.cancelPreview();App.tab('lineup')">📋 로테이션·마무리 설정</button>
-      <button class="btn primary" onclick="App.startMatch()">✅ 엔트리 제출 & 경기 시작</button>
+      <button class="btn" onclick="App.cancelPreview();App.tab('lineup')">로테이션·마무리 설정</button>
+      <button class="btn primary" onclick="App.startMatch()">${FM.icon('play')}경기 시작</button>
     </div>
   </div>`;
   let o=$('prematch');
@@ -879,7 +881,8 @@ function relayHTML(game,feed,M){
     <div style="${userBatting?'box-shadow:inset 0 0 0 1px var(--accent)':''}">시즌 타율 ${matchAvg}${bSeason&&bSeason.AB>0?` · ${bSeason.HR}홈런 ${bSeason.RBI}타점`:''}<br>오늘 ${bToday&&bToday.PA?`${bToday.AB}타수 ${bToday.H}안타${bToday.HR?' '+bToday.HR+'홈런':''}${bToday.RBI?' '+bToday.RBI+'타점':''}`:'첫 타석'}</div>
   </div>`;
   const cm=M.comm||[], cur=cm[0];
-  const caption = cur ? `<div class="cm-now cm-${cur.k||'call'}">${cur.t}</div>${cm.slice(1,2).map(l=>`<div class="cm-prev">${l.t}</div>`).join('')}` : (game.over?'경기 종료':'플레이볼!');
+  const finalLine=`경기 종료`; // the score itself is in the result banner above
+  const caption = game.over ? `<div class="cm-now cm-final">${finalLine}</div>` : cur ? `<div class="cm-now cm-${cur.k||'call'}">${cur.t}</div>${cm.slice(1,2).map(l=>`<div class="cm-prev">${l.t}</div>`).join('')}` : '플레이볼!';
   const paResult=PitchView.result(ab,shown[shown.length-1],PITCHLABEL);
   const paName=ab&&ab.steal ? ab.runner : batName;
   const paSummary=`<div class="pv-summary"><div class="pv-summary-meta"><span>${ab&&ab.committed?'플레이 결과':'현재 타석'}</span><span>${slot}번 · ${batSide(batName,pitName)}타</span></div><div class="pv-result"><b>${PitchView.escape(paName)}</b><span class="pv-result-colon">:</span><strong>${PitchView.escape(paResult)}</strong></div></div>`;
@@ -894,12 +897,12 @@ function relayHTML(game,feed,M){
   } else if(game.over) wpDelta='<span class="pv-wp-pending">경기 종료</span>';
   const wpBox=`<div class="wp"><div class="wp-line"><span><b>${USER}</b> 승리 확률 <small>추정</small></span><strong>${(wpU*100).toFixed(1)}<small>%</small></strong></div><div class="wp-bar" role="meter" aria-label="${USER} 승리 확률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${(wpU*100).toFixed(1)}"><span style="width:${(wpU*100).toFixed(1)}%"></span></div><div class="pv-wp-note">${wpDelta}</div></div>`;
 
-  const ctrl = game.over ? `<button class="btn primary" onclick="Match.finalize()">✅ 경기 결과 보기</button>${M._ended?'<span class="muted" style="font-size:12px;margin-left:8px">결과는 저장됐어요</span>':''}`
+  const ctrl = game.over ? `<button class="btn primary live-final" onclick="Match.finalize()">${FM.icon('check')}경기 결과 보기</button>${M._ended?'<span class="muted" style="font-size:12px;margin-left:8px">결과는 저장됐어요</span>':''}`
     : `<div class="live-row live-play">
-        ${M.paused?`<button class="btn primary" onclick="Match.play()"><span class="ic">▶</span> 재생</button>`:`<button class="btn" onclick="Match.pause()"><span class="ic">⏸</span> 일시정지</button>`}
-        <button class="btn" onclick="Match.stepOne()"><span class="ic">⏭</span> 한 구</button>
-        <button class="btn" onclick="Match.stepPA()"><span class="ic">⏭</span> 한 타자</button>
-        <button class="btn" onclick="Match.toEnd()"><span class="ic">⏩</span> 끝까지</button>
+        ${M.paused?`<button class="btn primary" onclick="Match.play()">${FM.icon('play')}재생</button>`:`<button class="btn" onclick="Match.pause()">${FM.icon('pause')}멈춤</button>`}
+        <button class="btn" onclick="Match.stepOne()">${FM.icon('ball')}한 구</button>
+        <button class="btn" onclick="Match.stepPA()">${FM.icon('fast-forward')}한 타자</button>
+        <button class="btn" onclick="Match.toEnd()">${FM.icon('skip')}끝까지</button>
         <select onchange="Match.setSpeed(this.value)">
           <option value="1900" ${M.speed==1900?'selected':''}>느리게</option>
           <option value="1300" ${M.speed==1300?'selected':''}>보통</option>
@@ -911,9 +914,9 @@ function relayHTML(game,feed,M){
   let interv='', mgrRow='';
   if(!game.over){
     const btns=[];
-    btns.push(`<button class="btn${M.panel==='sub'?' primary':''}" ${userPitching?'':'disabled title="수비 중에만 바꿀 수 있어요"'} onclick="Match.togglePanel('sub')"><span class="ic">🔄</span> 투수 교체</button>`);
-    btns.push(`<button class="btn${M.panel==='pinch'?' primary':''}" onclick="Match.togglePanel('pinch')"><span class="ic">🏏</span> 야수 교체</button>`);
-    btns.push(`<button class="btn${M.panel==='tac'?' primary':''}" onclick="Match.togglePanel('tac')"><span class="ic">🎯</span> 작전</button>`);
+    btns.push(`<button class="btn${M.panel==='sub'?' primary':''}" ${userPitching?'':'disabled title="수비 중에만 바꿀 수 있어요"'} onclick="Match.togglePanel('sub')">${FM.icon('substitute')}투수 교체</button>`);
+    btns.push(`<button class="btn${M.panel==='pinch'?' primary':''}" onclick="Match.togglePanel('pinch')">${FM.icon('pinch-hit')}야수 교체</button>`);
+    btns.push(`<button class="btn${M.panel==='tac'?' primary':''}" onclick="Match.togglePanel('tac')">${FM.icon('steal')}작전</button>`);
     mgrRow=`<div class="live-row live-mgr">${btns.join('')}</div>`;
     if(M.panel==='sub'&&userPitching){
       const avail=game.availPitchers(USER).sort((x,y)=>K.ovr(y)-K.ovr(x));
@@ -967,14 +970,15 @@ function relayHTML(game,feed,M){
   const feedHtml = feed.slice(0,3).map(feedRow).join('') + (older.length? `<details class="pv-log-more" ${M.logMore?'open':''} ontoggle="Match.logMore=this.open"><summary>이전 기록 ${older.length}개</summary>${older.map(feedRow).join('')}</details>` : '');
 
   const lastP=shown[shown.length-1];
-  const pitchInfo=`<div class="pv-pitchinfo"><span>${lastP? `${shown.length}구 · ${PITCHLABEL[lastP.res]||(lastP.res==='IBB'?'고의4구':lastP.res)}` : (game.over?'경기 종료':'투구 위치')}</span><b>${lastP? (lastP.res==='IBB'?'고의4구':`${lastP.velo||'—'} km/h · ${lastP.type}`) : '첫 투구 대기'}</b></div>`;
+  const pitchInfo= game.over ? ''
+    : `<div class="pv-pitchinfo"><span>${lastP? `${shown.length}구 · ${PITCHLABEL[lastP.res]||(lastP.res==='IBB'?'고의4구':lastP.res)}` : '투구 위치'}</span><b>${lastP? (lastP.res==='IBB'?'고의4구':`${lastP.velo||'—'} km/h · ${lastP.type}`) : '첫 투구 대기'}</b></div>`;
   const resultBanner = game.over ? (()=>{ const w=game.winner; const userWon=w===USER; const tie=w===null;
     const d=game.decisions;
     const dec=d? `<div style="font-size:12.5px;margin-top:4px;opacity:.9">승 ${d.W} · 패 ${d.L}${d.SV?' · 세 '+d.SV:''}${d.HD.length?' · 홀드 '+d.HD.join(', '):''}</div>` : '';
-    return `<div class="deal-result ${tie?'':(userWon?'deal-ok':'deal-no')}" style="text-align:center;font-size:15px;margin:8px 0">${tie?'무승부':(userWon?'🎉 '+USER+' 승리!':'😔 '+USER+' 패배')} — 최종 ${a} ${game.score[a]} : ${game.score[h]} ${h}${dec}</div>`; })() : '';
+    return `<div class="deal-result ${tie?'':(userWon?'deal-ok':'deal-no')}" style="text-align:center;font-size:15px;margin:8px 0">${tie?'무승부':(userWon?USER+' 승리':USER+' 패배')} — 최종 ${a} ${game.score[a]} : ${game.score[h]} ${h}${dec}</div>`; })() : '';
 
   return `
-    <div class="mp-bar"><h2>⚾ 실시간 중계</h2><small>${a}(원정) @ ${h}(홈)</small></div>
+    <div class="mp-bar"><h2>실시간 중계</h2><small>${a}(원정) @ ${h}(홈)</small></div>
     <div class="live-grid">
       ${Scoreboard.line(game,M)}
       ${Scoreboard.board(game,M,{offId,defId,batName,pitName,slot,shown,cnt,ptot,pstr,pball})}
@@ -1136,7 +1140,8 @@ function nextSeason(){
 }
 
 // ================= RENDERING =================
-const TABS=[["dash","dashboard","대시보드"],["inbox","inbox","받은편지함"],["feed","feed","뉴스"],["squad","squad","스쿼드"],["lineup","lineup","라인업"],["tactics","settings","팀 전술"],["train","camp","훈련"],["sched","schedule","일정·경기"],["stand","standings","순위"],["leaders","records","기록실"],["trade","trade","트레이드"],["club","club","구단"]];
+// the first four are the phone bottom bar; the rest open from 더보기 there
+const TABS=[["dash","dashboard","감독실"],["inbox","inbox","받은편지함"],["squad","squad","선수단"],["lineup","lineup","라인업"],["feed","feed","뉴스"],["tactics","settings","팀 전술"],["train","camp","훈련"],["sched","schedule","일정·경기"],["stand","standings","순위"],["leaders","records","기록실"],["trade","trade","트레이드"],["club","club","구단"]];
 
 function render(){
   FM.ensure();
@@ -1144,12 +1149,14 @@ function render(){
   // header
   $("brandBadge").innerHTML = FM.badge(USER,44);
   $("brandName").textContent = `${K.ROSTERS[USER].name} 감독실`;
-  $("brandSub").textContent = `${state.year} / CLUB MANAGEMENT`;
+  $("brandSub").textContent = `${state.year} · ${phaseLabel()}`;
   { const st=standings(), info=heroInfo(st.findIndex(x=>x.t===USER)+1);
     $("nextStep").innerHTML = FM.gateCta((info.cta||"").replace("btn primary hero-cta","btn primary next-cta")); }
-  $("teaminfo").innerHTML = `${FM.mgrAvatar(26)} ${FM.esc(state.user.name)} 감독 · <span class="chip team">${phaseLabel()}</span>`;
+  $("teaminfo").innerHTML = `${FM.mgrAvatar(26)} ${FM.esc(state.user.name)} 감독`;
   // tabs
-  $("tabs").innerHTML = TABS.map(([id,ic,lbl])=>`<button class="${currentTab===id?'active':''}" ${currentTab===id?'aria-current="page"':''} onclick="App.tab('${id}')">${FM.icon(ic)}${lbl}${FM.tabBadge(id)}</button>`).join("");
+  { const moreOn=TABS.slice(4).some(x=>x[0]===currentTab);
+    $("tabs").innerHTML = TABS.map(([id,ic,lbl],i)=>`<button class="${currentTab===id?'active':''}${i>=4?' tab-x':''}" ${currentTab===id?'aria-current="page"':''} onclick="App.tab('${id}')">${FM.icon(ic)}<span>${lbl}</span>${FM.tabBadge(id)}</button>`).join("")
+      + `<button class="tab-more${moreOn?' active':''}" onclick="App.more()" aria-haspopup="dialog">${FM.icon('settings')}<span>${moreOn?TABS.find(x=>x[0]===currentTab)[2]:'더보기'}</span></button>`; }
   const v=$("view");
   if(currentTab==="dash") v.innerHTML=renderDash();
   else if(currentTab==="squad") v.innerHTML=renderSquad();
@@ -1264,11 +1271,13 @@ function renderDash(){
       starters=`<p>예고 선발</p><strong>${FM.esc(sa.n)} <span class="muted">vs</span> ${FM.esc(sh.n)}</strong><p>${a} ${sa.s} / ${hm} ${sh.s}</p>`; }
     else starters=`<p>개막전 선발 (로테이션 1번)</p><strong>${FM.esc(state.cfgs[USER].rotation[0]||'미정')}</strong><p>라인업 탭에서 개막 로테이션을 확인하세요.</p>`;
   } else if(h.tbd){
-    matchup=`${mark(USER)}<span class="versus">VS</span><div class="club-mark"><span class="tbd-badge" aria-hidden="true">?</span><div><strong>미정</strong><small>상대 미정</small></div></div><div class="match-meta"><span>${h.tbd}</span><p>일정 미정</p></div>`;
+    matchup='';
+    const steps=['스토브리그','스프링캠프','시범경기','개막'], at=state.phase==='stove'?0:state.phase==='spring'?2:3;
+    starters=`<p>개막까지</p><ol class="road">${steps.map((s,i)=>`<li class="${i<at?'done':i===at?'now':''}"><i></i>${s}</li>`).join('')}</ol>`;
   } else matchup='';
   const hero=`${FM.returnCard()}<section class="hero" aria-labelledby="heroTitle">
-    <div class="hero-top"><p class="eyebrow">${h.eyebrow}</p><span class="chip team">${phaseLabel()}</span></div>
-    <h1 class="hero-title" id="heroTitle">${FM.esc(h.title)}</h1><p class="hero-sub">${h.sub}</p>
+    <div class="hero-top"><p class="eyebrow">${h.eyebrow}</p></div>
+    <h1 class="hero-title" id="heroTitle">${FM.esc(h.title)}</h1>${h.tbd?'':`<p class="hero-sub">${h.sub}</p>`}
     ${matchup?`<div class="matchup">${matchup}</div>`:'<div style="height:18px"></div>'}
     <div class="hero-bottom"><div>${starters}</div></div>
     ${h.hint?`<p class="hero-hint">${h.hint}</p>`:''}
@@ -1361,7 +1370,10 @@ function renderSquad(){
       <th>구위</th><th>제구</th><th>무브</th><th>체력</th>
       <th>G</th><th>GS</th><th>W</th><th>L</th><th>SV</th><th>HD</th><th>IP</th><th>SO</th><th>BB</th><th>ERA</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   }
-  return `${FM.fxCard()}<div class="card"><h3>${r.name} 스쿼드 <span class="tag">1군 엔트리 ${FM.entryCount(USER)}/${FM.ENTRY_MAX} · 능력치 1~20 (FM 스케일) · 선수 이름 클릭 시 상세 프로필</span></h3>${tabs}${body}</div>`;
+  const q=s=>s.replace(/'/g,"\\'"), two=(p,ks)=>ks.map(([k,l])=>[l,p[k]]).sort((x,y)=>y[1]-x[1]).slice(0,2).map(([l,v])=>`${l} <b>${ratNum(v)}</b>`).join(' · ');
+  const card=(p,isP)=>`<li class="sq-row"><button class="sq-main" onclick="App.player('${USER}','${q(p.n)}')"><span class="sq-name">${FM.esc(p.n)}</span><span class="sq-sub">${isP?p.role:p.pos} · ${p.age}세 · ${two(p,isP?[['stu','구위'],['ctl','제구'],['mov','무브'],['sta','체력']]:[['con','컨택'],['pow','파워'],['eye','선구'],['spd','주력'],['fld','수비']])}</span><span class="sq-st">${FM.statusInline(p)}</span></button><span class="sq-ovr">${K.ovr(p)}</span><button class="btn btn-sm" onclick="FM.demote('${q(p.n)}')">2군</button></li>`;
+  const list = squadView==='farm' ? '' : `<ul class="sq-list">${(squadView==='bat'?r.batters:r.pitchers).slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).map(p=>card(p,squadView!=='bat')).join('')}</ul>`;
+  return `${FM.fxCard()}<div class="card"><h3>${r.name} 선수단 <span class="tag">1군 엔트리 ${FM.entryCount(USER)}/${FM.ENTRY_MAX} · 이름을 누르면 상세 프로필</span></h3>${tabs}${list}<div class="${squadView==='farm'?'':'sq-table'}">${body}</div></div>`;
 }
 
 const POS_OPTS=['C','1B','2B','3B','SS','LF','CF','RF','DH'];
@@ -1372,17 +1384,16 @@ function userLineupTable(){
   const lineupRows=c.lineup.map((n,i)=>{
     const b=K.ROSTERS[USER].batters.find(x=>x.n===n);
     const fit=b? K.posFit(b,pos[i]) : 0;
-    const fitTxt= pos[i]==='DH'? '<span class="muted">DH</span>' : fit===0? '<span style="color:var(--good)">✓ 주 포지션</span>' : fit<10? `<span style="color:var(--warn)">수비 -${fit}</span>` : `<span style="color:var(--bad)">수비 -${fit}</span>`;
-    return `<tr><td><b>${i+1}</b></td>
-      <td class="name"><select onchange="App.setLineup(${i},this.value)">${batOpts(n)}</select></td>
-      <td><select onchange="App.setPos(${i},this.value)" aria-label="${i+1}번 타자 수비 위치">${POS_OPTS.map(x=>`<option ${x===pos[i]?'selected':''}>${x}</option>`).join('')}</select></td>
-      <td style="white-space:nowrap">${fitTxt}</td>
-      <td style="white-space:nowrap;font-size:12px">컨${b?ratNum(b.con):'-'} / 파${b?ratNum(b.pow):'-'} / 선${b?ratNum(b.eye):'-'} / 주${b?ratNum(b.spd):'-'} / 수${b?ratNum(b.fld):'-'}</td><td>${b?FM.statusInline(b):''}</td></tr>`;
+    const fitTxt= pos[i]==='DH'? '<span class="muted">DH</span>' : fit===0? '<span style="color:var(--good)">주 포지션</span>' : fit<10? `<span style="color:var(--warn)">수비 -${fit}</span>` : `<span style="color:var(--bad)">수비 -${fit}</span>`;
+    return `<li class="lu-row"><span class="lu-o">${i+1}</span>
+      <select class="lu-name" onchange="App.setLineup(${i},this.value)" aria-label="${i+1}번 타자">${batOpts(n)}</select>
+      <select class="lu-pos" onchange="App.setPos(${i},this.value)" aria-label="${i+1}번 타자 수비 위치">${POS_OPTS.map(x=>`<option ${x===pos[i]?'selected':''}>${x}</option>`).join('')}</select>
+      <span class="lu-meta">${fitTxt}<span>컨 ${b?ratNum(b.con):'-'} · 파 ${b?ratNum(b.pow):'-'} · 선 ${b?ratNum(b.eye):'-'} · 주 ${b?ratNum(b.spd):'-'} · 수 ${b?ratNum(b.fld):'-'}</span>${b?FM.statusInline(b):''}</span></li>`;
   }).join("");
   const issues=K.positionIssues(USER,c.lineup,pos);
   const defense=K.teamDefense(USER,c.lineup,pos);
   const defBox=`<div class="${issues.length?'deal-result deal-no':'hint'}" style="margin-top:10px">팀 수비력 <b>${defense.toFixed(1)}</b> <span class="muted">(리그 평균 70)</span>${issues.length?'<br>⚠️ '+issues.join(' · '):''}</div>`;
-  return `<div style="overflow-x:auto"><table><thead><tr><th>순서</th><th class="name">선수</th><th>위치</th><th>적합도</th><th>주요능력</th><th>상태</th></tr></thead><tbody>${lineupRows}</tbody></table></div>
+  return `<ol class="lu-list">${lineupRows}</ol>
       ${defBox}`;
 }
 function renderLineup(){
@@ -1403,13 +1414,13 @@ function renderLineup(){
   const banner = pm ? (()=>{ const opp=pm.home===USER?pm.away:pm.home;
     return `<div class="card" style="border-color:var(--accent);background:color-mix(in srgb, var(--accent) 9%, transparent);margin-bottom:14px">
       <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <div><b>⚾ 경기 대기 중</b> — ${pm.ps?pm.label+' · ':''}${pm.home===USER?'vs':'@'} ${K.ROSTERS[opp].name}. 라인업/선발을 확정한 뒤 제출하세요.</div>
-        <button class="btn primary" onclick="App.startMatch()">✅ 엔트리 제출 & 경기 시작</button>
+        <div><b>경기 대기 중</b> — ${pm.ps?pm.label+' · ':''}${pm.home===USER?'vs':'@'} ${K.ROSTERS[opp].name}. 라인업/선발을 확정한 뒤 제출하세요.</div>
+        <button class="btn primary" onclick="App.startMatch()">${FM.icon('play')}경기 시작</button>
       </div></div>`; })() : '';
   return banner + `<div class="grid cols2">
     <div class="card"><h3>타순 · 수비 위치 <span class="tag">8개 수비 위치 + 지명타자</span></h3>
       ${userLineupTable()}
-      <button class="btn" style="margin-top:10px" onclick="App.autoLineup()">🤖 자동 추천 라인업 (출루율 중심 타순)</button>
+      <button class="btn" style="margin-top:10px" onclick="App.autoLineup()">${FM.icon('lineup')}코치 추천 라인업</button>
     </div>
     <div class="card"><h3>선발 로테이션</h3>
       <table><thead><tr><th>순번</th><th class="name">투수</th><th>능력</th></tr></thead><tbody>${rotRows}</tbody></table>
@@ -1783,7 +1794,9 @@ function selfTest(){
 
 // ---------- App API ----------
 const App={
-  tab:(t)=>{FM.closeProfile();currentTab=t;render();},
+  tab:(t)=>{FM.closeProfile();closeModal();const moved=currentTab!==t;currentTab=t;render();if(moved) toTop();},
+  // phone: the menu items that don't fit the bottom bar
+  more:()=>modal(`<span class="closeX" onclick="App.closeModal()" role="button" aria-label="닫기">×</span><h2>더보기</h2><div class="more-grid">${TABS.slice(4).map(([id,ic,lbl])=>`<button class="btn${currentTab===id?' primary':''}" onclick="App.tab('${id}')">${FM.icon(ic)}<span>${lbl}</span></button>`).join('')}</div>`),
   squadView:(v)=>{squadView=v;render();},
   leaderCat:(c)=>{leaderCat=c;render();},
   nextGame:()=>startNextUserGame(),
@@ -1823,6 +1836,8 @@ function boot(){
   if(window.Gate && Gate.required()){ Gate.ensure(bootGame); return; }
   bootGame();
 }
+// back to the top of the page (no-op in the headless QA runner)
+function toTop(){ if(typeof window!=="undefined"&&typeof window.scrollTo==="function") window.scrollTo(0,0); }
 function bootGame(){
   if(!K){ document.getElementById('view').innerHTML='<div class="card">엔진(core.js) 로드 실패. core.js가 같은 폴더에 있는지 확인하세요.</div>'; return; }
   if(window.Info&&Info.askFeedback) setTimeout(()=>Info.askFeedback(),1200); // returning visitors: one feedback request
@@ -1837,7 +1852,7 @@ function beginCareer(user){
   state.user=user;
   FM.onCareerStart();
   if(window.Track) Track.career();
-  currentTab="dash"; render();
+  currentTab="dash"; render(); toTop();
 }
 boot();
 </script>

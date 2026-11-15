@@ -1,0 +1,155 @@
+/* ==== Stageshow layer (UI/UX recipe book · Stageshow) ====
+   Real product, only what the screen needs. Depth from surface steps instead of shadows, five greys and one
+   accent (the club color), one icon set, one big number per screen, touch targets of 44px or more.
+   Phone (<768): sticky top bar with the next action, bottom bar of five. Tablet (768-1023): side rail.
+   Loaded after material.css; self-contained (system fonts, no CDN) for the packaged client. */
+:root{
+  --ss-0:#0b0c0e; --ss-1:#141518; --ss-2:#1c1d21; --ss-3:#26282d; --ss-4:#34363c;
+  --ss-ink:#f2f3f5; --ss-ink2:#b4b8c0; --ss-ink3:#8b8f98;
+  --md-surface:var(--ss-0); --md-surface-dim:var(--ss-0); --md-surface-container-lowest:#08090a;
+  --md-surface-container-low:#111214; --md-surface-container:var(--ss-1); --md-surface-container-high:var(--ss-2);
+  --md-surface-container-highest:var(--ss-3);
+  --md-on-surface:var(--ss-ink); --md-on-surface-variant:var(--ss-ink2); --md-outline:#5d616a; --md-outline-variant:var(--ss-3);
+  --md-secondary-container:var(--ss-2); --md-on-secondary-container:var(--ss-ink);
+  --md-primary-container:color-mix(in oklab, var(--team) 24%, var(--ss-1)); --md-on-primary-container:var(--ss-ink);
+  --ss-num:-apple-system,"SF Pro Display","Segoe UI Variable Display","Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+  --ss-bar:64px;
+}
+html,body{background:var(--ss-0)}
+header.top{background:var(--ss-1)}
+.btn:hover{background:var(--ss-3)}
+.btn:active{background:var(--ss-4)}
+.btn.primary:hover{filter:brightness(1.08);background:var(--team)}
+.card,.panel{box-shadow:none}
+.tabsm button{min-height:44px}
+.ovr,.sq-ovr,.lu-o,.hero-title{font-variant-numeric:tabular-nums}
+
+/* ---- top bar: phase under the club name, the next action always in reach ---- */
+.brand small{letter-spacing:.04em}
+.next-cta{min-height:44px}
+
+/* ---- navigation: the extra 더보기 button only lives in the phone bar ---- */
+nav.tabs .tab-more{display:none}
+nav.tabs button>span{white-space:nowrap}
+.more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+.more-grid .btn{justify-content:flex-start;min-height:56px;gap:10px;font-size:15px}
+.more-grid .icon{width:20px;height:20px}
+
+/* ---- dashboard: the road to opening day instead of an empty matchup ---- */
+.road{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.road li{display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:var(--ss-ink3)}
+.road li i{display:block;height:6px;border-radius:3px;background:var(--ss-3)}
+.road li.done i,.road li.now i{background:var(--team)}
+.road li.now{color:var(--ss-ink);font-weight:700}
+
+/* ---- inbox: answers stacked as equal choices; the default is told in words, not by a red button ---- */
+.msg-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.msg-acts .btn{min-height:48px}
+
+/* ---- lineup: one row per hitter ---- */
+.lu-list{list-style:none;margin:0;padding:0}
+.lu-row{display:grid;grid-template-columns:28px minmax(0,1fr) 84px;gap:6px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--ss-3)}
+.lu-row:last-child{border-bottom:0}
+.lu-o{font:700 18px var(--ss-num);color:var(--ss-ink3);text-align:center}
+.lu-name,.lu-pos{width:100%;min-width:0;min-height:44px}
+.lu-meta{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:12px;color:var(--ss-ink3)}
+
+/* ---- squad: list on phones and tablets, the full table on desktop ---- */
+.sq-list{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);column-gap:24px}
+.sq-row{display:flex;align-items:center;gap:10px;min-height:60px;border-bottom:1px solid var(--ss-3)}
+.sq-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding:8px 0;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.sq-name{font-weight:700;font-size:15px}
+.sq-sub{font-size:12px;color:var(--ss-ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sq-sub b{color:var(--ss-ink2);font-weight:600}
+.sq-st{font-size:12px}
+.sq-ovr{font:700 20px var(--ss-num);min-width:30px;text-align:right}
+.sq-row .btn-sm{min-height:40px}
+@media(min-width:600px){.sq-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1024px){.sq-list{display:none}}
+@media(max-width:1023px){.sq-table{display:none}}
+
+/* ---- broadcast controls: manager calls on top, playback below, every label whole ---- */
+.pv-broadcast .live-ctrl{background:var(--ss-0);border-top-color:var(--ss-3)}
+.live-ctrl .btn{background:var(--ss-2);border-color:var(--ss-3);color:var(--ss-ink);min-height:48px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.live-ctrl .btn:hover{border-color:var(--ss-ink3);color:var(--ss-ink)}
+.live-ctrl .btn.primary{background:var(--team);border-color:var(--team);color:var(--on-team)}
+.live-ctrl .icon{width:18px;height:18px;flex:none}
+.live-mgr .btn{min-height:56px}
+.live-final{width:100%;min-height:52px}
+.cm-final{font-weight:700}
+
+/* ================= phone ================= */
+@media(max-width:767px){
+  body{padding-bottom:calc(var(--ss-bar) + env(safe-area-inset-bottom, 0px))}
+  header.top{position:sticky;top:env(safe-area-inset-top, 0px);flex-wrap:nowrap;gap:10px;padding-top:10px;padding-bottom:10px;min-height:0}
+  #brandBadge{display:none}
+  .brand{flex:1;min-width:0}
+  .brand>div{min-width:0}
+  .brand b{font-size:16px;display:block;overflow:hidden;text-overflow:ellipsis}
+  .brand small{font-size:11.5px;letter-spacing:.02em}
+  .teaminfo{display:none}
+  .headctrl{flex-wrap:nowrap;gap:6px;margin-left:0}
+  .headctrl .next-cta{padding:0 14px;font-size:14px;white-space:nowrap}
+  .headctrl .next-cta .icon{display:none}
+  .headctrl .set-btn{min-width:44px;min-height:44px;padding:0 10px}
+
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:35;margin:0;gap:0;overflow:visible;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+    height:calc(var(--ss-bar) + env(safe-area-inset-bottom, 0px));padding:0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    background:var(--ss-1);border-top:1px solid var(--ss-3)}
+  nav.tabs button{flex-direction:column;justify-content:center;gap:3px;min-height:var(--ss-bar);padding:4px 0;border:0;border-radius:0;font-size:11px;font-weight:600;color:var(--ss-ink3);background:none!important;box-shadow:none!important;position:relative}
+  nav.tabs button.active{color:var(--ss-ink)}
+  nav.tabs button.active::before{content:"";position:absolute;top:0;left:28%;right:28%;height:3px;border-radius:0 0 3px 3px;background:var(--team)}
+  nav.tabs button .icon{width:22px;height:22px}
+  nav.tabs button .count{position:absolute;top:6px;left:calc(50% + 6px);margin:0;min-width:17px;height:17px;padding:0 4px;font-size:10px;line-height:17px}
+  nav.tabs .tab-x{display:none}
+  nav.tabs .tab-more{display:flex}
+  nav.tabs button>span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  #toasts{padding-bottom:calc(var(--ss-bar) + 16px + env(safe-area-inset-bottom, 0px))!important}
+  .coach-tip{bottom:calc(var(--ss-bar) + 12px + env(safe-area-inset-bottom, 0px))!important}
+
+  .msg-acts{flex-direction:column}
+  .msg-acts .btn{width:100%;justify-content:flex-start;text-align:left;min-height:52px}
+  .btn-sm{min-height:40px}
+  select{min-height:44px}
+
+  .live-row{gap:6px}
+  .live-mgr{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .live-play{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .live-play select{grid-column:1/-1;min-height:44px}
+  .live-row .btn{flex-direction:column;gap:3px;padding:6px 2px!important;font-size:12.5px!important}
+  .live-mgr .btn{min-height:60px}
+  .live-play .btn{min-height:54px}
+}
+
+/* ================= tablet: side rail ================= */
+@media(min-width:768px) and (max-width:1023px){
+  header.top{position:sticky;top:env(safe-area-inset-top, 0px)}
+  .shell{grid-template-columns:92px minmax(0,1fr);gap:20px;align-items:start}
+  .shell:has(> nav.tabs[hidden]){grid-template-columns:minmax(0,1fr)}
+  nav.tabs{flex-direction:column;overflow:visible;position:sticky;top:96px;margin:16px 0;gap:2px}
+  nav.tabs button{flex-direction:column;justify-content:center;gap:4px;min-height:58px;padding:6px 2px;border:0;border-radius:12px;font-size:11.5px;box-shadow:none!important}
+  nav.tabs button.active{background:var(--ss-2);color:var(--ss-ink);box-shadow:inset 3px 0 0 var(--team)!important}
+  nav.tabs button .icon{width:22px;height:22px}
+  nav.tabs button .count{position:absolute;top:6px;right:14px;margin:0}
+  #view{padding-top:16px}
+}
+
+/* ---- hero: a flat surface step, no decorative rings ---- */
+.hero{background:var(--ss-1);border-color:var(--ss-3)}
+.hero::before{display:none}
+.hero-title{font-weight:700}
+@media(max-width:767px){
+  .hero{padding:20px 16px;border-radius:16px}
+  .hero-top .chip{display:none}
+  /* the top bar already carries this action */
+  .hero-more .hero-cta{display:none}
+  .hero-more{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
+  .hero-more .btn{width:100%;justify-content:center;min-height:48px;padding:8px 6px;font-size:13.5px}
+  .hero-more .gold{grid-column:1/-1}
+  .hero-more .btn{white-space:nowrap}
+  .hero-more .btn:not(.gold) .icon{display:none}
+}
+.sq-st{display:flex;align-items:center;gap:6px;margin-top:2px}
+/* both control groups stacked, full width, at every size */
+.pv-broadcast .live-ctrl,.live-ctrl{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:8px}
+.live-ctrl>.live-row,.live-ctrl>.card{width:100%;margin:0}
