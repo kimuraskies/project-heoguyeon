@@ -85,6 +85,7 @@ function previewNote(){
 function afterGame(res){
   ensure();
   const f=fm();
+  tradeReact(); // press and fan reactions for new trades, and the second look 40 games on
   [res.home,res.away].forEach(t=>{
     const wasInj = t===USER? allPlayers(t).filter(p=>K.isInjured(p)).map(p=>p.n) : [];
     const hurt=K.applyFatigue(t,res.box,coachWear(t));

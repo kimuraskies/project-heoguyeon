@@ -200,3 +200,17 @@ nav.tabs button>span{white-space:nowrap}
 .sp-pt.hit{fill:#e5484d}.sp-pt.out{fill:var(--ss-ink3);fill-opacity:.75}
 .sc-spray[data-f="GB"] .sp-pt:not(.t-GB),.sc-spray[data-f="LD"] .sp-pt:not(.t-LD),.sc-spray[data-f="FB"] .sp-pt:not(.t-FB):not(.t-PU){display:none}
 @media(max-width:767px){.sc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---- 0.7 trade history ---- */
+.th-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.th-row{background:var(--ss-2);border-radius:12px;padding:12px}
+.th-when{font-size:12px;color:var(--ss-ink3);margin-bottom:8px}
+.th-sides{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.th-side{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:13.5px}
+.th-side small{color:var(--ss-ink3);font-size:11px}
+.th-side em{font-style:normal;color:var(--ss-ink3);font-size:12px}
+.th-g{align-self:flex-start;font:700 13px var(--ss-num);padding:1px 8px;border-radius:6px;background:var(--ss-3)}
+.th-g.g-A,.th-g.g-B{background:color-mix(in oklab,var(--good) 30%,var(--ss-2))}.th-g.g-D,.th-g.g-F{background:color-mix(in oklab,var(--bad) 30%,var(--ss-2))}
+.th-fans{margin-top:8px;font-size:13px}.th-fans summary{cursor:pointer;color:var(--ss-ink2)}
+.th-fans p{margin:6px 0 0;padding:8px 10px;background:var(--ss-1);border-radius:8px}.th-fans p small{display:block;color:var(--ss-ink3);font-size:11px}
+@media(max-width:600px){.th-sides{grid-template-columns:minmax(0,1fr)}}

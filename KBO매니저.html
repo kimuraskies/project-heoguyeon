@@ -1166,7 +1166,7 @@ function render(){
   else if(currentTab==="sched") v.innerHTML=renderSched();
   else if(currentTab==="stand") v.innerHTML=renderStand();
   else if(currentTab==="leaders") v.innerHTML=FM.saberTeam()+renderLeaders();
-  else if(currentTab==="trade") v.innerHTML=renderTrade();
+  else if(currentTab==="trade") v.innerHTML=renderTrade()+(FM.tradeHistoryCard?FM.tradeHistoryCard():"");
   else if(currentTab==="inbox") v.innerHTML=FM.renderInbox();
   else if(currentTab==="feed") v.innerHTML=FM.renderFeed();
   else if(currentTab==="club") v.innerHTML=FM.renderClub()+FM.staffCard();
