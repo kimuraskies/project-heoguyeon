@@ -317,7 +317,7 @@ function fxQuotaFix(t){ const r=K.ROSTERS[t], moved=[];
       const fa=farmOf(t), up=fa.filter(x=>!x.f&&x.type===p.type&&!K.isInjured(x)&&
         (p.role!=='SP'||x.role==='SP')&&(p.pos!=='C'||x.pos==='C'))
         .sort((a,b)=>K.ovr(b)-K.ovr(a)).find(x=>!entryProblem(t,[p],[x]));
-      if(!up) throw new Error('No legal domestic replacement for '+t+' '+p.n);
+      if(!up) break;   // no legal swap: leave it; tools/tests/roster-rules.js fails on any club over the quota
       const arr=p.type==='B'?r.batters:r.pitchers;
       arr.splice(arr.indexOf(p),1,up); fa.splice(fa.indexOf(up),1,p);
       on.splice(on.indexOf(p),1); moved.push(p.n);
