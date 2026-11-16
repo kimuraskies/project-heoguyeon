@@ -101,7 +101,7 @@ function renderSetup(){
       </div>
     </div>
   </section>
-  <div class="card" style="margin-top:14px"><h3>구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
+  <div class="card" id="clubPick" style="margin-top:14px"><h3>구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">${K.TEAM_IDS.slice().sort((a,b)=>ranks[a]-ranks[b]).map(card).join('')}</div>
   </div>
   <div class="card setup-foot">
@@ -109,7 +109,8 @@ function renderSetup(){
       <b id="setup-sum-name">${esc((setup.name||'').trim()||'무명')} 감독</b> <span class="muted">· ${MGR_BG[setup.bg].label}</span><br>
       ${ready? `<span class="muted" style="font-size:13px"><span class="teamdot" style="background:${K.ROSTERS[t].color}"></span> ${K.ROSTERS[t].name} · 전력 ${ranks[t]}위 · 목표 ${expectationFor(ranks[t]).label}</span>`
         : '<span class="muted" style="font-size:13px">구단을 선택하세요.</span>'}</div></div>
-    <button class="btn primary" style="padding:12px 22px;font-size:15px" ${ready?'':'disabled'} onclick="FM.setupStart()">✍ 감독 취임하기</button>
+    ${ready? '<button class="btn primary" style="padding:12px 22px;font-size:15px" onclick="FM.setupStart()">감독 취임하기</button>'
+      : '<button class="btn" style="padding:12px 22px;font-size:15px" onclick="document.getElementById(\'clubPick\').scrollIntoView({behavior:\'smooth\'})">구단 고르기 ↓</button>'}
   </div>`;
 }
 function setupMore(open){ setup.more=!!open; }

@@ -94,6 +94,7 @@
     if (get(PLAN) === PLAN_ID) return;
     if (document.querySelector('.modal-bg') || document.body.classList.contains('gate-on')) { if ((tries || 0) < 20) setTimeout(() => askFeedback((tries || 0) + 1), 1500); return; }
     set(PLAN, PLAN_ID); set(ASKED, ASK_ID); set(SEEN, NOTICES[0].id); dot();
+    if (!RETURNING) return; // first visit: the coach's guide comes first, the notes stay in 공지사항
     if (window.Track) Track.action('plan_show');
     const li = a => a.map(x => `<li>${x}</li>`).join('');
     show(`${X}<h2>0.5 업데이트가 나왔어요</h2>
@@ -101,7 +102,7 @@
       <h3>이번에 바뀐 점</h3><ul>${li(SOON)}</ul>
       <h3>그다음 준비 중</h3><ul>${li(NEXT)}</ul>
       <p class="hint">새 버전을 플레이해 보신 느낌이나 불편한 점도 들려 주세요.</p></div>
-      <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="Info.askOpen()">의견 보내기</button><button class="btn" onclick="Info.askClose()">확인</button></div>`);
+      <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="Info.askClose()">확인</button><button class="btn" onclick="Info.askOpen()">의견 보내기</button></div>`);
   }
   function askOpen() { if (window.Track) Track.action('askfb_open'); App.closeModal(); Feedback.open('plan-popup'); }
   function askClose() { if (window.Track) Track.action('askfb_close'); App.closeModal(); }

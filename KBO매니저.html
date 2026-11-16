@@ -533,7 +533,7 @@ function openPreview(){
     ${FM.previewNote()}
     ${FM.briefingCard()}${FM.tacticsCard('match')}
     <div class="mp-foot">
-      <button class="btn" onclick="App.cancelPreview();App.tab('lineup')">로테이션·마무리 설정</button>
+      <button class="btn" onclick="App.cancelPreview();App.luView('pit');App.tab('lineup')">로테이션·마무리 설정</button>
       <button class="btn primary" onclick="App.startMatch()">${FM.icon('play')}경기 시작</button>
     </div>
   </div>`;
@@ -1355,7 +1355,7 @@ function renderSquad(){
     <button class="${squadView==='bat'?'active':''}" onclick="App.squadView('bat')">타자</button>
     <button class="${squadView==='pit'?'active':''}" onclick="App.squadView('pit')">투수</button>
     <button class="${squadView==='farm'?'active':''}" onclick="App.squadView('farm')">2군 (퓨처스)</button></div>`;
-  const down=p=>`<td><button class="btn btn-sm" onclick="FM.demote('${p.n.replace(/'/g,"\\'")}')">2군</button></td></tr>`;
+  const down=p=>`<td><button class="btn btn-sm" onclick="FM.demote('${p.n.replace(/'/g,"\\'")}')">2군 보내기</button></td></tr>`;
   const withDown=(html,p)=>html.replace(/<\/tr>$/,'')+down(p);
   let body;
   if(squadView==="farm") body=FM.farmView();
@@ -1371,13 +1371,14 @@ function renderSquad(){
       <th>G</th><th>GS</th><th>W</th><th>L</th><th>SV</th><th>HD</th><th>IP</th><th>SO</th><th>BB</th><th>ERA</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   }
   const q=s=>s.replace(/'/g,"\\'"), two=(p,ks)=>ks.map(([k,l])=>[l,p[k]]).sort((x,y)=>y[1]-x[1]).slice(0,2).map(([l,v])=>`${l} <b>${ratNum(v)}</b>`).join(' · ');
-  const card=(p,isP)=>`<li class="sq-row"><button class="sq-main" onclick="App.player('${USER}','${q(p.n)}')"><span class="sq-name">${FM.esc(p.n)}</span><span class="sq-sub">${isP?p.role:p.pos} · ${p.age}세 · ${two(p,isP?[['stu','구위'],['ctl','제구'],['mov','무브'],['sta','체력']]:[['con','컨택'],['pow','파워'],['eye','선구'],['spd','주력'],['fld','수비']])}</span><span class="sq-st">${FM.statusInline(p)}</span></button><span class="sq-ovr">${K.ovr(p)}</span><button class="btn btn-sm" onclick="FM.demote('${q(p.n)}')">2군</button></li>`;
+  const card=(p,isP)=>`<li class="sq-row"><button class="sq-main" onclick="App.player('${USER}','${q(p.n)}')"><span class="sq-name">${FM.esc(p.n)}</span><span class="sq-sub">${isP?p.role:p.pos} · ${p.age}세 · ${two(p,isP?[['stu','구위'],['ctl','제구'],['mov','무브'],['sta','체력']]:[['con','컨택'],['pow','파워'],['eye','선구'],['spd','주력'],['fld','수비']])}</span><span class="sq-st">${FM.statusInline(p)}</span></button><span class="sq-ovr"><small>OVR</small>${K.ovr(p)}</span><button class="btn btn-sm" onclick="FM.demote('${q(p.n)}')">2군 보내기</button></li>`;
   const list = squadView==='farm' ? '' : `<ul class="sq-list">${(squadView==='bat'?r.batters:r.pitchers).slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).map(p=>card(p,squadView!=='bat')).join('')}</ul>`;
-  return `${FM.fxCard()}<div class="card"><h3>${r.name} 선수단 <span class="tag">1군 엔트리 ${FM.entryCount(USER)}/${FM.ENTRY_MAX} · 이름을 누르면 상세 프로필</span></h3>${tabs}${list}<div class="${squadView==='farm'?'':'sq-table'}">${body}</div></div>`;
+  return `${FM.fxCard()}<div class="card"><h3 class="sq-h">${r.name} 선수단 <span class="tag">1군 엔트리 ${FM.entryCount(USER)}/${FM.ENTRY_MAX} · 이름을 누르면 상세 프로필</span></h3>${tabs}${list}<div class="${squadView==='farm'?'':'sq-table'}">${body}</div></div>`;
 }
 
 const POS_OPTS=['C','1B','2B','3B','SS','LF','CF','RF','DH'];
 function userPositions(){ const c=state.cfgs[USER]; if(!c.positions||c.positions.length!==c.lineup.length) c.positions=K.autoPositions(USER,c.lineup); return c.positions; }
+let luView='bat'; // phones and tablets show one half of the lineup tab at a time
 function userLineupTable(){
   const c=state.cfgs[USER]; const r=K.ROSTERS[USER]; const pos=userPositions();
   const batOpts=(sel)=>r.batters.map(b=>`<option value="${b.n}" ${b.n===sel?'selected':''}>${b.n} (${b.pos}·${K.ovr(b)})</option>`).join("");
@@ -1388,7 +1389,7 @@ function userLineupTable(){
     return `<li class="lu-row"><span class="lu-o">${i+1}</span>
       <select class="lu-name" onchange="App.setLineup(${i},this.value)" aria-label="${i+1}번 타자">${batOpts(n)}</select>
       <select class="lu-pos" onchange="App.setPos(${i},this.value)" aria-label="${i+1}번 타자 수비 위치">${POS_OPTS.map(x=>`<option ${x===pos[i]?'selected':''}>${x}</option>`).join('')}</select>
-      <span class="lu-meta">${fitTxt}<span>컨 ${b?ratNum(b.con):'-'} · 파 ${b?ratNum(b.pow):'-'} · 선 ${b?ratNum(b.eye):'-'} · 주 ${b?ratNum(b.spd):'-'} · 수 ${b?ratNum(b.fld):'-'}</span>${b?FM.statusInline(b):''}</span></li>`;
+      <span class="lu-meta">${fitTxt}<span>컨택 ${b?ratNum(b.con):'-'} · 파워 ${b?ratNum(b.pow):'-'} · 선구 ${b?ratNum(b.eye):'-'} · 주력 ${b?ratNum(b.spd):'-'} · 수비 ${b?ratNum(b.fld):'-'} <small class="muted">(20점 만점)</small></span>${b?FM.statusInline(b):''}</span></li>`;
   }).join("");
   const issues=K.positionIssues(USER,c.lineup,pos);
   const defense=K.teamDefense(USER,c.lineup,pos);
@@ -1417,16 +1418,18 @@ function renderLineup(){
         <div><b>경기 대기 중</b> — ${pm.ps?pm.label+' · ':''}${pm.home===USER?'vs':'@'} ${K.ROSTERS[opp].name}. 라인업/선발을 확정한 뒤 제출하세요.</div>
         <button class="btn primary" onclick="App.startMatch()">${FM.icon('play')}경기 시작</button>
       </div></div>`; })() : '';
-  return banner + `<div class="grid cols2">
-    <div class="card"><h3>타순 · 수비 위치 <span class="tag">8개 수비 위치 + 지명타자</span></h3>
+  const luBtn=(v,l)=>`<button class="${luView===v?'active':''}" onclick="App.luView('${v}')">${l}</button>`;
+  return banner + `<div class="tabsm lu-switch">${luBtn('bat','타순 · 수비')}${luBtn('pit','투수 · 로테이션')}</div><div class="grid cols2 lu-split lu-show-${luView}">
+    <div class="card lu-bat"><h3>타순 · 수비 위치 <span class="tag">8개 수비 위치 + 지명타자</span></h3>
       ${userLineupTable()}
       <button class="btn" style="margin-top:10px" onclick="App.autoLineup()">${FM.icon('lineup')}코치 추천 라인업</button>
     </div>
-    <div class="card"><h3>선발 로테이션</h3>
+    <div class="card lu-pit"><h3>선발 로테이션</h3>
       <table><thead><tr><th>순번</th><th class="name">투수</th><th>능력</th></tr></thead><tbody>${rotRows}</tbody></table>
       <h3 style="margin-top:18px">마무리 투수</h3>
       <div class="row">${closerSel}</div>
       <div class="hint" style="margin-top:10px">선발은 투구수(체력에 따라 70~112구)나 5실점에서 교체됩니다. 불펜은 능력치 순으로 한 이닝씩 맡고, 지친 투수(컨디션 55% 미만)는 건너뜁니다. 9회 1~3점 차 리드 때 마무리가 등판합니다.</div>
+      <div class="hint" style="margin-top:8px">불펜 투수도 로테이션에 넣을 수 있어요. 로테이션에서 빠진 선발은 불펜으로 갑니다. 투수의 주 보직 자체를 바꾸려면 <a href="javascript:void(0)" onclick="App.tab('train')">훈련 → 보직 훈련</a>을 쓰세요.</div>
     </div>
   </div>` + FM.lineupCard();
 }
@@ -1811,6 +1814,7 @@ const App={
   setLineup:(i,v)=>{ const c=state.cfgs[USER], pos=userPositions();
     const old=c.lineup.indexOf(v); if(old>=0&&old!==i){ c.lineup[old]=c.lineup[i]; const tp=pos[old]; pos[old]=pos[i]; pos[i]=tp; } c.lineup[i]=v; render(); },
   setPos:(i,v)=>{ const pos=userPositions(); const old=pos.indexOf(v); if(old>=0&&old!==i){ pos[old]=pos[i]; } pos[i]=v; render(); },
+  luView:(v)=>{ luView=v; render(); },
   setRotation:(i,v)=>{ const c=state.cfgs[USER]; const old=c.rotation.indexOf(v); if(old>=0&&old!==i){c.rotation[old]=c.rotation[i];} c.rotation[i]=v; render(); },
   setCloser:(v)=>{ state.cfgs[USER].closer=v; render(); },
   autoLineup:()=>{ const d=K.defaultLineup(USER); state.cfgs[USER].lineup=d.lineup.slice(); state.cfgs[USER].positions=d.positions.slice(); render(); },

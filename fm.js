@@ -405,7 +405,7 @@ function renderSetup(){
       </div>
     </div>
   </section>
-  <div class="card" style="margin-top:14px"><h3>구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
+  <div class="card" id="clubPick" style="margin-top:14px"><h3>구단 선택 <span class="tag">전력 순위는 시즌 전 평가</span></h3>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px">${K.TEAM_IDS.slice().sort((a,b)=>ranks[a]-ranks[b]).map(card).join('')}</div>
   </div>
   <div class="card setup-foot">
@@ -413,7 +413,8 @@ function renderSetup(){
       <b id="setup-sum-name">${esc((setup.name||'').trim()||'무명')} 감독</b> <span class="muted">· ${MGR_BG[setup.bg].label}</span><br>
       ${ready? `<span class="muted" style="font-size:13px"><span class="teamdot" style="background:${K.ROSTERS[t].color}"></span> ${K.ROSTERS[t].name} · 전력 ${ranks[t]}위 · 목표 ${expectationFor(ranks[t]).label}</span>`
         : '<span class="muted" style="font-size:13px">구단을 선택하세요.</span>'}</div></div>
-    <button class="btn primary" style="padding:12px 22px;font-size:15px" ${ready?'':'disabled'} onclick="FM.setupStart()">✍ 감독 취임하기</button>
+    ${ready? '<button class="btn primary" style="padding:12px 22px;font-size:15px" onclick="FM.setupStart()">감독 취임하기</button>'
+      : '<button class="btn" style="padding:12px 22px;font-size:15px" onclick="document.getElementById(\'clubPick\').scrollIntoView({behavior:\'smooth\'})">구단 고르기 ↓</button>'}
   </div>`;
 }
 function setupMore(open){ setup.more=!!open; }
@@ -2575,7 +2576,7 @@ function statusCells(p){
 }
 function statusInline(p){
   if(K.isInjured(p)) return `<span class="pill" style="background:rgba(224,85,106,.2);color:var(--bad)">🩹부상 ${p.inj}</span>`;
-  return `${condBar(p)} ${moraleFace(K.mor(p))}${fm()&&fm().restNext.indexOf(p.n)>=0?' <span class="pill pos">휴식예정</span>':''}`;
+  return `${condBar(p)} <span class="mor-face" title="사기">${moraleFace(K.mor(p))}</span>${fm()&&fm().restNext.indexOf(p.n)>=0?' <span class="pill pos">휴식예정</span>':''}`;
 }
 function attrNum(v){ const a=attr20(v); return `<b style="color:${attrColor(a)}">${a}</b>`; }
 function tabBadge(id){
@@ -3109,7 +3110,7 @@ function entryProblem(t, outP, inP, who){
 function fxCard(){ const on=allPlayers(USER).filter(p=>p.f), off=farmOf(USER).filter(p=>p.f);
   const slot=(p,lab)=>p? `<div class="fx-slot"><small>${lab}</small><b><a href="javascript:void(0)" onclick="FM.showProfile('${USER}','${q(p.n)}')">${esc(p.n)}</a></b><span>${posFull(p.pos||p.role)} · OVR ${K.ovr(p)}</span></div>` : `<div class="fx-slot empty"><small>${lab}</small><b>빈 자리</b><span>구단 탭에서 영입</span></div>`;
   const F=on.filter(p=>!p.aq), A=on.filter(p=>p.aq);
-  return `<div class="card fx-card"><h3>🌏 1군 보유 외국인 선수 <span class="tag">외국인 ${F.length}/${FX_F} · 아시아쿼터 ${A.length}/${FX_AQ}</span></h3>
+  return `<div class="card fx-card"><h3>1군 보유 외국인 선수 <span class="tag"${F.length>FX_F?' style="color:var(--bad)"':''}>외국인 ${F.length}/${FX_F} · 아시아쿼터 ${A.length}/${FX_AQ}</span></h3>
     <div class="fx-slots">${[0,1,2].map(i=>slot(F[i],'외국인 '+(i+1))).join('')}${slot(A[0],'아시아쿼터')}</div>
     ${off.length?`<p class="hint" style="margin:8px 0 0">2군: ${off.map(p=>`${esc(p.n)}(${fxLabel(p)})`).join(', ')}. 1군 자리가 비어야 올릴 수 있습니다.</p>`:''}</div>`; }
 function joinClub(t,p){
@@ -3408,6 +3409,7 @@ function renderTraining(){
     <div class="section-head"><div><p class="eyebrow">Player development</p><h2>육성 · 훈련</h2></div>
       <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn btn-sm" onclick="FM.setTrainAll('f')">약점 보완 자동 설정</button>
         <button class="btn btn-sm" onclick="FM.setTrainAll('i','light')">전원 가볍게</button><button class="btn btn-sm" onclick="FM.setTrainAll('i','normal')">전원 보통</button><button class="btn btn-sm" onclick="FM.setTrainAll('i','hard')">전원 강하게</button></div></div>
+    <p class="hint" style="margin:10px 0 0">선발과 불펜을 <b>지금 바로</b> 바꾸려면 <a href="javascript:void(0)" onclick="App.luView('pit');App.tab('lineup')">라인업 → 투수</a>에서 로테이션을 바꾸세요. 아래 <b>보직 훈련</b>은 몇 주에 걸쳐 다른 보직에 익숙해지게 하는 훈련이에요.</p>
     <p class="hint" style="margin:10px 0 0">정규시즌 ${TR_EVERY}경기마다 훈련 효과가 반영되고, ${TR_REPORT}경기마다 육성 코치가 리포트를 보냅니다. 성장 가능성은 <b>나이</b>, <b>잠재력까지 남은 여유</b>, <b>출전 기회</b>(2군에서 매일 뛰면 ↑, 1군 벤치에 오래 있으면 ↓), <b>훈련 강도</b>로 정해집니다. 강하게 하면 빨리 크지만 컨디션이 떨어지고 가끔 다칩니다. 야수는 <b>포지션 훈련</b>으로 다른 자리 수비를 익힐 수 있습니다. 숙련이 오를수록 그 자리 수비 페널티가 줄고, 100%가 되면 제2 포지션이 됩니다(포수가 가장 오래 걸리고, 젊을수록·수비 코치가 좋을수록 빠름). 투수는 <b>보직 훈련</b>(선발·중계·마무리 숙련도)과 <b>신규 구종</b>을 익힐 수 있습니다. 숙련이 낮은 보직에 쓰면 그만큼 공이 덜 위력적이고, 새 구종을 익히면 무브먼트가 오릅니다.</p>
     ${top.length? `<div class="brief-line" style="flex-wrap:wrap">${icon('morale-up')}<span>${state.year} 성장 TOP: ${top.map(x=>`<b>${esc(x.p.n)}</b> +${x.n}`).join(' · ')}</span></div>` : ''}
     <div class="tabsm" style="margin-top:14px">${filt.map(([k,l])=>`<button class="${trFilter===k?'active':''}" onclick="FM.setTrFilter('${k}')">${l}</button>`).join('')}</div>

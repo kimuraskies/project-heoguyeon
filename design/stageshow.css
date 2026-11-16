@@ -141,8 +141,8 @@ nav.tabs button>span{white-space:nowrap}
 @media(max-width:767px){
   .hero{padding:20px 16px;border-radius:16px}
   .hero-top .chip{display:none}
-  /* the top bar already carries this action */
-  .hero-more .hero-cta{display:none}
+  /* the next game also lives on the card the eye is on */
+  .hero-more .hero-cta{grid-column:1/-1;order:-1;min-height:52px}
   .hero-more{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
   .hero-more .btn{width:100%;justify-content:center;min-height:48px;padding:8px 6px;font-size:13.5px}
   .hero-more .gold{grid-column:1/-1}
@@ -153,3 +153,18 @@ nav.tabs button>span{white-space:nowrap}
 /* both control groups stacked, full width, at every size */
 .pv-broadcast .live-ctrl,.live-ctrl{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:8px}
 .live-ctrl>.live-row,.live-ctrl>.card{width:100%;margin:0}
+
+/* ---- 0.5.1 ---- */
+/* lineup: one half at a time below desktop */
+.lu-switch{margin-bottom:12px}
+@media(min-width:1024px){.lu-switch{display:none}}
+@media(max-width:1023px){.lu-show-bat .lu-pit,.lu-show-pit .lu-bat{display:none}.lu-split{grid-template-columns:minmax(0,1fr)!important}}
+/* squad: OVR named, title on its own line */
+.sq-ovr small{display:block;font:600 9.5px/1 var(--ss-num);letter-spacing:.06em;color:var(--ss-ink3);text-align:right;margin-bottom:2px}
+/* card titles with a note: the note goes under the title so the title never breaks mid-word */
+@media(max-width:767px){.card>h3:has(>.tag){display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left}.card>h3>.tag{margin-left:0}}
+/* status in lists says what it is */
+.sq-st [title^="컨디션"]>span:last-child::before,.lu-meta [title^="컨디션"]>span:last-child::before{content:"컨디션 "}
+.sq-st .mor-face::before,.lu-meta .mor-face::before{content:"사기 ";font-size:11px;color:var(--ss-ink3)}
+/* coach guide: dim everything but the thing being explained */
+.guide-hl{box-shadow:0 0 0 100vmax rgba(0,0,0,.55)}
