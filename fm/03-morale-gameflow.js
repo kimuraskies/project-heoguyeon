@@ -104,6 +104,7 @@ function afterGame(res){
     checkUnhappy(ug);
     checkFatigueWarning(ug);
     checkStreak();
+    aiTradeTick();
     maybeTradeOffer(ug);
     coachReport(ug);
     coachDesk(ug);
@@ -180,15 +181,11 @@ function maybeTradeOffer(ug){
   // offers pick up in the last two weeks before the deadline
   const rush=w.daysLeft!=null&&w.daysLeft<=14;
   if(ug-f.lastOffer<(rush?3:10) || Math.random()>(rush?0.3:0.08)) return;
-  const mine=allPlayers(USER).filter(p=>!K.isInjured(p));
-  const listed=mine.filter(p=>p.listed);
-  const pool=listed.length? listed : mine.slice().sort((a,b)=>playerValue(b)-playerValue(a)).slice(0,14);
-  const want=pool[Math.floor(Math.random()*pool.length)]; if(!want) return;
-  const teams=K.TEAM_IDS.filter(t=>t!==USER); const team=teams[Math.floor(Math.random()*teams.length)];
-  const v=playerValue(want);
-  const give=allPlayers(team).filter(p=>!K.isInjured(p) && p.type===want.type && (p.type==='B'||(p.role==='SP')===(want.role==='SP')) && playerValue(p)>=v-4 && playerValue(p)<=v+1)
-    .sort((a,b)=>playerValue(b)-playerValue(a))[0];
-  if(!give) return;
+  const teams=K.TEAM_IDS.filter(t=>t!==USER), start=Math.floor(Math.random()*teams.length);
+  let offer=null;
+  for(let i=0;i<teams.length&&!offer;i++) offer=findTradeOffer(teams[(i+start)%teams.length]);
+  if(!offer) return;
+  const {team,want,give}=offer;
   f.lastOffer=ug;
   send(`${K.ROSTERS[team].name} 단장`,'🤝',`트레이드 제안: ${want.n} ↔ ${give.n}`,
     `${K.ROSTERS[team].name}가 ${want.n} 영입을 원합니다.\n\n` +
