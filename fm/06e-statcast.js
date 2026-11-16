@@ -74,7 +74,7 @@ function sprayChart(name){
   const btn=(v,l)=>`<button type="button" onclick="const w=this.closest('.sc-spray');w.dataset.f='${v}';w.querySelectorAll('.sc-filter button').forEach(b=>b.classList.toggle('active',b===this))" class="${v==='all'?'active':''}">${l}</button>`;
   return `<figure class="sc-spray" data-f="all"><figcaption>스프레이 차트 <small>최근 ${pts.length}타구 · 빨강 안타, 회색 아웃</small></figcaption>
     <div class="tabsm sc-filter">${btn('all','전체')}${btn('GB','땅볼')}${btn('LD','라인드라이브')}${btn('FB','뜬공')}</div>
-    <svg viewBox="0 0 300 160" role="img" aria-label="${esc(name)} 스프레이 차트">
+    <svg viewBox="48 18 204 138" role="img" aria-label="${esc(name)} 스프레이 차트">
       <path d="M150 150 L${fence[0]} ${fence.map(p=>'L'+p.join(' ')).join(' ')} Z" class="sp-field"/>
       <path d="M150 150 L${inf.map(p=>p.join(' ')).join(' L')} Z" class="sp-inf"/>${dots}</svg></figure>`;
 }
