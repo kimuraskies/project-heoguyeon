@@ -1,8 +1,9 @@
 /* Options, notices and the information pages: what this project is, what it records, where the
    data comes from, and how saves work. Opened from the header's 설정 dropdown. */
 (function () {
-  const TRACK_OFF = 'kbo-track-off', SEEN = 'kbo-notice-seen', ASKED = 'kbo-ask-feedback', ASK_ID = '2026-11-12', PLAN = 'kbo-upcoming', PLAN_ID = '2026-11-14';
-  const SOON = ["실제 2026 신인 드래프트: 10개 구단이 지명한 신인 선수가 가상 신인 대신 2군에 합류했어요. 새 커리어부터 적용돼요.","스토브리그가 주 단위 결정으로 바뀌었어요. 구단주 방침, FA 협상, 트레이드 주간, 코치 평가, 스프링캠프 이벤트와 주전 경쟁이 생겼어요.","야수 포지션 훈련, 받은편지함과 설정 화면 개선, 투수 구종과 보직 정리","버그 수정: 시즌 중 합류한 선발 투수(예: 삼성 페덱)가 불펜으로 나오던 문제, 2군 선수가 1루수로 몰리던 문제, 스프링캠프에 외국인 선수를 영입할 수 없던 문제"];
+  const TRACK_OFF = 'kbo-track-off', SEEN = 'kbo-notice-seen', ASKED = 'kbo-ask-feedback', ASK_ID = '2026-11-12', PLAN = 'kbo-upcoming', PLAN_ID = '2026-11-16';
+  const SOON = ["휴대폰 화면을 새로 짰어요. 자주 쓰는 다섯 메뉴가 화면 아래에 고정되고, 나머지는 '더보기'에 모았어요. 태블릿에서는 왼쪽 세로 메뉴로 바뀌어요.","위쪽 막대에 지금 시즌 단계와 다음 행동 버튼이 항상 보여요.","받은편지함: 메시지를 열면 바로 본문으로 내려가고, 답한 뒤 '다음 결정'으로 이어져요. 오늘 마감인 결정만 진행을 멈춰요.","라인업과 선수단이 휴대폰에서 표 대신 한 줄 목록으로 보여요.","개막 전 감독실에 개막까지 남은 단계가 보여요.","중계 버튼이 커지고 이모지 대신 아이콘으로 바뀌었어요. 경기가 끝나면 결과가 깔끔하게 정리돼요.","작은 탭에서 고른 항목이 채워진 색과 체크로 표시돼요."];
+  const PREV = ["실제 2026 신인 드래프트: 10개 구단이 지명한 신인 선수가 가상 신인 대신 2군에 합류했어요. 새 커리어부터 적용돼요.","스토브리그가 주 단위 결정으로 바뀌었어요. 구단주 방침, FA 협상, 트레이드 주간, 코치 평가, 스프링캠프 이벤트와 주전 경쟁이 생겼어요.","야수 포지션 훈련, 받은편지함과 설정 화면 개선, 투수 구종과 보직 정리","버그 수정: 시즌 중 합류한 선발 투수(예: 삼성 페덱)가 불펜으로 나오던 문제, 2군 선수가 1루수로 몰리던 문제, 스프링캠프에 외국인 선수를 영입할 수 없던 문제"];
   const NEXT = ["트레이드 이력: 우리 구단과 다른 구단의 트레이드 기록을 볼 수 있어요.","팬 반응: 연승, 트레이드, 인터뷰에 팬들이 반응하는 글이 올라와요."];
   const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   // read before the gate or the game writes anything: a save or an earlier entry means this visitor has been here before
@@ -10,7 +11,8 @@
   const set = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
   // newest first. id is the date; the header dot shows until the newest one has been opened
   const NOTICES = [
-    {id: '2026-11-14', t: '0.4 업데이트', b: SOON.concat(NEXT.map(x => '다음 준비 중 · ' + x))},
+    {id: '2026-11-16', t: '0.5 업데이트 · 휴대폰·태블릿 화면', b: SOON.concat(NEXT.map(x => '다음 준비 중 · ' + x))},
+    {id: '2026-11-14', t: '0.4 업데이트', b: PREV},
     {id: '2026-11-10', t: '0.3 업데이트', b: ['작전 야구: 번트·스퀴즈·히트앤런·도루·견제·피치아웃 사인을 경기 중에 낼 수 있어요.', '코칭스태프 10자리: 2026 개막 등록 코치와 보직 변경, 코치 건의', '경기 전 전력분석 브리핑, 선수 분석(WAR·상황별 기록·코치 진단)', '스프링캠프 4주, 스토브리그 FA 입찰, 뉴스, 연말 시상식', '정규시즌 일정이 3연전·2연전 방식으로 바뀌었어요.']},
     {id: '2026-11-09', t: '세이브는 이 브라우저에만 저장돼요', b: ['브라우저 데이터를 지우거나 기기를 바꾸면 커리어가 사라져요.', '설정 → 세이브 관리에서 세이브 파일을 받아 두면 다른 기기에서도 불러올 수 있어요.']},
     {id: '2026-11-07', t: '비영리 팬 프로젝트 안내', b: ['KBO 매니저는 한국 프로야구를 좋아하는 팬이 만든 비영리 프로젝트예요. KBO와 10개 구단의 공식 게임이 아니에요.', '광고와 결제가 없고, 수익을 내지 않아요.']}
@@ -94,7 +96,7 @@
     set(PLAN, PLAN_ID); set(ASKED, ASK_ID); set(SEEN, NOTICES[0].id); dot();
     if (window.Track) Track.action('plan_show');
     const li = a => a.map(x => `<li>${x}</li>`).join('');
-    show(`${X}<h2>0.4 업데이트가 나왔어요</h2>
+    show(`${X}<h2>0.5 업데이트가 나왔어요</h2>
       <div class="info-page"><p>${RETURNING ? '다시 찾아 주셔서 고마워요! ' : ''}남겨 주신 의견을 반영했어요.</p>
       <h3>이번에 바뀐 점</h3><ul>${li(SOON)}</ul>
       <h3>그다음 준비 중</h3><ul>${li(NEXT)}</ul>
