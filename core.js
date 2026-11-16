@@ -713,50 +713,152 @@ function restAdjust(teamId, cfg, opts){
 
 // ============ PITCH-BY-PITCH GENERATION ============
 var PITCH_TYPES=[
-  {k:'직구',base:147,sp:5},{k:'투심',base:144,sp:4},
-  {k:'슬라이더',base:135,sp:5},{k:'커브',base:121,sp:5},
-  {k:'체인지업',base:130,sp:4},{k:'포크',base:132,sp:4},
-  {k:'커터',base:140,sp:4},{k:'스위퍼',base:128,sp:4},{k:'스플리터',base:134,sp:4}
+  {k:'직구',code:'FF',base:147,sp:5,hb:-12,vb:38,whiff:.18},
+  {k:'투심',code:'SI',base:144,sp:4,hb:-24,vb:24,whiff:.14},
+  {k:'슬라이더',code:'SL',base:135,sp:5,hb:15,vb:6,whiff:.32},
+  {k:'커브',code:'CU',base:121,sp:5,hb:13,vb:-22,whiff:.29},
+  {k:'체인지업',code:'CH',base:130,sp:4,hb:-21,vb:17,whiff:.30},
+  {k:'포크',code:'FS',base:132,sp:4,hb:-7,vb:5,whiff:.34},
+  {k:'커터',code:'FC',base:140,sp:4,hb:5,vb:23,whiff:.22},
+  {k:'스위퍼',code:'SW',base:128,sp:4,hb:32,vb:4,whiff:.33},
+  {k:'스플리터',code:'SP',base:134,sp:4,hb:-10,vb:8,whiff:.35}
 ];
-function repertoire(pit){
-  var seed=0; for(var i=0;i<pit.n.length;i++) seed+=pit.n.charCodeAt(i);
-  var pool=[PITCH_TYPES[1],PITCH_TYPES[2],PITCH_TYPES[3],PITCH_TYPES[4],PITCH_TYPES[5]];
-  var r=[PITCH_TYPES[0], pool[seed%pool.length], pool[(seed+2)%pool.length]];
-  // pitches learned in training (p.np: names) join the mix
-  (pit.np||[]).forEach(function(k){ var t=PITCH_TYPES.filter(function(x){return x.k===k;})[0]; if(t&&r.indexOf(t)<0) r.push(t); });
-  return r;
+function statSeed(s){ var h=2166136261; for(var i=0;i<s.length;i++) h=Math.imul(h^s.charCodeAt(i),16777619); return h>>>0; }
+function statRNG(seed){ return function(){ seed=(seed+0x6D2B79F5)>>>0; var t=Math.imul(seed^seed>>>15,1|seed); t^=t+Math.imul(t^t>>>7,61|t); return ((t^t>>>14)>>>0)/4294967296; }; }
+var pitchRandom=statRNG(0x53544154);
+function arsenal(pit){
+  var seed=statSeed(pit.n), random=statRNG(seed), pool=PITCH_TYPES.slice(1);
+  var first=seed%pool.length, second=(first+3)%pool.length;
+  if(pool[first].code==='FC'&&pool[second].code==='SI') second=1; // keep an offspeed pitch in the base mix
+  var r=[PITCH_TYPES[0],pool[first],pool[second]];
+  (pit.np||[]).forEach(function(k){ var t=PITCH_TYPES.filter(function(x){return x.k===k||x.code===k;})[0]; if(t&&r.indexOf(t)<0) r.push(t); });
+  var fast=.35+random()*.20, weights=r.map(function(){return .7+random()*.6;}), sum=weights.slice(1).reduce(function(a,b){return a+b;},0);
+  var mirror=(pit.hand||handsOf(pit.n).t)==='좌'?-1:1, mov=1+((pit.mov==null?65:pit.mov)-65)*.007;
+  return r.map(function(t,i){return {k:t.k,code:t.code,use:i?(1-fast)*weights[i]/sum:fast,
+    velo:Math.round((140+((pit.stu==null?65:pit.stu)-50)*.35+t.base-147)*10)/10,
+    hb:Math.round(t.hb*mov*mirror*10)/10,vb:Math.round(t.vb*mov*10)/10,
+    whiff:clamp(t.whiff+((pit.stu||65)-65)*.002,.08,.48),zone:clamp(.47+((pit.ctl||65)-65)*.002,.36,.60),base:t.base,sp:t.sp};});
 }
+function repertoire(pit){ return arsenal(pit); }
 // 보직 숙련도 0..100: his own role is 100; training (p.rs) raises the others
 var ROLE_BASE={SP:{SP:100,RP:60,CL:50}, RP:{SP:45,RP:100,CL:70}, CL:{SP:40,RP:90,CL:100}};
 function roleSkill(p,job){ var own=ROLE_BASE[p.role]||ROLE_BASE.RP, v=p.rs&&p.rs[job]; return Math.max(own[job]||50, v||0); }
-function pickType(pit){ var r=repertoire(pit); return rnd()<0.5? r[0] : r[1+Math.floor(rnd()*(r.length-1))]; }
-function pitchVelo(pit,t){ return Math.round(t.base + (pit.stu-70)*0.32 + (rnd()*2-1)*t.sp); }
-function locFor(res){
-  function inZone(){ return {x:0.5+(rnd()*2-1)*0.17, y:0.5+(rnd()*2-1)*0.19}; }
-  function edge(){ var a=rnd()*Math.PI*2, rad=0.24+rnd()*0.13; return {x:0.5+Math.cos(a)*rad, y:0.5+Math.sin(a)*rad}; }
-  if(res==='B') return edge();
-  if(res==='HBP') return {x:0.5+(rnd()<0.5?-1:1)*(0.33+rnd()*0.08), y:0.5+(rnd()*2-1)*0.28};
-  if(res==='F'||res==='SW') return rnd()<0.5?inZone():edge();
-  return inZone();
+function pickType(pit,random,balls,strikes,res,side,list){
+  random=random||pitchRandom; var r=list||arsenal(pit), total=0;
+  var weights=r.map(function(t){ var fast=t.code==='FF'||t.code==='SI'||t.code==='FC';
+    var w=t.use*(balls>strikes?(fast?1.35:.72):strikes>balls?(fast?.8:1.3):1);
+    if(side&&side!==handsOf(pit.n).t&&(t.code==='CH'||t.code==='SP'||t.code==='FS')) w*=1.18;
+    if(res==='SW'||res==='K') w*=t.whiff; else if(res==='IP') w*=1-t.whiff;
+    total+=w; return w; });
+  var pick=random()*total; for(var i=0;i<r.length-1;i++){ pick-=weights[i]; if(pick<0) return r[i]; } return r[r.length-1];
 }
-function makePitch(pit,res){ var t=pickType(pit), loc=locFor(res); return {type:t.k,velo:pitchVelo(pit,t),res:res,x:loc.x,y:loc.y}; }
-function genPitchSeq(bat,pit,oc,extra){
+function inPitchZone(p){ return p.x>=.33&&p.x<=.67&&p.y>=.30&&p.y<=.70; }
+function zoneAxis(v,lo,hi){ return v<lo?0:v>hi?4:Math.min(3,1+Math.floor((v-lo)/((hi-lo)/3))); }
+function locFor(res,t,random){
+  function inside(){return {x:.33+random()*.34,y:.30+random()*.40};}
+  function outside(){ var p; do {p={x:.08+random()*.84,y:.06+random()*.88};} while(inPitchZone(p)); return p; }
+  if(res==='S') return inside();
+  if(res==='B'||res==='HBP') return outside();
+  var z=(res==='SW'?.35:res==='F'?.70:.81)+(t.zone-.47);
+  return random()<z?inside():outside();
+}
+function batHand(bat,pit){ var b=bat.hand||handsOf(bat.n).b; return b==='양'?((pit.hand||handsOf(pit.n).t)==='좌'?'우':'좌'):b; }
+function makePitch(pit,res,random,balls,strikes,bat,terminal,list){
+  random=random||pitchRandom;
+  var t=pickType(pit,random,balls||0,strikes||0,terminal==='K'?'K':res,bat&&batHand(bat,pit),list), loc=locFor(res,t,random);
+  return {type:t.k,code:t.code,velo:Math.round(t.velo+(random()*2-1)*t.sp),res:res,x:loc.x,y:loc.y};
+}
+// Length/count stream is independent of all pitch and contact decoration. Preserve the
+// old length rules (including patient/nibble extra fouls); never call the outcome RNG.
+function genPitchSeq(bat,pit,oc,extra,countRandom,random){
+  countRandom=countRandom||pitchRandom; random=random||pitchRandom;
+  var next=countRandom;
   var seq=[],balls=0,strikes=0;
-  function push(res){ seq.push(makePitch(pit,res)); }
-  if(oc==='BB'){ var ts=Math.floor(rnd()*3); while(balls<4){ if(strikes<ts&&rnd()<0.4){push('S');strikes++;} else {push('B');balls++;} } }
-  else if(oc==='K'){ var tb=Math.floor(rnd()*3),g=0; while(strikes<3&&g<10){ g++; if(balls<tb&&rnd()<0.45){push('B');balls++;} else { if(strikes===2&&rnd()<0.35){push('F');} else {push(rnd()<0.5?'SW':'S');strikes++;} } } }
-  else if(oc==='HBP'){ var n=Math.floor(rnd()*2); for(var i=0;i<n;i++){ if(rnd()<0.5){push('B');balls++;}else{push('S');strikes++;} if(balls>=3||strikes>=2)break; } push('HBP'); }
-  else { var tb2=Math.floor(rnd()*3),ts2=Math.floor(rnd()*3),g2=0; while((balls<tb2||strikes<ts2)&&g2<8){ g2++; if(balls<tb2&&(strikes>=ts2||rnd()<0.5)){push('B');balls++;} else { if(strikes===2&&rnd()<0.3){push('F');} else {push('S');strikes++;} } } push('IP'); }
-  if(extra && rnd()<extra && seq.length>=2){
-    var s2=0; for(var i=0;i<seq.length-1;i++){ var r=seq[i].res; if(r==='S'||r==='SW'||(r==='F'&&s2<2)) s2++; }
-    if(s2>=2) seq.splice(seq.length-1,0,makePitch(pit,'F'));
+  function push(res){ seq.push(res); }
+  if(oc==='BB'){ var ts=Math.floor(next()*3); while(balls<4){ if(strikes<ts&&next()<0.4){push('S');strikes++;} else {push('B');balls++;} } }
+  else if(oc==='K'){ var tb=Math.floor(next()*3),g=0; while(strikes<3&&g<10){ g++; if(balls<tb&&next()<0.45){push('B');balls++;} else { if(strikes===2&&next()<0.35){push('F');} else {push(next()<0.5?'SW':'S');strikes++;} } } }
+  else if(oc==='HBP'){ var n=Math.floor(next()*2); for(var i=0;i<n;i++){ if(next()<0.5){push('B');balls++;}else{push('S');strikes++;} if(balls>=3||strikes>=2)break; } push('HBP'); }
+  else { var tb2=Math.floor(next()*3),ts2=Math.floor(next()*3),g2=0; while((balls<tb2||strikes<ts2)&&g2<8){ g2++; if(balls<tb2&&(strikes>=ts2||next()<0.5)){push('B');balls++;} else { if(strikes===2&&next()<0.3){push('F');} else {push('S');strikes++;} } } push('IP'); }
+  if(extra && next()<extra && seq.length>=2){
+    var s2=0; for(var i=0;i<seq.length-1;i++){ var r=seq[i]; if(r==='S'||r==='SW'||(r==='F'&&s2<2)) s2++; }
+    if(s2>=2) seq.splice(seq.length-1,0,'F');
   }
-  return seq;
+  balls=0; strikes=0; var list=arsenal(pit);
+  return seq.map(function(res,i){ var terminal=i===seq.length-1&&oc==='K';
+    // The old ten-pitch guard can end on a foul; close a K with strike three
+    // in that same slot, preserving length and therefore every pitching change.
+    if(terminal||res==='S'||res==='SW'){ var u=random(); res=terminal?(u<.71?'SW':'S'):(u<.225?'SW':u<.64?'S':'F'); }
+    var p=makePitch(pit,res,random,balls,strikes,bat,terminal?'K':null,list);
+    if(res==='B') balls++; else if(res==='S'||res==='SW'||(res==='F'&&strikes<2)) strikes++;
+    return p;
+  });
 }
+
+// Generic symmetric park: center 122 m, gaps 110 m, foul lines 98 m.
+function statFence(ang){ return 122-24*Math.abs(ang)/45; }
+function bbDirection(bb,side){ return Math.abs(bb.ang)<=15?'Cent':(bb.ang*(side==='좌'?1:-1)>0?'Pull':'Oppo'); }
+// Empirical EV x LA lookup; node tools/statcast_audit.js 10 --fit, seed 20261106.
+// 398,679 contacts; mean weights 1B=.88, 2B=1.24, 3B=1.56, HR=2.01, other=0.
+// Rows: EV <110,<130,<145,<153,<165,>=165; columns: LA <0,<10,<20,<30,<40,>=40.
+var XW_EV=[110,130,145,153,165], XW_LA=[0,10,20,30,40];
+var XW_TABLE=[
+  [.29723,.29747,.55749,.38136,.12857,.02889],
+  [.29487,.29569,.55634,.38593,.12496,.04500],
+  [.29608,.29698,.55294,.39074,.12004,.05744],
+  [.30241,.29832,.55677,.40924,.13289,.12535],
+  [.34120,.33335,.63309,.68089,.69011,.17559],
+  [.33311,.32512,.64376,.96799,1.13286,.17751]
+];
+function statBucket(v,edges){ var i=0; while(i<edges.length&&v>=edges[i]) i++; return i; }
+function xwOBA(bb){ return XW_TABLE[statBucket(bb.ev,XW_EV)][statBucket(bb.la,XW_LA)]; }
+function barrel(bb){ return bb.ev>=158&&bb.la>=Math.max(8,26-(bb.ev-158))&&bb.la<=Math.min(50,30+(bb.ev-158)*1.5); }
+function battedBall(bat,pit,res,bunt,random){
+  var u=random(), tendency=clamp((bat.con-bat.pow)*.0015,-.07,.07), t;
+  if(bunt) t='BU';
+  else if(res==='HR') t=u<.10?'LD':'FB';
+  else if(res==='GIDP'||res==='FC') t='GB';
+  else if(res==='SF') t='FB';
+  else if(res==='1B') t=u<.60+tendency?'GB':u<.94?'LD':'FB';
+  else if(res==='2B'||res==='3B') t=u<.18+tendency?'GB':u<.78?'LD':'FB';
+  else if(res==='E') t=u<.85?'GB':'FB';
+  else t=u<.43+tendency?'GB':u<.57+tendency?'LD':u<.72+tendency?'PU':'FB';
+  var side=batHand(bat,pit), pull=clamp(.41+(bat.pow-70)*.0015,.35,.49), d=random();
+  var sign=d<pull?(side==='좌'?1:-1):d<pull+.37?0:(side==='좌'?-1:1);
+  var ang=sign?sign*(16+random()*28):(random()*2-1)*15;
+  var hard=random()<clamp(.32+(bat.pow-70)*.003+(res==='1B'?.03:res==='2B'||res==='3B'?.12:0),.15,.60);
+  var ev=hard?153+random()*25:100+random()*52;
+  ev+=(bat.pow-70)*.12;
+  var la,dist;
+  if(t==='BU'){ ev=45+random()*40; la=-20+random()*30; dist=2+random()*14; }
+  else if(t==='GB'){ la=-25+random()*34; dist=18+random()*23; }
+  else if(t==='LD'){ la=10+random()*15; dist=55+random()*40; }
+  else if(t==='PU'){ la=50+random()*25; ev=90+random()*50; dist=8+random()*38; }
+  else { la=25+random()*24; dist=65+random()*40; }
+  if(res==='HR'){ ev=158+random()*27+(bat.pow-70)*.12; la=t==='LD'?20+random()*5:26+random()*13; dist=statFence(ang)+2+random()*22; }
+  else if(res==='2B'||res==='3B'){
+    ang=sign?sign*(random()<.55?20+random()*6:39+random()*5):(ang<0?-1:1)*(18+random()*6);
+    dist=Math.min(statFence(ang)-2,(t==='GB'?64:83)+random()*20);
+  } else if(res==='1B'&&!bunt){
+    if(t==='GB') { ang=sign?sign*(22+random()*5):ang; dist=30+random()*22; }
+    else dist=45+random()*28;
+  } else if(res==='SF'){ dist=70+random()*30; }
+  else if(res==='OUT'||res==='GIDP'){
+    if(t==='GB'||t==='PU'){ ang=sign?sign*(random()<.5?19:36)+(random()*2-1)*2:(ang<0?-1:1)*9; dist=t==='PU'?10+random()*25:27+random()*10; }
+    else { ang=sign?sign*29+(random()*2-1)*4:(random()*2-1)*7; dist=77+random()*20; }
+  }
+  if(res!=='HR') dist=Math.min(dist,statFence(ang)-1);
+  return {t:t,ang:Math.round(ang*10)/10,dist:Math.round(dist*10)/10,ev:Math.round(ev*10)/10,la:Math.round(la*10)/10};
+}
+function addStat(o,k,n){ o[k]=(o[k]||0)+n; }
 
 // ============ THE GAME (live step-by-step; simGame runs the same engine without pauses) ============
 function InteractiveGame(cfgH, cfgA, opts){
   opts=opts||{};
+  // One fixed seed draw per game. Changing decoration or its seed never consumes
+  // additional outcome draws or changes the independent pitch-length stream.
+  var gameSeed=(rnd()*4294967296)>>>0;
+  this._countRandom=statRNG(gameSeed^0x434E5421);
+  this._statRandom=statRNG(opts.statcastSeed==null?gameSeed^0x53544154:opts.statcastSeed);
   var self=this;
   this.h=cfgH.teamId; this.a=cfgA.teamId;
   this.maxInn=opts.maxInnings||12;
@@ -790,6 +892,32 @@ function InteractiveGame(cfgH, cfgA, opts){
 var IP=InteractiveGame.prototype;
 IP._ensureBat=function(t,n){var b=this.box[t].bat; if(!b[n])b[n]=newBatStat(); return b[n];};
 IP._ensurePit=function(t,n){var p=this.box[t].pit; if(!p[n]){ p[n]=newPitStat(); p[n].G=1; } return p[n];};
+IP._statPitches=function(p,ps){
+  var self=this, side=batHand(p.bat,getP(p.def,p.pitName))==='좌'?'L':'R';
+  p.pitches.forEach(function(x){ if(!x.code) return; var k='p'+x.code+'_';
+    if(ps[k+'n']==null) ['n','v','sw','wh','cs','z','ab','h','tb','k','gb','bip','nL','nR'].forEach(function(s){ps[k+s]=0;});
+    addStat(ps,k+'n',1); addStat(ps,k+'v',x.velo); addStat(ps,k+'n'+side,1);
+    addStat(ps,k+'sw',+(x.res==='SW'||x.res==='F'||x.res==='IP'));
+    addStat(ps,k+'wh',+(x.res==='SW')); addStat(ps,k+'cs',+(x.res==='S')); addStat(ps,k+'z',+inPitchZone(x));
+    // Middle 3x3 cells cover x [.33,.67], y [.30,.70]; outer ring is outside.
+    if(self.cfg[p.def].splits){ var col=zoneAxis(x.x,.33,.67),row=zoneAxis(x.y,.30,.70); addStat(ps,'z'+x.code+'_'+side+'_'+(row*5+col),1); }
+  });
+};
+IP._statContact=function(p,ev,bs,ps){
+  var res=ev.oc, pit=getP(p.def,p.pitName), last=p.pitches[p.pitches.length-1];
+  var bip=p.kind==='bunt'||['1B','2B','3B','HR','OUT','SF','GIDP','E','FC'].indexOf(res)>=0;
+  if(bip){ var bb=battedBall(p.bat,pit,res,p.kind==='bunt',this._statRandom); ev.bb=bb;
+    addStat(bs,'bb'+bb.t,1); addStat(bs,'bb'+bbDirection(bb,batHand(p.bat,pit)),1);
+    addStat(bs,'bbN',1); addStat(bs,'bbEV',bb.ev); addStat(bs,'bbHard',+(bb.ev>=153)); addStat(bs,'bbBrl',+barrel(bb)); addStat(bs,'xw',xwOBA(bb));
+    if(this.cfg[p.off].splits){ if(!bs.spr) bs.spr=[]; bs.spr.push([bb.ang,bb.dist,bb.t,res].join(',')); }
+  }
+  if(!last||!last.code) return;
+  var k='p'+last.code+'_', hit=['1B','2B','3B','HR'].indexOf(res)+1;
+  if(res==='BUNT1B') hit=1;
+  var ab=['BB','IBB','HBP','SF','SAC','SQOK'].indexOf(res)<0;
+  addStat(ps,k+'ab',+ab); addStat(ps,k+'h',+(hit>0)); addStat(ps,k+'tb',hit);
+  addStat(ps,k+'k',+(res==='K')); addStat(ps,k+'gb',+(bip&&ev.bb.t==='GB')); addStat(ps,k+'bip',+bip);
+};
 IP.offId=function(){return this.half==='top'?this.a:this.h;};
 IP.defId=function(){return this.half==='top'?this.h:this.a;};
 IP.opp=function(t){return t===this.h?this.a:this.h;};
@@ -1021,7 +1149,7 @@ IP.prepareAB=function(){
     return this._pending;
   }
   var bd=dcall==='buntd'?0.12:0;
-  function bp(){ var a=[]; if(rnd()<0.35) a.push(makePitch(pit,rnd()<0.5?'B':'F')); a.push(makePitch(pit,'IP')); return a; }
+  function bp(){ var a=[]; if(self._countRandom()<0.35) a.push(makePitch(pit,self._statRandom()<0.5?'B':'F',self._statRandom,0,0,bat)); a.push(makePitch(pit,'IP',self._statRandom,0,0,bat)); return a; }
   function buntPA(boc){ self.cmd[off]=null; if(dcall){ self.cmd[def]=null; }
     self._pending={kind:'bunt',off:off,def:def,batName:batName,bat:bat,pitName:self.pitcher[def],oc:boc,pitches:bp(),slot:slot}; return self._pending; }
   var be=this.edge(off,'bat');
@@ -1041,10 +1169,10 @@ IP.prepareAB=function(){
   if(v==='steal'||v==='delay'||v==='steal3'||v==='dsteal'||v==='shome'){
     this.cmd[off]=null; this.cmd[def]=null;
     var fs=this._signSteal(off,def,v,dcall);
-    if(fs){ this._pending={kind:'steal',variant:fs.variant,off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:fs.oc,runner:fs.runner,pitches:[makePitch(pit,dcall==='pitchout'||rnd()<0.6?'B':'S')],slot:slot,po:dcall==='pitchout'}; return this._pending; }
+    if(fs){ this._pending={kind:'steal',variant:fs.variant,off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:fs.oc,runner:fs.runner,pitches:[makePitch(pit,dcall==='pitchout'||this._statRandom()<0.6?'B':'S',this._statRandom,0,0,bat)],slot:slot,po:dcall==='pitchout'}; return this._pending; }
   } else if(!sign){
     var st=this._stealTry(off,def,false);
-    if(st){ this.cmd[def]=null; this._pending={kind:'steal',variant:'steal',off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:st.oc,runner:st.runner,pitches:[makePitch(pit, rnd()<0.6?'B':'S')],slot:slot}; return this._pending; }
+    if(st){ this.cmd[def]=null; this._pending={kind:'steal',variant:'steal',off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:st.oc,runner:st.runner,pitches:[makePitch(pit,this._statRandom()<0.6?'B':'S',this._statRandom,0,0,bat)],slot:slot}; return this._pending; }
   }
   var fatigue=Math.max(0,(this.pBF[def]-(pit.role==='SP'?18:4))*0.7);
   var mods=platoon(scoutMods(paMods(this.tac[off],this.tac[def],this.bases,this.outs,this.ex.bind(this,off),this.ex.bind(this,def)),this.know[off],this.know[def]),batName,this.pitcher[def]);
@@ -1059,8 +1187,8 @@ IP.prepareAB=function(){
   else if(sign==='buster'){ mods.K-=0.01; mods.BIP+=0.016+(dcall==='buntd'?0.02:0); mods.HR-=0.003; }
   if(dcall==='pitchout'){ mods.BB+=0.03; mods.K-=0.015; }
   var oc=simPA(bat,pit,fatigue,this.defense(def),mods);
-  var pitches=genPitchSeq(bat,pit,oc,(this.tac[off].atk==="patient"?0.35:0)+(this.tac[def].bat==="nibble"?0.35:0));
-  if(dcall==='pitchout'&&oc!=='BB') pitches.unshift(makePitch(pit,'B'));
+  var pitches=genPitchSeq(bat,pit,oc,(this.tac[off].atk==="patient"?0.35:0)+(this.tac[def].bat==="nibble"?0.35:0),this._countRandom,this._statRandom);
+  if(dcall==='pitchout'&&oc!=='BB') pitches.unshift(makePitch(pit,'B',this._statRandom,0,0,bat));
   if(sign&&(hr||sign==='buster')) this._log(off,sign,oc!=='K');
   this.cmd[off]=null; this.cmd[def]=null;
   this._pending={off:off,def:def,batName:batName,bat:bat,pitName:this.pitcher[def],oc:oc,pitches:pitches,slot:slot,hr:hr,po:dcall==='pitchout'};
@@ -1073,6 +1201,7 @@ IP.commitAB=function(){
   var thrown = (p.kind==='ibb'||p.variant==='pick')? 0 : p.pitches.length; if(p.kind==='ibb'||p.variant==='pick'){ strk=0; bll=0; }
   this.ptot[def]+=thrown; this.pstr[def]+=strk; this.pball[def]+=bll;
   var ps=this._ensurePit(def,p.pitName); ps.NP+=thrown;
+  this._statPitches(p,ps);
   var ev={inning:this.inning,half:this.half,batter:batName,pitcher:p.pitName,off:off,def:def,oc:oc,runs:0,desc:'',pitches:p.pitches};
   if(p.kind==='steal'){
     var rs=this._ensureBat(off,p.runner), B=this.bases, vr=p.variant||'steal'; ev.runner=p.runner; ev.steal=true; ev.variant=vr;
@@ -1124,6 +1253,7 @@ IP.commitAB=function(){
     }
   }
   if(p.kind==='ibb'||p.kind==='bunt'){
+    this._statContact(p,ev,bs,ps);
     if(this.half==='bottom'&&this.inning>=9&&this.score[this.h]>this.score[this.a]){ this.line[this.h].push(this.runsThisHalf); this.runsThisHalf=0; ev.walkoff=true; this.walkoff=true; this._finish(this.h); }
     else if(this.outs>=3) this._endHalf();
     ev.score={}; ev.score[this.h]=this.score[this.h]; ev.score[this.a]=this.score[this.a];
@@ -1165,6 +1295,7 @@ IP.commitAB=function(){
   if(splitB||splitP){ var fc=ev.oc, hi=['1B','2B','3B','HR'].indexOf(fc), noAB=fc==='BB'||fc==='HBP'||fc==='SF';
     var addS=function(o,keys){ keys.forEach(function(k){ if(!k) return; o[k+'_PA']=(o[k+'_PA']||0)+1; if(!noAB) o[k+'_AB']=(o[k+'_AB']||0)+1; if(hi>=0){ o[k+'_H']=(o[k+'_H']||0)+1; o[k+'_TB']=(o[k+'_TB']||0)+hi+1; } if(fc==='BB') o[k+'_BB']=(o[k+'_BB']||0)+1; if(fc==='K') o[k+'_SO']=(o[k+'_SO']||0)+1; }); };
     if(splitB) addS(bs,splitB); if(splitP) addS(ps,splitP); }
+  this._statContact(p,ev,bs,ps);
   // walk-off or half end
   if(this.half==='bottom'&&this.inning>=9&&this.score[this.h]>this.score[this.a]){
     this.line[this.h].push(this.runsThisHalf); this.runsThisHalf=0; ev.walkoff=true; this.walkoff=true; this._finish(this.h);
@@ -1193,7 +1324,7 @@ global.KBO = {
   newBatStat:newBatStat, newPitStat:newPitStat,
   getB:getB, getP:getP, InteractiveGame:InteractiveGame,
   cond:cond, mor:mor, isInjured:isInjured, applyFatigue:applyFatigue, restAdjust:restAdjust,
-  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf, handsOf:handsOf, repertoire:repertoire, roleSkill:roleSkill, PITCH_TYPES:PITCH_TYPES, ASIA_Q:ASIA_Q, posFitBase:posFitBase, SIGNS:SIGNS, planMods:planMods,
+  DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf, handsOf:handsOf, repertoire:repertoire, arsenal:arsenal, pickType:pickType, genPitchSeq:genPitchSeq, statRNG:statRNG, statFence:statFence, battedBall:battedBall, bbDirection:bbDirection, inPitchZone:inPitchZone, xwOBA:xwOBA, XW_EV:XW_EV, XW_LA:XW_LA, XW_TABLE:XW_TABLE, roleSkill:roleSkill, PITCH_TYPES:PITCH_TYPES, ASIA_Q:ASIA_Q, posFitBase:posFitBase, SIGNS:SIGNS, planMods:planMods,
   POS_LIST:POS_LIST, posFit:posFit, fieldVal:fieldVal, teamDefense:teamDefense, autoPositions:autoPositions, positionIssues:positionIssues
 };
 
