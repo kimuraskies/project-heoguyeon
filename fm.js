@@ -2596,7 +2596,7 @@ function tradeHistoryCard(){
   tradeReact();
   let list=tradeLogList().slice().reverse(); if(trHistFilter==='mine') list=list.filter(e=>e.a===USER||e.b===USER);
   const ft=(id,l)=>`<button class="${trHistFilter===id?'active':''}" onclick="FM.setTradeHist('${id}')">${l}</button>`;
-  const side=(t,got,g)=>`<div class="th-side"><b>${esc(K.ROSTERS[t].name)}</b>${g?`<span class="th-g g-${g}">${g}</span>`:''}<small>받음</small><span>${(got||[]).map(s=>`${esc(s.n)} <em>${esc(s.pos||s.role||'')} · ${s.age}세 · OVR ${s.ovr}</em>`).join('<br>')||'-'}</span></div>`;
+  const side=(t,got,g)=>`<div class="th-side"><div class="th-head"><b>${esc(K.ROSTERS[t].name)}</b>${g?`<span class="th-g g-${g}">${g} · ${TR_GRADE_L[g]}</span>`:''}</div><small>받음</small><span>${(got||[]).map(s=>`${esc(s.n)} <em>${esc(s.pos||s.role||'')} · ${s.age}세 · OVR ${s.ovr}</em>`).join('<br>')||'-'}</span></div>`;
   const rows=list.slice(0,30).map(e=>{ const rx=e.rx||{};
     return `<li class="th-row"><div class="th-when">${e.y} · ${e.phase==='stove'?'스토브리그':e.phase==='regular'?'시즌 중':esc(e.phase||'')}${e.kind==='ai'?'':' · <b>우리 구단</b>'}</div>
       <div class="th-sides">${side(e.a,e.bGive,rx.gA)}${side(e.b,e.aGive,rx.gB)}</div>
