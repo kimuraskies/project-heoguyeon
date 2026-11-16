@@ -1,11 +1,24 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+// Bootstrap a separate process from a fixed source tree, including its QA modules.
+// Every Runtime (also reloads/cases) then resolves sources relative to that copy.
+if(process.env.KBO_QA_SNAPSHOT!==path.resolve(__dirname,'..')){
+  const snapshot=require('./snapshot').createSnapshot(path.resolve(__dirname,'..'));
+  try{
+    const result=require('node:child_process').spawnSync(process.execPath,[path.join(snapshot.root,'qa','run.js'),...process.argv.slice(2)],{
+      stdio:'inherit',env:{...process.env,KBO_QA_SNAPSHOT:snapshot.root,KBO_QA_RESULTS:path.join(__dirname,'results')}
+    });
+    if(result.error)throw result.error;
+    process.exitCode=result.status??1;
+  }finally{snapshot.cleanup();}
+  return;
+}
 const {Runtime,sourceHashes,copy,json,attrs}=require('./runtime');
 const {Audit,totals,futuresTotals}=require('./audit');
 const opts={suite:'all',seed:20261105,seasons:6,growthSeeds:3};
 for(let i=2;i<process.argv.length;i++){const a=process.argv[i];if(a==='--suite')opts.suite=process.argv[++i];else if(a==='--seed')opts.seed=+process.argv[++i];else if(a==='--seasons')opts.seasons=+process.argv[++i];else if(a==='--growth-seeds')opts.growthSeeds=+process.argv[++i];else throw new Error('Unknown option '+a);}
 if(!['all','smoke','career','abuse','balance','growth','speed'].includes(opts.suite))throw new Error('Unknown suite');
-const out=path.join(__dirname,'results',opts.suite);fs.mkdirSync(out,{recursive:true});
+const out=path.join(process.env.KBO_QA_RESULTS||path.join(__dirname,'results'),opts.suite);fs.mkdirSync(out,{recursive:true});
 const start=performance.now(),hashes=sourceHashes(),audit=new Audit(out),runs=[],seasons=[],failures=[];
 const report={options:opts,node:process.version,platform:process.platform,cpu:os.cpus()[0]?.model,startedUTC:new Date().toISOString(),sourceHashes:hashes,runs,seasons,failures};
 function make(label,seed=opts.seed,extra={}){const h=new Runtime({seed,label,audit,...extra});runs.push(h);return h;}
