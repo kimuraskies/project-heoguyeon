@@ -143,6 +143,7 @@ function ensure(){
       lastWarn:-99, lastOffer:-99, lastTalk:{}, rt:{}, board:null, fin:null, fired:false, lastChance:false };
     seasonStart(true);
   }
+  if(!Array.isArray(state.fm.tradeLog)) state.fm.tradeLog=[];
   if(state.fm.fans==null) state.fm.fans=50;
   if(!state.fm.farmV){ K.TEAM_IDS.forEach(seedFarm); state.fm.farmV=1; }
   if(!state.fm.aqV){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(p=>{ if(p.f&&K.ASIA_Q.indexOf(p.n)>=0) p.aq=1; })); state.fm.aqV=1; }   // saves from before the Asia quota

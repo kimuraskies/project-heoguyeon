@@ -128,7 +128,7 @@ const ACTIONS={
     const theirs=findPlayer(a.team,a.give), mine=findPlayer(USER,a.want);
     if(!theirs||!mine) return '선수 구성이 바뀌어 제안이 무효가 되었습니다.';
     const b=tradeBudget([a.want],a.team,[a.give]); if(!b.ok) return '❌ '+b.msg;
-    const why=doTrade(a.team,[a.want],[a.give]); if(why) return '❌ '+why;
+    const why=doTrade(a.team,[a.want],[a.give],'offer'); if(why) return '❌ '+why;
     return `트레이드 성사! ${a.want} ↔ ${a.give} (${K.ROSTERS[a.team].name}). 라인업이 자동 재구성되었습니다.`; },
   declineTrade(){ return '제안을 거절했습니다.'; },
   renew(m,a){ const p=findPlayer(USER,a.n); if(!p) return '이미 팀을 떠난 선수입니다.';

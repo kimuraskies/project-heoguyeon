@@ -41,7 +41,7 @@ function faSign(x,b){ const f=fm(), p=x.p; f.fa.splice(f.fa.indexOf(x),1);
   const where=joinClub(USER,p), bonus=eok(b.sal*b.yrs*0.25); f.fin.balance-=bonus; f.fin.exp+=bonus;
   return `${p.n}와(과) ${b.yrs}년 연봉 ${b.sal}억에 계약했습니다. 계약금 ${bonus}억.${where==='2군'?' 1군 엔트리가 가득 차 2군에 등록했습니다.':''}`; }
 function offWeekEnd(o){
-  if(o.stage==='stove'){ offAiWeek(); o.week++; if(o.week>=o.weeks.length){ o.stage='dir'; o.q=[]; o.used=[]; return; } offFill(o); return; }
+  if(o.stage==='stove'){ offAiWeek(); aiTradeTick(); o.week++; if(o.week>=o.weeks.length){ o.stage='dir'; o.q=[]; o.used=[]; return; } offFill(o); return; }
   if(o.stage==='camp'){ const c=campState(); campRunWeek(); if(c.week>=4){ o.stage='done'; o.q=[]; return; } offFill(o); } }
 // applies a choice. Returns the outcome text.
 function offResolve(i){ const o=offState(), e=o.q[0]; if(!e) return '';
@@ -227,16 +227,16 @@ const EV={
       ms.forEach((m,k)=>{ const a=k<keep? m.actions[0] : m.actions[m.actions.length-1]; const res=ACTIONS[a.fn](m,a.arg||{}); if(String(res).startsWith('❌')&&k<keep){ out.push(`${a.arg.n}: 예산 초과로 실패`); return; } m.done=true; m.read=true; m.result=josa(res); out.push(`${a.arg.n}: ${a.fn==='renew'?'재계약':'결별'}`); });
       return out.join('\n'); }},
   fa:{safe:2, make(o){ return faTalk(o); }, pick(i,d){ return faPick(i,d); }},
-  trade:{safe:9, make(){ const mine=allPlayers(USER).filter(p=>!K.isInjured(p)).sort(byOvr).slice(0,14), offers=[], teams=K.TEAM_IDS.filter(t=>t!==USER).sort(()=>Math.random()-0.5);
-      for(const t of teams){ if(offers.length>=2) break; const want=mine[Math.floor(Math.random()*mine.length)]; if(!want||offers.some(x=>x.want===want.n)) continue;
-        const give=allPlayers(t).filter(p=>!K.isInjured(p)&&p.type===want.type&&(p.type==='B'||(p.role==='SP')===(want.role==='SP'))&&K.ovr(p)>=K.ovr(want)-3&&K.ovr(p)<=K.ovr(want)+2).sort((a,b)=>a.age-b.age)[0];
+  trade:{safe:9, make(){ const offers=[], teams=K.TEAM_IDS.filter(t=>t!==USER).sort(()=>Math.random()-0.5);
+      for(const t of teams){ if(offers.length>=2) break; const x=findTradeOffer(t); if(!x||offers.some(o=>o.want===x.want.n)) continue;
+        const {want,give}=x;
         if(give) offers.push({team:t,want:want.n,give:give.n,txt:`${want.n}(${want.age}세·${K.ovr(want)}) ↔ ${give.n}(${give.age}세·${K.ovr(give)})`}); }
       if(!offers.length) return null;
       return {who:'단장',icon:'🤝',title:'트레이드 주간',body:`다른 구단에서 제안이 들어왔습니다. 하나만 받을 수 있습니다.\n\n${offers.map(x=>`• ${K.ROSTERS[x.team].name}: ${x.txt}`).join('\n')}`,
         opts:offers.map(x=>({l:`${K.ROSTERS[x.team].name}의 제안을 받는다`,d:x.txt})).concat([{l:'모두 거절한다',d:'지금 전력을 유지'}]),data:{offers}}; },
     pick(i,d){ const x=d.offers[i]; if(!x) return '제안을 모두 거절했습니다.';
       if(!findPlayer(USER,x.want)||!findPlayer(x.team,x.give)) return '선수 구성이 바뀌어 제안이 무효가 됐습니다.';
-      const b=tradeBudget([x.want],x.team,[x.give]); if(!b.ok) return b.msg; const why=doTrade(x.team,[x.want],[x.give]); if(why) return why;
+      const b=tradeBudget([x.want],x.team,[x.give]); if(!b.ok) return b.msg; const why=doTrade(x.team,[x.want],[x.give],'offer'); if(why) return why;
       memo('trade',x.give,`트레이드: ${x.want} ↔ ${x.give}`); return `트레이드 성사: ${x.txt}. 라인업을 다시 짰습니다.`; }},
   coach:{safe:2, make(){ const s=staffOf(USER); let worst=null; COACH_ROLES.forEach(([r,l])=>{ const c=coachInit(s[r]), v=c.a[ROLE_MAIN[r]]; if(!worst||v<worst.v) worst={r,l,v,n:c.n}; });
       return {who:'단장',icon:'🧢',title:'코치진 정비',body:`캠프 전에 코치진을 점검할 시간입니다.\n가장 약한 자리: ${worst.l} ${worst.n} (핵심 능력 ${worst.v})`,
@@ -264,12 +264,12 @@ const EV={
       if(payroll(USER)+sal>f.fin.budget*1.1) return '연봉 총액 한도를 넘어 제안을 넣지 못했습니다. '+lose();
       if(i===1&&Math.random()<0.5) return lose(); memo('fa',d.n,`경쟁 끝에 FA ${d.n} 영입`); return faSign(x,{sal,yrs:x.yrs}); }},
   prospect:{safe:1, make(){ const young=allPlayers(USER).filter(p=>p.age<=23&&(p.pot||0)>=K.ovr(p)+4).sort((a,b)=>(b.pot||0)-(a.pot||0))[0]; if(!young) return null;
-      const t=K.TEAM_IDS.filter(t=>t!==USER).sort(()=>Math.random()-0.5)[0], vet=allPlayers(t).filter(p=>p.type===young.type&&(p.type==='B'||(p.role==='SP')===(young.role==='SP'))&&p.age>=28&&K.ovr(p)>=K.ovr(young)+3&&K.ovr(p)<=K.ovr(young)+8).sort(byOvr)[0]; if(!vet) return null;
+      const t=K.TEAM_IDS.filter(t=>t!==USER).sort(()=>Math.random()-0.5)[0], vet=allPlayers(t).filter(p=>p.type===young.type&&(p.type==='B'||(p.role==='SP')===(young.role==='SP'))&&p.age>=28&&K.ovr(p)>=K.ovr(young)+3&&K.ovr(p)<=K.ovr(young)+8).sort(byOvr)[0]; if(!vet||!tradeVerdict(t,[young],[vet]).ok) return null;
       return {who:`${K.ROSTERS[t].name} 단장`,icon:'🌱',title:`유망주 ${young.n}을(를) 달라는 제안`,body:`${K.ROSTERS[t].name}에서 ${young.n}(${young.age}세, OVR ${K.ovr(young)}, 잠재력 ${young.pot})을(를) 원합니다.\n대가: ${vet.n}(${vet.age}세, OVR ${K.ovr(vet)})\n\n올해 전력은 올라가지만 미래를 내주는 거래입니다.`,
         opts:[{l:'받아들인다',d:`지금 전력 +${K.ovr(vet)-K.ovr(young)} · 유망주를 잃는다`},{l:'거절한다',d:`${young.n}의 사기 상승`}],data:{t,want:young.n,give:vet.n}}; },
     pick(i,d){ const y=findPlayer(USER,d.want); if(i===1){ if(y) addMor(y,6); memo('prospect',d.want,`유망주 ${d.want}을(를) 지킴`); return `${d.want}은(는) 구단이 자신을 믿는다는 걸 알았습니다.`; }
       if(!y||!findPlayer(d.t,d.give)) return '선수 구성이 바뀌어 제안이 무효가 됐습니다.';
-      const b=tradeBudget([d.want],d.t,[d.give]); if(!b.ok) return b.msg; const why=doTrade(d.t,[d.want],[d.give]); if(why) return why;
+      const b=tradeBudget([d.want],d.t,[d.give]); if(!b.ok) return b.msg; const why=doTrade(d.t,[d.want],[d.give],'offer'); if(why) return why;
       memo('trade',d.give,`유망주 ${d.want}을(를) 보내고 ${d.give} 영입`); return `${d.give}이(가) 합류했습니다. ${d.want}은(는) 새 팀으로 떠났습니다.`; }},
   mentor:{safe:2, make(){ const p=allPlayers(USER).filter(p=>p.age>=35).sort(byOvr)[0]; if(!p) return null;
       return {who:p.n,icon:'🧓',title:`베테랑 ${p.n}의 고민`,body:`${p.n}(${p.age}세)이(가) 찾아왔습니다.\n"감독님, 올해가 마지막일지도 모르겠습니다. 팀에서 제가 뭘 하면 좋겠습니까?"`,

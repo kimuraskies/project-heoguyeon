@@ -1530,36 +1530,36 @@ function renderTrade(){
     <span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span> ${p.n} <span class="muted">${p.pos||p.role}·${p.age}세</span></label>`;
   const itemIn=p=>`<label class="checkitem"><input type="checkbox" ${tradeIn.has(p.n)?'checked':''} onchange="App.toggleIn('${p.n}')">
     <span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span> ${p.n} <span class="muted">${p.pos||p.role}·${p.age}세</span></label>`;
-  const outVal=[...tradeOut].reduce((a,n)=>a+playerValue(findPlayer(USER,n)),0);
-  const inVal=[...tradeIn].reduce((a,n)=>a+playerValue(findPlayer(tradeTeam,n)),0);
+  const verdict=FM.tradeVerdict(tradeTeam,[...tradeOut].map(n=>findPlayer(USER,n)),[...tradeIn].map(n=>findPlayer(tradeTeam,n)));
+  const outVal=verdict.have.toFixed(1), inVal=verdict.need.toFixed(1);
   const budget = FM.tradeBudget([...tradeOut],tradeTeam,[...tradeIn]);
-  const valueOk = inVal>0 && outVal>=inVal*0.98;
+  const valueOk = verdict.ok;
   const roster = tradeOut.size||tradeIn.size? FM.tradeCheck(tradeTeam,[...tradeOut],[...tradeIn]) : "";
   const accept = valueOk && budget.ok && !roster;
   return `<div class="card"><h3>트레이드 <span class="tag">${FM.tradeTag()}</span></h3>${FM.tradeWindow().open? "" : `<div class="deal-result deal-no" style="margin-bottom:10px">${FM.tradeWindow().msg}</div>`}
     <div class="row" style="margin-bottom:10px">상대팀: <select onchange="App.tradeTeam(this.value)">${teams.map(t=>`<option value="${t}" ${t===tradeTeam?'selected':''}>${K.ROSTERS[t].name}</option>`).join("")}</select></div>
     <div class="row" style="align-items:flex-start">
       <div class="trade-side"><b>내보낼 선수 (${USER})</b><div style="max-height:340px;overflow:auto;margin-top:6px">${myAll.map(itemOut).join("")}</div>
-        <div style="margin-top:6px">가치 합계: <b>${outVal}</b></div></div>
+        <div style="margin-top:6px">제시 가치: <b>${outVal}억</b></div></div>
       <div class="trade-side"><b>받을 선수 (${tradeTeam})</b><div style="max-height:340px;overflow:auto;margin-top:6px">${themAll.map(itemIn).join("")}</div>
-        <div style="margin-top:6px">가치 합계: <b>${inVal}</b></div></div>
+        <div style="margin-top:6px">요구 가치: <b>${inVal}억</b></div></div>
     </div>
     <div class="deal-result ${accept?'deal-ok':'deal-no'}">${
       tradeIn.size===0&&tradeOut.size===0? '교환할 선수를 선택하세요.' :
       accept? '✅ 상대가 받아들일 만한 제안입니다. 트레이드를 실행하세요!' :
       valueOk&&roster? '❌ '+roster :
       valueOk? '❌ '+budget.msg :
-      '❌ 상대팀이 거절할 제안입니다. 더 좋은 카드를 제시하세요 (받을 가치 ≤ 내줄 가치).'}</div>
+      '❌ '+FM.esc(verdict.reason)}</div>
     <button class="btn primary" ${accept?'':'disabled'} onclick="App.execTrade()">🤝 트레이드 실행</button>
     <div class="muted" style="margin-top:6px">트레이드 후 연봉 총액: <b>${budget.after}억</b> / 한도 ${budget.limit}억</div>
-    <div class="hint" style="margin-top:8px">선수 가치 = 능력치(OVR) + 나이 보정(어릴수록 +). 트레이드 후 라인업은 자동 재구성되니 라인업 탭에서 확인하세요.</div>
+    <div class="hint" style="margin-top:8px">선수 가치 = 예상 WAR의 계약 잉여가치 + 잠재력 + 구단 수요. 패키지는 가치 할인과 엔트리 비용을 반영합니다. 트레이드 후 라인업은 자동 재구성되니 라인업 탭에서 확인하세요.</div>
   </div>`;
 }
 function findPlayer(team,n){ const r=K.ROSTERS[team]; return r.batters.find(x=>x.n===n)||r.pitchers.find(x=>x.n===n)||(r.farm||[]).find(x=>x.n===n); }
 function execTrade(){
   const outs=[...tradeOut].map(n=>findPlayer(USER,n)), ins=[...tradeIn].map(n=>findPlayer(tradeTeam,n));
-  const outVal=outs.reduce((a,p)=>a+(p?playerValue(p):0),0), inVal=ins.reduce((a,p)=>a+(p?playerValue(p):0),0);
-  if(!outs.length || !(inVal>0 && outVal>=inVal*0.98)){ FM.notify('상대팀이 거절할 제안입니다.'); render(); return; }
+  const verdict=FM.tradeVerdict(tradeTeam,outs,ins);
+  if(!verdict.ok){ FM.notify(verdict.reason); render(); return; }
   const budget=FM.tradeBudget([...tradeOut],tradeTeam,[...tradeIn]); if(!budget.ok){ FM.notify(budget.msg); render(); return; }
   const why=FM.doTrade(tradeTeam,[...tradeOut],[...tradeIn]); // moves players and rebuilds both lineups
   if(why){ FM.notify(why); render(); return; }
