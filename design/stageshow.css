@@ -215,3 +215,8 @@ nav.tabs button>span{white-space:nowrap}
 .th-fans{margin-top:8px;font-size:13px}.th-fans summary{cursor:pointer;color:var(--ss-ink2)}
 .th-fans p{margin:6px 0 0;padding:8px 10px;background:var(--ss-1);border-radius:8px}.th-fans p small{display:block;color:var(--ss-ink3);font-size:11px}
 @media(max-width:600px){.th-sides{grid-template-columns:minmax(0,1fr)}}
+
+/* 0.71 report -> plan */
+.sc-plan{margin-top:14px}
+.sc-plan .bf-chips{margin:6px 0}
+.sc-plan h4 .tag{font-weight:400;color:var(--dim);margin-left:6px;font-size:.85em}

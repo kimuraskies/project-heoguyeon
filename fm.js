@@ -2352,6 +2352,7 @@ function analysisPanel(team,p){
     <div>${sparkSVG(trendOf(team,p))}</div></div>
     ${team===USER?`<div style="overflow-x:auto;margin-top:12px"><table><thead><tr><th>상황</th><th>타석</th><th>타율</th><th>OPS</th><th>삼진</th></tr></thead><tbody>${splitRows(s,defs)}</tbody></table></div>`:''}
     ${isB? batReport(team,p,s) : pitchReport(team,p,s)}
+    ${typeof scPlanCard==='function'? scPlanCard(team,p,s) : ''}
     <h4 class="st-group">코치 진단</h4>${dx.length? dx.map(([c,t,a])=>`<div class="an-dx"><div><small>${c}</small><p>${t}</p></div>${a?`<button class="btn" onclick="${a.fn}">${a.l}</button>`:''}</div>`).join('') : '<div class="muted">아직 표본이 적거나 눈에 띄는 점이 없습니다.</div>'}</div>`;
 }
 let saberSort={B:'war',P:'war'};
@@ -2522,6 +2523,26 @@ function batReport(team,p,s){
       <div><small>방향</small>${[['bbPull','당겨친 타구'],['bbCent','가운데'],['bbOppo','밀어친 타구']].map(([k,l])=>`<span>${l} <b>${scPct(g(k),dir)}</b></span>`).join('')}</div></div>
     ${team===USER? sprayChart(p.n) : ''}`;
 }
+
+// ---- 0.71: the report feeds the plan for the next meeting (same plan.vs / plan.pit the briefing uses) ----
+const SC_FAST=['FF','SI','FC'];
+function scPlanCard(team,p,s){
+  if(team===USER||!state.cfgs[team]) return '';
+  const isB=p.type==='B', plan=planOf(team), qo=q(team), qn=q(p.n);
+  const set=(kind,key,v)=>`FM.setPlanFromReport('${qo}','${kind}','${qn}','${key}','${v}')`;
+  if(!isB){ if(!scHas(s,false)) return ''; const rows=scPitchRows(s), fast=rows.filter(r=>SC_FAST.includes(r.c)), brk=rows.filter(r=>!SC_FAST.includes(r.c));
+    const share=fast.reduce((a,r)=>a+r.use,0), wh=l=>{ const sw=l.reduce((a,r)=>a+r.sw,0); return sw? l.reduce((a,r)=>a+r.wh,0)/sw : 0; };
+    const rec=share>=0.5?'fast':'break', cur=(plan.pit[p.n]||{}).look||'';
+    return `<div class="sc-plan"><h4 class="st-group">다음 맞대결 지시 <span class="tag">우리 타자들의 노림수</span></h4>
+      <p class="hint">직구 계열 ${Math.round(share*100)}% · 직구 계열 헛스윙률 ${Math.round(wh(fast)*100)}% · 변화구 헛스윙률 ${Math.round(wh(brk)*100)}%.<br>리포트 기준 추천: <b>${LOOK_L[rec]}</b></p>
+      ${chipRow(cur,LOOK_L,k=>set('pit','look',k))}<p class="hint">전력분석 브리핑과 같은 지시예요. 효과는 분석도만큼 반영돼요.</p></div>`; }
+  if(!scHas(s,true)) return ''; const g=k=>s[k]||0, dir=g('bbPull')+g('bbCent')+g('bbOppo'), pull=dir?g('bbPull')/dir:0, oppo=dir?g('bbOppo')/dir:0;
+  const rec=pull>=0.42?'out':oppo>=0.32?'in':(recBat(p).zone||''), cur=(plan.vs[p.n]||{}).zone||'';
+  return `<div class="sc-plan"><h4 class="st-group">다음 맞대결 지시 <span class="tag">우리 배터리의 승부 코스</span></h4>
+    <p class="hint">당겨친 타구 ${Math.round(pull*100)}% · 밀어친 타구 ${Math.round(oppo*100)}%.<br>리포트 기준 추천: <b>${ZONE_L[rec]}</b></p>
+    ${chipRow(cur,ZONE_L,k=>set('vs','zone',k))}<p class="hint">전력분석 브리핑과 같은 지시예요. 효과는 분석도만큼 반영돼요.</p></div>`;
+}
+function setPlanFromReport(opp,kind,n,key,v){ setPlan(opp,kind,n,key,v); if(window.Track) Track.action('plan_report'); showProfile(opp,n); }
 
 // ---------- 0.7 trade history and reactions ----------
 // Reads fm().tradeLog (written by the trade model in fm/04-market.js: {id,y,day,phase,a,b,aGive,bGive,vA,vB,kind}).
@@ -3759,7 +3780,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeValue, packageValue, tradeVerdict, tradeLog, teamMode, aiTradeTick, clubTradeBudget, playerValue:p=>playerValue(p), tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   sprayTake, tradeHistoryCard, setTradeHist, tradeReact, tradeGrade, showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,

@@ -94,6 +94,7 @@ function analysisPanel(team,p){
     <div>${sparkSVG(trendOf(team,p))}</div></div>
     ${team===USER?`<div style="overflow-x:auto;margin-top:12px"><table><thead><tr><th>상황</th><th>타석</th><th>타율</th><th>OPS</th><th>삼진</th></tr></thead><tbody>${splitRows(s,defs)}</tbody></table></div>`:''}
     ${isB? batReport(team,p,s) : pitchReport(team,p,s)}
+    ${typeof scPlanCard==='function'? scPlanCard(team,p,s) : ''}
     <h4 class="st-group">코치 진단</h4>${dx.length? dx.map(([c,t,a])=>`<div class="an-dx"><div><small>${c}</small><p>${t}</p></div>${a?`<button class="btn" onclick="${a.fn}">${a.l}</button>`:''}</div>`).join('') : '<div class="muted">아직 표본이 적거나 눈에 띄는 점이 없습니다.</div>'}</div>`;
 }
 let saberSort={B:'war',P:'war'};

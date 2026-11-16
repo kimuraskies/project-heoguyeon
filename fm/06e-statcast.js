@@ -88,3 +88,23 @@ function batReport(team,p,s){
       <div><small>방향</small>${[['bbPull','당겨친 타구'],['bbCent','가운데'],['bbOppo','밀어친 타구']].map(([k,l])=>`<span>${l} <b>${scPct(g(k),dir)}</b></span>`).join('')}</div></div>
     ${team===USER? sprayChart(p.n) : ''}`;
 }
+
+// ---- 0.71: the report feeds the plan for the next meeting (same plan.vs / plan.pit the briefing uses) ----
+const SC_FAST=['FF','SI','FC'];
+function scPlanCard(team,p,s){
+  if(team===USER||!state.cfgs[team]) return '';
+  const isB=p.type==='B', plan=planOf(team), qo=q(team), qn=q(p.n);
+  const set=(kind,key,v)=>`FM.setPlanFromReport('${qo}','${kind}','${qn}','${key}','${v}')`;
+  if(!isB){ if(!scHas(s,false)) return ''; const rows=scPitchRows(s), fast=rows.filter(r=>SC_FAST.includes(r.c)), brk=rows.filter(r=>!SC_FAST.includes(r.c));
+    const share=fast.reduce((a,r)=>a+r.use,0), wh=l=>{ const sw=l.reduce((a,r)=>a+r.sw,0); return sw? l.reduce((a,r)=>a+r.wh,0)/sw : 0; };
+    const rec=share>=0.5?'fast':'break', cur=(plan.pit[p.n]||{}).look||'';
+    return `<div class="sc-plan"><h4 class="st-group">다음 맞대결 지시 <span class="tag">우리 타자들의 노림수</span></h4>
+      <p class="hint">직구 계열 ${Math.round(share*100)}% · 직구 계열 헛스윙률 ${Math.round(wh(fast)*100)}% · 변화구 헛스윙률 ${Math.round(wh(brk)*100)}%.<br>리포트 기준 추천: <b>${LOOK_L[rec]}</b></p>
+      ${chipRow(cur,LOOK_L,k=>set('pit','look',k))}<p class="hint">전력분석 브리핑과 같은 지시예요. 효과는 분석도만큼 반영돼요.</p></div>`; }
+  if(!scHas(s,true)) return ''; const g=k=>s[k]||0, dir=g('bbPull')+g('bbCent')+g('bbOppo'), pull=dir?g('bbPull')/dir:0, oppo=dir?g('bbOppo')/dir:0;
+  const rec=pull>=0.42?'out':oppo>=0.32?'in':(recBat(p).zone||''), cur=(plan.vs[p.n]||{}).zone||'';
+  return `<div class="sc-plan"><h4 class="st-group">다음 맞대결 지시 <span class="tag">우리 배터리의 승부 코스</span></h4>
+    <p class="hint">당겨친 타구 ${Math.round(pull*100)}% · 밀어친 타구 ${Math.round(oppo*100)}%.<br>리포트 기준 추천: <b>${ZONE_L[rec]}</b></p>
+    ${chipRow(cur,ZONE_L,k=>set('vs','zone',k))}<p class="hint">전력분석 브리핑과 같은 지시예요. 효과는 분석도만큼 반영돼요.</p></div>`;
+}
+function setPlanFromReport(opp,kind,n,key,v){ setPlan(opp,kind,n,key,v); if(window.Track) Track.action('plan_report'); showProfile(opp,n); }
