@@ -111,10 +111,19 @@ function ensurePlayer(p){
   // remaining years: veterans on short deals; others spread 1..4 (1 year ~15%) so few expire at once
   if(p.yrs==null){ const h=hash(p.n+'y')%20; p.yrs = p.age>=35? 1+hash(p.n)%2 : h<3?1 : h<9?2 : h<15?3 : 4; }
   if(p.bench==null) p.bench=0;
-  if(p.pot==null){ const h=hash(p.n+'p'), o=K.ovr(p);
-    const room=p.age<=21? 8+h%18 : p.age<=24? 5+h%14 : p.age<=27? 2+h%9 : p.age<=30? h%4 : 0;
-    p.pot=Math.max(o,Math.min(96,o+room)); }
+  if(p.pot==null) p.pot=potentialOf(p).pot;
 }
+// potential: room to grow by age, the 2024-26 trend while it is still current, the draft round for rookies.
+// The same rule as tools/tests/potential-rule.js (the review sheet uses that copy; a test keeps them equal).
+const POT_ROOM=[16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,14,12,10,8,6,4,3,2,1];
+const POT_VER=1;
+function potentialOf(p){ const o=K.ovr(p), age=p.age;
+  const base=age<POT_ROOM.length? POT_ROOM[age] : 0;
+  const trend=age<=30 && (!state||state.year<=2027) && typeof TREND_2026!=='undefined'? (TREND_2026[p.n]||0) : 0;
+  const r=p.dr&&p.dy===(state&&state.year)? p.dr.r : null, draft=r===1?6:r===2?4:r===3?2:0;
+  const spread=age<=24? hash(p.n+'p')%3-1 : 0;
+  const room=Math.max(0,base+trend+draft+spread);
+  return {pot:Math.min(95,Math.max(o,o+room)), parts:{age:base,trend,draft,spread}}; }
 // aging: snapshot a player, then undo any gain that carried him past his potential
 const ATTRS={B:['con','pow','eye','spd','fld','arm'],P:['stu','ctl','mov','sta']};
 function snap(p){ const o={_ovr:K.ovr(p)}; ATTRS[p.type].forEach(k=>o[k]=p[k]); return o; }
@@ -126,6 +135,8 @@ function ensurePlayers(){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(K.ROSTERS[t
 function ensure(){
   if(!state) return;
   ensurePlayers();
+  // saves from before 0.7 drew potential from a hash: recompute once with the rule
+  if(state.fm&&state.fm.potVer!==POT_VER){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(K.ROSTERS[t].farm||[]).forEach(p=>{ p.pot=potentialOf(p).pot; })); state.fm.potVer=POT_VER; }
   if(!state.user) state.user={name:'무명', team:USER, bg:'coach'}; // saves from before the setup screen
   if(!state.fm){
     state.fm={ inbox:[], nextId:1, autoRest:true, restNext:[], promises:[], lastMeeting:-99,
