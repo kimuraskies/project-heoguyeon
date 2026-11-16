@@ -29,7 +29,9 @@ function scMixBar(rows){
 }
 // average break of each pitch from the arsenal (pitcher's view: + = arm side, + = rise)
 function scMovement(p,rows){
-  const ars=(K.arsenal? K.arsenal(p) : [])||[]; const pts=rows.map(r=>({r,a:ars.find(x=>x.code===r.c)})).filter(x=>x.a&&x.a.hb!=null);
+  // the engine stores catcher's-view cm (right-handers' arm side is negative); draw arm side to the right for both hands
+  const lefty=K.handsOf&&K.handsOf(p.n).t==='좌';
+  const ars=((K.arsenal? K.arsenal(p) : [])||[]).map(x=>Object.assign({},x,{hb:lefty? x.hb : -x.hb})); const pts=rows.map(r=>({r,a:ars.find(x=>x.code===r.c)})).filter(x=>x.a&&x.a.hb!=null);
   if(!pts.length) return '';
   const S=60, X=v=>(100+v*90/S).toFixed(1), Y=v=>(100-v*90/S).toFixed(1);
   const grid=[-40,-20,0,20,40].map(v=>`<line x1="${X(v)}" y1="10" x2="${X(v)}" y2="190" class="sc-grid${v?'':' z'}"/><line x1="10" y1="${Y(v)}" x2="190" y2="${Y(v)}" class="sc-grid${v?'':' z'}"/>`).join('');
