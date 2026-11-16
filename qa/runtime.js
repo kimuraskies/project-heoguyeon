@@ -4,7 +4,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const crypto = require('node:crypto');
 const ROOT = path.resolve(__dirname, '..');
 const HTML = fs.readdirSync(ROOT).find(n => n.endsWith('.html'));
 const attrs = p => p.type === 'B' ? ['con','pow','eye','spd','fld','arm'] : ['stu','ctl','mov','sta'];
@@ -134,5 +133,5 @@ class Runtime {
   }
   saveObject(){return {state:copy(this.state),rosters:copy(this.K.ROSTERS),teamGameCount:copy(this.readCounts())};}
 }
-function sourceHashes(){const names=[HTML,'core.js','fm.js','farm.js','career.js','design/badges.js'];return Object.fromEntries(names.map(n=>[n,crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT,n))).digest('hex') ]));}
+function sourceHashes(){return require('./snapshot').sourceHashes(ROOT);}
 module.exports={Runtime,ROOT,HTML,attrs,copy,json,sourceHashes};

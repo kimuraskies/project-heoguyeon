@@ -299,18 +299,30 @@ function fxCount(t,onEntry){ const L=onEntry? allPlayers(t).filter(p=>p.f) : for
 // (mid-season replacements); those extras sit in the 2군 and block new signings of that kind.
 function fxRoom(t,p,out){ const c=fxCount(t), k=fxKind(p); return c[k]-(out&&fxKind(out)===k?1:0) < fxCap(p); }
 function fxEntryRoom(t,p){ const c=fxCount(t,true); return c[fxKind(p)] < fxCap(p); }
-// keep the 1군 within 3 + 1: the weakest extras go down to the 2군
+// Initial 2026 clubs with replacement foreigners: appearances in data/kbo2026.json.
+// Compare pitchers with pitchers and batters with batters before falling back to OVR.
+const FX_2026_GAMES={시라카와:18,네일:31,올러:30,카스트로:99,
+  해치:8,아빌라:14,베니지아노:16,에레디아:115,
+  대니엘:10,보쉴리:11,로건:17,사우어:18,힐리어드:142,
+  세베리노:46,카메론:75,벤자민:24,잭로그:31};
+// Keep the 1군 within 3 + 1. Pair each demotion with a domestic call-up so
+// the minimum pitcher/starter rules cannot veto removal of an excess foreigner.
 function fxQuotaFix(t){ const r=K.ROSTERS[t], moved=[];
-  ['f','aq'].forEach(k=>{ const cap=k==='aq'?FX_AQ:FX_F, on=allPlayers(t).filter(p=>p.f&&fxKind(p)===k).sort((a,b)=>K.ovr(b)-K.ovr(a));
-    on.slice(cap).forEach(p=>{ if(entryProblem(t,[p],[])) return; const arr=p.type==='B'?r.batters:r.pitchers; arr.splice(arr.indexOf(p),1); farmOf(t).push(p); moved.push(p.n); }); });
-  // a foreign starter sent down can leave four starters: swap the 2군's best starter up for the weakest reliever
-  const cl=state.cfgs&&state.cfgs[t]&&state.cfgs[t].closer;
-  while(moved.length && r.pitchers.filter(p=>p.role==='SP').length<5){
-    const up=farmOf(t).filter(p=>p.type==='P'&&p.role==='SP'&&!p.f&&!K.isInjured(p)).sort((a,b)=>K.ovr(b)-K.ovr(a))[0];
-    const down=r.pitchers.filter(p=>p.role!=='SP'&&p.n!==cl).sort((a,b)=>K.ovr(a)-K.ovr(b))[0];
-    if(!up||!down) break;
-    r.pitchers.splice(r.pitchers.indexOf(down),1,up); const fa=farmOf(t); fa.splice(fa.indexOf(up),1,down); moved.push(down.n);
-  }
+  ['f','aq'].forEach(k=>{ const cap=k==='aq'?FX_AQ:FX_F, on=allPlayers(t).filter(p=>p.f&&fxKind(p)===k);
+    // Preserve the existing hitter/pitcher allocation; the least-used player of
+    // the most numerous type goes down first. No ratings or simulation inputs change.
+    while(on.length>cap){
+      const nb=on.filter(p=>p.type==='B').length, type=nb>on.length-nb?'B':'P';
+      const p=on.filter(p=>p.type===type).sort((a,b)=>(FX_2026_GAMES[a.n]??Infinity)-(FX_2026_GAMES[b.n]??Infinity)||K.ovr(a)-K.ovr(b))[0];
+      const fa=farmOf(t), up=fa.filter(x=>!x.f&&x.type===p.type&&!K.isInjured(x)&&
+        (p.role!=='SP'||x.role==='SP')&&(p.pos!=='C'||x.pos==='C'))
+        .sort((a,b)=>K.ovr(b)-K.ovr(a)).find(x=>!entryProblem(t,[p],[x]));
+      if(!up) throw new Error('No legal domestic replacement for '+t+' '+p.n);
+      const arr=p.type==='B'?r.batters:r.pitchers;
+      arr.splice(arr.indexOf(p),1,up); fa.splice(fa.indexOf(up),1,p);
+      on.splice(on.indexOf(p),1); moved.push(p.n);
+    }
+  });
   if(moved.length&&state.cfgs&&state.cfgs[t]) repairCfg(t);
   return moved; }
 // `used` is shared across one batch of candidates so two of them never get the same name
