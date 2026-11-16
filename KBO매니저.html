@@ -411,6 +411,7 @@ function ePit(team,n){ const p=state.season[team].pit; if(!p[n]) p[n]=newPitSeas
 function accumulate(res){
   [res.home,res.away].forEach(team=>{
     const bx=res.box[team];
+    if(FM.sprayTake) FM.sprayTake(team,bx); // spray points leave the box before the numbers merge
     for(const n in bx.bat){ const src=bx.bat[n]; const t=eBat(team,n); mergeNum(t,src); if(src.PA>0)t.G++; }
     for(const n in bx.pit){ mergeNum(ePit(team,n), bx.pit[n]); }
   });
