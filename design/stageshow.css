@@ -1,7 +1,7 @@
 /* ==== Stageshow layer (UI/UX recipe book · Stageshow) ====
    Real product, only what the screen needs. Depth from surface steps instead of shadows, five greys and one
    accent (the club color), one icon set, one big number per screen, touch targets of 44px or more.
-   Phone (<768): sticky top bar with the next action, bottom bar of five. Tablet (768-1023): side rail.
+   Phone (<768): sticky top bar with the next action, bottom bar of five. Tablet and PC (768+): left menu.
    Loaded after material.css; self-contained (system fonts, no CDN) for the packaged client. */
 :root{
   --ss-0:#0b0c0e; --ss-1:#141518; --ss-2:#1c1d21; --ss-3:#26282d; --ss-4:#34363c;
@@ -65,8 +65,8 @@ nav.tabs button>span{white-space:nowrap}
 .sq-ovr{font:700 20px var(--ss-num);min-width:30px;text-align:right}
 .sq-row .btn-sm{min-height:40px}
 @media(min-width:600px){.sq-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(min-width:1024px){.sq-list{display:none}}
-@media(max-width:1023px){.sq-table{display:none}}
+@media(min-width:768px){.sq-list{display:none}}
+@media(max-width:767px){.sq-table{display:none}}
 
 /* ---- broadcast controls: manager calls on top, playback below, every label whole ---- */
 .pv-broadcast .live-ctrl{background:var(--ss-0);border-top-color:var(--ss-3)}
@@ -121,18 +121,7 @@ nav.tabs button>span{white-space:nowrap}
   .live-play .btn{min-height:54px}
 }
 
-/* ================= tablet: side rail ================= */
-@media(min-width:768px) and (max-width:1023px){
-  header.top{position:sticky;top:env(safe-area-inset-top, 0px)}
-  .shell{grid-template-columns:92px minmax(0,1fr);gap:20px;align-items:start}
-  .shell:has(> nav.tabs[hidden]){grid-template-columns:minmax(0,1fr)}
-  nav.tabs{flex-direction:column;overflow:visible;position:sticky;top:96px;margin:16px 0;gap:2px}
-  nav.tabs button{flex-direction:column;justify-content:center;gap:4px;min-height:58px;padding:6px 2px;border:0;border-radius:12px;font-size:11.5px;box-shadow:none!important}
-  nav.tabs button.active{background:var(--ss-2);color:var(--ss-ink);box-shadow:inset 3px 0 0 var(--team)!important}
-  nav.tabs button .icon{width:22px;height:22px}
-  nav.tabs button .count{position:absolute;top:6px;right:14px;margin:0}
-  #view{padding-top:16px}
-}
+/* tablet (768-1023px) uses the PC layout: wide left menu, lineup and rotation side by side */
 
 /* ---- hero: a flat surface step, no decorative rings ---- */
 .hero{background:var(--ss-1);border-color:var(--ss-3)}
@@ -155,10 +144,10 @@ nav.tabs button>span{white-space:nowrap}
 .live-ctrl>.live-row,.live-ctrl>.card{width:100%;margin:0}
 
 /* ---- 0.5.1 ---- */
-/* lineup: one half at a time below desktop */
+/* lineup: one half at a time on phones */
 .lu-switch{margin-bottom:12px}
-@media(min-width:1024px){.lu-switch{display:none}}
-@media(max-width:1023px){.lu-show-bat .lu-pit,.lu-show-pit .lu-bat{display:none}.lu-split{grid-template-columns:minmax(0,1fr)!important}}
+@media(min-width:768px){.lu-switch{display:none}}
+@media(max-width:767px){.lu-show-bat .lu-pit,.lu-show-pit .lu-bat{display:none}.lu-split{grid-template-columns:minmax(0,1fr)!important}}
 /* squad: OVR named, title on its own line */
 .sq-ovr small{display:block;font:600 9.5px/1 var(--ss-num);letter-spacing:.06em;color:var(--ss-ink3);text-align:right;margin-bottom:2px}
 /* card titles with a note: the note goes under the title so the title never breaks mid-word */
@@ -220,3 +209,8 @@ nav.tabs button>span{white-space:nowrap}
 .sc-plan{margin-top:14px}
 .sc-plan .bf-chips{margin:6px 0}
 .sc-plan h4 .tag{font-weight:400;color:var(--dim);margin-left:6px;font-size:.85em}
+/* squad table (tablet and PC): one line per player, the table scrolls sideways inside its card instead of being cut off */
+.sq-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.sq-table table{min-width:100%}
+.sq-table td,.sq-table th{white-space:nowrap}
+.sq-table .btn{white-space:nowrap}
