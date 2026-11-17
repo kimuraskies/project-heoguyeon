@@ -297,29 +297,46 @@ function fxCap(p){ return p.aq? FX_AQ : FX_F; }
 function fxCount(t,onEntry){ const L=onEntry? allPlayers(t).filter(p=>p.f) : foreignOf(t); return {f:L.filter(p=>!p.aq).length, aq:L.filter(p=>p.aq).length}; }
 // signing: room in that kind once `out` (if any) leaves. Real records can leave a club over the cap
 // (mid-season replacements); those extras sit in the 2군 and block new signings of that kind.
+// " · 2군 2명" when released or extra foreigners sit in the 2군 (they still count against new signings)
+function fxFarmNote(){ const n=farmOf(USER).filter(p=>p.f).length; return n? ` · 2군 보유 ${n}명` : ''; }
 function fxRoom(t,p,out){ const c=fxCount(t), k=fxKind(p); return c[k]-(out&&fxKind(out)===k?1:0) < fxCap(p); }
 function fxEntryRoom(t,p){ const c=fxCount(t,true); return c[fxKind(p)] < fxCap(p); }
-// Initial 2026 clubs with replacement foreigners: appearances in data/kbo2026.json.
-// Compare pitchers with pitchers and batters with batters before falling back to OVR.
+// Initial 2026 clubs with replacement foreigners. FX_2026_OUT: players a club released or replaced
+// during 2026 (news reports, 2026-06~08). They stay in the club's 2군 so the season's records still show,
+// and the replacement holds the 1군 slot: KIA 데일→시라카와 (Asia quota), SSG 베니지아노→아빌라,
+// KT 보쉴리→로건 and 사우어→대니엘, 두산 카메론→세베리노.
+const FX_2026_OUT={KIA:['데일'], SSG:['베니지아노'], KT:['보쉴리','사우어'], 두산:['카메론']};
+// fallback order for any other excess: fewest 2026 appearances goes down first
 const FX_2026_GAMES={시라카와:18,네일:31,올러:30,카스트로:99,
   해치:8,아빌라:14,베니지아노:16,에레디아:115,
   대니엘:10,보쉴리:11,로건:17,사우어:18,힐리어드:142,
   세베리노:46,카메론:75,벤자민:24,잭로그:31};
-// Keep the 1군 within 3 + 1. Pair each demotion with a domestic call-up so
-// the minimum pitcher/starter rules cannot veto removal of an excess foreigner.
-function fxQuotaFix(t){ const r=K.ROSTERS[t], moved=[];
+// swap a 1군 player for a 2군 player of the same type when the entry rules allow it
+function fxSwap(t,down,up){ const r=K.ROSTERS[t], fa=farmOf(t);
+  if(down.type!==up.type||entryProblem(t,[down],[up])) return false;
+  const arr=down.type==='B'?r.batters:r.pitchers;
+  arr.splice(arr.indexOf(down),1,up); fa.splice(fa.indexOf(up),1,down); return true; }
+// a domestic 2군 player who can take p's 1군 place (same type, healthy, keeps the entry legal)
+function fxDomesticUp(t,p){ return farmOf(t).filter(x=>!x.f&&x.type===p.type&&!K.isInjured(x)&&
+  (p.role!=='SP'||x.role==='SP')&&(p.pos!=='C'||x.pos==='C')).sort((a,b)=>K.ovr(b)-K.ovr(a)).find(x=>!entryProblem(t,[p],[x])); }
+// a domestic 1군 player who can make room for foreigner q (same type, weakest first, never the last catcher)
+function fxDomesticDown(t,q){ return allPlayers(t).filter(x=>!x.f&&x.type===q.type&&x.pos!=='C')
+  .sort((a,b)=>K.ovr(a)-K.ovr(b)).find(x=>!entryProblem(t,[x],[q])); }
+// Keep the 1군 within 3 + 1, with each club's latest signings on it: released players go down,
+// their replacements come up, then any other excess goes down (paired with a domestic call-up
+// so the minimum pitcher/starter rules cannot veto it). No ratings or simulation inputs change.
+function fxQuotaFix(t){ const moved=[], out=FX_2026_OUT[t]||[];
+  allPlayers(t).filter(p=>p.f&&out.indexOf(p.n)>=0).forEach(p=>{ const up=fxDomesticUp(t,p); if(up&&fxSwap(t,p,up)) moved.push(p.n); });
+  farmOf(t).filter(p=>p.f&&out.indexOf(p.n)<0&&!K.isInjured(p)).forEach(q=>{
+    if(!fxEntryRoom(t,q)) return;
+    const dn=fxDomesticDown(t,q); if(dn&&fxSwap(t,dn,q)) moved.push(q.n);
+  });
   ['f','aq'].forEach(k=>{ const cap=k==='aq'?FX_AQ:FX_F, on=allPlayers(t).filter(p=>p.f&&fxKind(p)===k);
-    // Preserve the existing hitter/pitcher allocation; the least-used player of
-    // the most numerous type goes down first. No ratings or simulation inputs change.
     while(on.length>cap){
       const nb=on.filter(p=>p.type==='B').length, type=nb>on.length-nb?'B':'P';
       const p=on.filter(p=>p.type===type).sort((a,b)=>(FX_2026_GAMES[a.n]??Infinity)-(FX_2026_GAMES[b.n]??Infinity)||K.ovr(a)-K.ovr(b))[0];
-      const fa=farmOf(t), up=fa.filter(x=>!x.f&&x.type===p.type&&!K.isInjured(x)&&
-        (p.role!=='SP'||x.role==='SP')&&(p.pos!=='C'||x.pos==='C'))
-        .sort((a,b)=>K.ovr(b)-K.ovr(a)).find(x=>!entryProblem(t,[p],[x]));
-      if(!up) break;   // no legal swap: leave it; tools/tests/roster-rules.js fails on any club over the quota
-      const arr=p.type==='B'?r.batters:r.pitchers;
-      arr.splice(arr.indexOf(p),1,up); fa.splice(fa.indexOf(up),1,p);
+      const up=fxDomesticUp(t,p);
+      if(!up||!fxSwap(t,p,up)) break;   // no legal swap: leave it; tools/tests/roster-rules.js fails on any club over the quota
       on.splice(on.indexOf(p),1); moved.push(p.n);
     }
   });

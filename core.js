@@ -1323,7 +1323,7 @@ IP.result=function(){
 
 // foreign-player flag for the quota (FOREIGN comes from the roster build; signings set p.f themselves)
 // Asia quota (2026~): one player from Asia/Australia per club on top of the three foreign players
-var ASIA_Q = ["데일","웰스","왕옌청","타케다","오러클린","토다","스기모토","이이무라","타카다","유토"];
+var ASIA_Q = ["데일","시라카와","웰스","왕옌청","타케다","오러클린","토다","스기모토","이이무라","타카다","유토"];
 TEAM_IDS.forEach(function(t){ ROSTERS[t].batters.concat(ROSTERS[t].pitchers).forEach(function(p){ if(FOREIGN.indexOf(p.n)>=0) p.f=1; if(ASIA_Q.indexOf(p.n)>=0) p.aq=1; }); });
 
 global.KBO = {

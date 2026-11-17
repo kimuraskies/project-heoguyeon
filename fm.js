@@ -147,6 +147,7 @@ function ensure(){
   if(state.fm.fans==null) state.fm.fans=50;
   if(!state.fm.farmV){ K.TEAM_IDS.forEach(seedFarm); state.fm.farmV=1; }
   if(!state.fm.aqV){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(p=>{ if(p.f&&K.ASIA_Q.indexOf(p.n)>=0) p.aq=1; })); state.fm.aqV=1; }   // saves from before the Asia quota
+  if(state.fm.aqV<2){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(p=>{ if(p.f&&p.n==='시라카와') p.aq=1; })); state.fm.aqV=2; }   // 시라카와 replaced 데일 as KIA's Asia quota
   if(!state.fm.farmPayV){ const fin=state.fm.fin; if(fin) fin.budget=Math.round(fin.budget+farmOf(USER).reduce((a,p)=>a+(p.sal||0),0)*1.06); state.fm.farmPayV=1; }
 }
 
@@ -1013,29 +1014,46 @@ function fxCap(p){ return p.aq? FX_AQ : FX_F; }
 function fxCount(t,onEntry){ const L=onEntry? allPlayers(t).filter(p=>p.f) : foreignOf(t); return {f:L.filter(p=>!p.aq).length, aq:L.filter(p=>p.aq).length}; }
 // signing: room in that kind once `out` (if any) leaves. Real records can leave a club over the cap
 // (mid-season replacements); those extras sit in the 2군 and block new signings of that kind.
+// " · 2군 2명" when released or extra foreigners sit in the 2군 (they still count against new signings)
+function fxFarmNote(){ const n=farmOf(USER).filter(p=>p.f).length; return n? ` · 2군 보유 ${n}명` : ''; }
 function fxRoom(t,p,out){ const c=fxCount(t), k=fxKind(p); return c[k]-(out&&fxKind(out)===k?1:0) < fxCap(p); }
 function fxEntryRoom(t,p){ const c=fxCount(t,true); return c[fxKind(p)] < fxCap(p); }
-// Initial 2026 clubs with replacement foreigners: appearances in data/kbo2026.json.
-// Compare pitchers with pitchers and batters with batters before falling back to OVR.
+// Initial 2026 clubs with replacement foreigners. FX_2026_OUT: players a club released or replaced
+// during 2026 (news reports, 2026-06~08). They stay in the club's 2군 so the season's records still show,
+// and the replacement holds the 1군 slot: KIA 데일→시라카와 (Asia quota), SSG 베니지아노→아빌라,
+// KT 보쉴리→로건 and 사우어→대니엘, 두산 카메론→세베리노.
+const FX_2026_OUT={KIA:['데일'], SSG:['베니지아노'], KT:['보쉴리','사우어'], 두산:['카메론']};
+// fallback order for any other excess: fewest 2026 appearances goes down first
 const FX_2026_GAMES={시라카와:18,네일:31,올러:30,카스트로:99,
   해치:8,아빌라:14,베니지아노:16,에레디아:115,
   대니엘:10,보쉴리:11,로건:17,사우어:18,힐리어드:142,
   세베리노:46,카메론:75,벤자민:24,잭로그:31};
-// Keep the 1군 within 3 + 1. Pair each demotion with a domestic call-up so
-// the minimum pitcher/starter rules cannot veto removal of an excess foreigner.
-function fxQuotaFix(t){ const r=K.ROSTERS[t], moved=[];
+// swap a 1군 player for a 2군 player of the same type when the entry rules allow it
+function fxSwap(t,down,up){ const r=K.ROSTERS[t], fa=farmOf(t);
+  if(down.type!==up.type||entryProblem(t,[down],[up])) return false;
+  const arr=down.type==='B'?r.batters:r.pitchers;
+  arr.splice(arr.indexOf(down),1,up); fa.splice(fa.indexOf(up),1,down); return true; }
+// a domestic 2군 player who can take p's 1군 place (same type, healthy, keeps the entry legal)
+function fxDomesticUp(t,p){ return farmOf(t).filter(x=>!x.f&&x.type===p.type&&!K.isInjured(x)&&
+  (p.role!=='SP'||x.role==='SP')&&(p.pos!=='C'||x.pos==='C')).sort((a,b)=>K.ovr(b)-K.ovr(a)).find(x=>!entryProblem(t,[p],[x])); }
+// a domestic 1군 player who can make room for foreigner q (same type, weakest first, never the last catcher)
+function fxDomesticDown(t,q){ return allPlayers(t).filter(x=>!x.f&&x.type===q.type&&x.pos!=='C')
+  .sort((a,b)=>K.ovr(a)-K.ovr(b)).find(x=>!entryProblem(t,[x],[q])); }
+// Keep the 1군 within 3 + 1, with each club's latest signings on it: released players go down,
+// their replacements come up, then any other excess goes down (paired with a domestic call-up
+// so the minimum pitcher/starter rules cannot veto it). No ratings or simulation inputs change.
+function fxQuotaFix(t){ const moved=[], out=FX_2026_OUT[t]||[];
+  allPlayers(t).filter(p=>p.f&&out.indexOf(p.n)>=0).forEach(p=>{ const up=fxDomesticUp(t,p); if(up&&fxSwap(t,p,up)) moved.push(p.n); });
+  farmOf(t).filter(p=>p.f&&out.indexOf(p.n)<0&&!K.isInjured(p)).forEach(q=>{
+    if(!fxEntryRoom(t,q)) return;
+    const dn=fxDomesticDown(t,q); if(dn&&fxSwap(t,dn,q)) moved.push(q.n);
+  });
   ['f','aq'].forEach(k=>{ const cap=k==='aq'?FX_AQ:FX_F, on=allPlayers(t).filter(p=>p.f&&fxKind(p)===k);
-    // Preserve the existing hitter/pitcher allocation; the least-used player of
-    // the most numerous type goes down first. No ratings or simulation inputs change.
     while(on.length>cap){
       const nb=on.filter(p=>p.type==='B').length, type=nb>on.length-nb?'B':'P';
       const p=on.filter(p=>p.type===type).sort((a,b)=>(FX_2026_GAMES[a.n]??Infinity)-(FX_2026_GAMES[b.n]??Infinity)||K.ovr(a)-K.ovr(b))[0];
-      const fa=farmOf(t), up=fa.filter(x=>!x.f&&x.type===p.type&&!K.isInjured(x)&&
-        (p.role!=='SP'||x.role==='SP')&&(p.pos!=='C'||x.pos==='C'))
-        .sort((a,b)=>K.ovr(b)-K.ovr(a)).find(x=>!entryProblem(t,[p],[x]));
-      if(!up) break;   // no legal swap: leave it; tools/tests/roster-rules.js fails on any club over the quota
-      const arr=p.type==='B'?r.batters:r.pitchers;
-      arr.splice(arr.indexOf(p),1,up); fa.splice(fa.indexOf(up),1,p);
+      const up=fxDomesticUp(t,p);
+      if(!up||!fxSwap(t,p,up)) break;   // no legal swap: leave it; tools/tests/roster-rules.js fails on any club over the quota
       on.splice(on.indexOf(p),1); moved.push(p.n);
     }
   });
@@ -1353,7 +1371,7 @@ function stoveTasks(){
   return [
     {done:!renew, t:'재계약 협상', d: renew? `미결 ${renew}건 (받은편지함)` : '완료', go:"App.tab('inbox')"},
     {done:false, opt:true, t:'FA 시장', d:`${(f.fa||[]).length}명 시장에 있음`, go:"App.tab('club')"},
-    {done:false, opt:true, t:'외국인 선수', d:`외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 스토브리그엔 교체 횟수 차감 없음`, go:"App.tab('club')"},
+    {done:false, opt:true, t:'외국인 선수', d:`1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 스토브리그엔 교체 횟수 차감 없음`, go:"App.tab('club')"},
     {done:false, opt:true, t:'트레이드', d:'다른 구단과 협상', go:"App.tab('trade')"},
     {done:!!(f.camp&&f.camp.year===state.year&&f.camp.focus), t:'이번 주 결정', d: offHero().title, go:"FM.offOpen()"},
     {done:!!state.cfgs[USER].tac, opt:true, t:'팀 기본 전술', d: state.cfgs[USER].tac? '설정됨' : '팀 전술 탭', go:"App.tab('tactics')"}
@@ -3058,7 +3076,7 @@ function dashTasks(){
   if(tired.length && !f.autoRest) out.push({ic:'lineup', t:`지친 주전 ${tired.length}명`, d:'수석코치 · '+tired.map(p=>p.n).join(', ')+' · 휴식 권장', a:'라인업 확인', go:"App.tab('lineup')"});
   if(state.phase==='stove'){
     if(!c.tac) out.push({ic:'settings', t:'팀 기본 전술 정하기', d:'팀 전술 탭 · 공격·수비·배터리 기본값', a:'전술 설정', go:"App.tab('tactics')"});
-    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
+    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
   }
   if(!out.length && inj.length) out.push({ic:'injury', t:`부상자 ${inj.length}명 회복 중`, d:'의무팀 · '+inj.map(p=>`${p.n} (${p.inj})`).join(', '), a:'선수단 보기', go:"App.tab('squad')"});
   return out;
@@ -3169,7 +3187,7 @@ function marketCards(){
       ${list.map(({x,i})=>pRow(x.p, `${x.yrs}년 ${x.ask}억 <span class="muted">(전 ${esc(x.from)})</span>`, `<button class="btn" onclick="FM.signFA(${i})">계약</button>`)).join('')}</tbody></table></div></div>`);
   }
   const mine=foreignOf(USER), open=fxWindowOpen(), left=fxSwapsLeft();
-  out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 시즌 중 교체 ${Math.max(0,left)}회 남음 · 비시즌은 제한 없음</span></h3>
+  out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 시즌 중 교체 ${Math.max(0,left)}회 남음 · 비시즌은 제한 없음</span></h3>
     <div class="muted" style="margin-bottom:8px">현재: ${mine.map(p=>`${esc(p.n)}(${p.aq?'아시아쿼터 · ':''}${p.pos||p.role}·${K.ovr(p)}·${p.sal}억${isFarm(USER,p)?' · 2군':''})`).join(', ')||'없음'}</div>
     ${open&&(left>0||state.phase!=='regular')? `<div style="overflow-x:auto"><table><thead><tr><th class="name">후보</th><th>POS</th><th>나이</th><th>OVR</th><th>능력</th><th>연봉</th><th></th></tr></thead><tbody>
       ${scoutList().map((p,i)=>pRow(p, `${p.sal}억`, `<button class="btn" onclick="FM.fxPick(${i})">영입</button>`)).join('')}</tbody></table></div>

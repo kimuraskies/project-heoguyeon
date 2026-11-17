@@ -1335,7 +1335,7 @@ function batRow(team,p,showStat){
     else stat=`<td colspan="11" class="muted">기록 없음</td>`;
   }
   return `<tr><td class="name">${pname(team,p.n)}</td><td><span class="pill pos">${p.pos}</span></td><td>${p.age}</td>
-    <td><span class="ovr ${ovrClass(o)}">${o}</span></td>${FM.statusCells(p)}
+    <td><span class="ovr ${ovrClass(o)}">${o}</span></td>${showStat?`<td>${FM.starHTML(p)}</td>`:''}${FM.statusCells(p)}
     <td>${ratNum(p.con)}</td><td>${ratNum(p.pow)}</td><td>${ratNum(p.eye)}</td><td>${ratNum(p.spd)}</td><td>${ratNum(p.fld)}</td><td>${ratNum(p.arm)}</td>${stat}</tr>`;
 }
 function pitRow(team,p,showStat){
@@ -1346,10 +1346,20 @@ function pitRow(team,p,showStat){
     else stat=`<td colspan="10" class="muted">기록 없음</td>`;
   }
   return `<tr><td class="name">${pname(team,p.n)}</td><td><span class="pill pos">${p.role}</span></td><td>${p.age}</td>
-    <td><span class="ovr ${ovrClass(o)}">${o}</span></td>${FM.statusCells(p)}
+    <td><span class="ovr ${ovrClass(o)}">${o}</span></td>${showStat?`<td>${FM.starHTML(p)}</td>`:''}${FM.statusCells(p)}
     <td>${ratNum(p.stu)}</td><td>${ratNum(p.ctl)}</td><td>${ratNum(p.mov)}</td><td>${ratNum(p.sta)}</td>${stat}</tr>`;
 }
 let squadView="bat";
+// squad sort: key and direction; tapping the same key again reverses it
+let squadSort={k:'ovr',d:-1};
+const POS_ORDER=['C','1B','2B','3B','SS','LF','CF','RF','DH','SP','RP','CL'];
+const SQ_KEYS={ovr:p=>K.ovr(p), pot:p=>(p.pot||K.ovr(p)), age:p=>p.age, pos:p=>POS_ORDER.indexOf(p.pos||p.role)};
+function sqSorted(list){ const f=SQ_KEYS[squadSort.k]||SQ_KEYS.ovr, d=squadSort.d;
+  return list.slice().sort((a,b)=>d*(f(a)-f(b))||K.ovr(b)-K.ovr(a)); }
+function sqSortBar(){ const lab={ovr:'OVR',pot:'잠재력',age:'나이',pos:'포지션'};
+  return `<div class="sq-sort" role="group" aria-label="정렬"><span class="muted">정렬</span>${Object.keys(lab).map(k=>{ const on=squadSort.k===k;
+    return `<button class="chip${on?' on':''}" aria-pressed="${on}" onclick="App.squadSort('${k}')">${lab[k]}${on?(squadSort.d<0?' ↓':' ↑'):''}</button>`; }).join('')}</div>`; }
+function sqTh(k,l){ const on=squadSort.k===k; return `<th class="sq-th${on?' on':''}" onclick="App.squadSort('${k}')">${l}${on?(squadSort.d<0?' ↓':' ↑'):''}</th>`; }
 function renderSquad(){
   const r=K.ROSTERS[USER];
   const tabs=`<div class="tabsm">
@@ -1361,20 +1371,20 @@ function renderSquad(){
   let body;
   if(squadView==="farm") body=FM.farmView();
   else if(squadView==="bat"){
-    const rows=r.batters.slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).map(p=>withDown(batRow(USER,p,true),p)).join("");
-    body=`<table><thead><tr><th class="name">선수</th><th>POS</th><th>나이</th><th>OVR</th><th>컨디션</th><th>사기</th>
+    const rows=sqSorted(r.batters).map(p=>withDown(batRow(USER,p,true),p)).join("");
+    body=`<table><thead><tr><th class="name">선수</th>${sqTh('pos','POS')}${sqTh('age','나이')}${sqTh('ovr','OVR')}${sqTh('pot','잠재력')}<th>컨디션</th><th>사기</th>
       <th>컨택</th><th>파워</th><th>선구</th><th>주력</th><th>수비</th><th>송구</th>
       <th>G</th><th>AB</th><th>H</th><th>HR</th><th>타점</th><th>득점</th><th>BB</th><th>SO</th><th>도루</th><th>타율</th><th>출루</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   } else {
-    const rows=r.pitchers.slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).map(p=>withDown(pitRow(USER,p,true),p)).join("");
-    body=`<table><thead><tr><th class="name">선수</th><th>보직</th><th>나이</th><th>OVR</th><th>컨디션</th><th>사기</th>
+    const rows=sqSorted(r.pitchers).map(p=>withDown(pitRow(USER,p,true),p)).join("");
+    body=`<table><thead><tr><th class="name">선수</th>${sqTh('pos','보직')}${sqTh('age','나이')}${sqTh('ovr','OVR')}${sqTh('pot','잠재력')}<th>컨디션</th><th>사기</th>
       <th>구위</th><th>제구</th><th>무브</th><th>체력</th>
       <th>G</th><th>GS</th><th>W</th><th>L</th><th>SV</th><th>HD</th><th>IP</th><th>SO</th><th>BB</th><th>ERA</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   }
   const q=s=>s.replace(/'/g,"\\'"), two=(p,ks)=>ks.map(([k,l])=>[l,p[k]]).sort((x,y)=>y[1]-x[1]).slice(0,2).map(([l,v])=>`${l} <b>${ratNum(v)}</b>`).join(' · ');
-  const card=(p,isP)=>`<li class="sq-row"><button class="sq-main" onclick="App.player('${USER}','${q(p.n)}')"><span class="sq-name">${FM.esc(p.n)}</span><span class="sq-sub">${isP?p.role:p.pos} · ${p.age}세 · ${two(p,isP?[['stu','구위'],['ctl','제구'],['mov','무브'],['sta','체력']]:[['con','컨택'],['pow','파워'],['eye','선구'],['spd','주력'],['fld','수비']])}</span><span class="sq-st">${FM.statusInline(p)}</span></button><span class="sq-ovr"><small>OVR</small>${K.ovr(p)}</span><button class="btn btn-sm" onclick="FM.demote('${q(p.n)}')">2군 보내기</button></li>`;
-  const list = squadView==='farm' ? '' : `<ul class="sq-list">${(squadView==='bat'?r.batters:r.pitchers).slice().sort((a,b)=>K.ovr(b)-K.ovr(a)).map(p=>card(p,squadView!=='bat')).join('')}</ul>`;
-  return `${FM.fxCard()}<div class="card"><h3 class="sq-h">${r.name} 선수단 <span class="tag">1군 엔트리 ${FM.entryCount(USER)}/${FM.ENTRY_MAX} · 이름을 누르면 상세 프로필</span></h3>${tabs}${list}<div class="${squadView==='farm'?'':'sq-table'}">${body}</div></div>`;
+  const card=(p,isP)=>`<li class="sq-row"><button class="sq-main" onclick="App.player('${USER}','${q(p.n)}')"><span class="sq-name">${FM.esc(p.n)}</span><span class="sq-sub">${isP?p.role:p.pos} · ${p.age}세 · ${two(p,isP?[['stu','구위'],['ctl','제구'],['mov','무브'],['sta','체력']]:[['con','컨택'],['pow','파워'],['eye','선구'],['spd','주력'],['fld','수비']])}</span><span class="sq-st">${FM.statusInline(p)}</span></button><span class="sq-ovr"><small>OVR</small>${K.ovr(p)}<span class="sq-pot">${FM.starHTML(p)}</span></span><button class="btn btn-sm" onclick="FM.demote('${q(p.n)}')">2군 보내기</button></li>`;
+  const list = squadView==='farm' ? '' : `<ul class="sq-list">${sqSorted(squadView==='bat'?r.batters:r.pitchers).map(p=>card(p,squadView!=='bat')).join('')}</ul>`;
+  return `${FM.fxCard()}<div class="card"><h3 class="sq-h">${r.name} 선수단 <span class="tag">1군 엔트리 ${FM.entryCount(USER)}/${FM.ENTRY_MAX} · 이름을 누르면 상세 프로필</span></h3>${tabs}${squadView==='farm'?'':sqSortBar()}${list}<div class="${squadView==='farm'?'':'sq-table'}">${body}</div></div>`;
 }
 
 const POS_OPTS=['C','1B','2B','3B','SS','LF','CF','RF','DH'];
@@ -1397,6 +1407,37 @@ function userLineupTable(){
   const defBox=`<div class="${issues.length?'deal-result deal-no':'hint'}" style="margin-top:10px">팀 수비력 <b>${defense.toFixed(1)}</b> <span class="muted">(리그 평균 70)</span>${issues.length?'<br>⚠️ '+issues.join(' · '):''}</div>`;
   return `<ol class="lu-list">${lineupRows}</ol>
       ${defBox}`;
+}
+// lineup on a field: each position shows its player and batting order; tap one to change who plays there
+const FIELD_XY={CF:[50,12],LF:[17,27],RF:[83,27],SS:[35,47],'2B':[65,47],'3B':[17,66],'1B':[83,66],C:[50,90],DH:[86,90]};
+function fieldFit(b,x){ if(x==='DH') return 'ok'; const f=K.posFit(b,x); return f===0?'ok':f<10?'warn':'bad'; }
+function lineupField(){
+  const c=state.cfgs[USER], pos=userPositions(), sp=K.getP(USER,c.rotation[0]);
+  const spot=x=>{ const i=pos.indexOf(x), n=i>=0?c.lineup[i]:null, b=n&&K.ROSTERS[USER].batters.find(p=>p.n===n), [l,t]=FIELD_XY[x];
+    return `<button class="fld-spot fit-${b?fieldFit(b,x):'bad'}" style="left:${l}%;top:${t}%" onclick="App.fieldPick('${x}')" aria-label="${x} ${n?FM.esc(n)+' '+(i+1)+'번 타자':'비어 있음'}">
+      <small>${x}</small><b>${n?FM.esc(n):'비어 있음'}</b>${i>=0?`<i>${i+1}</i>`:''}</button>`; };
+  return `<div class="fld" role="group" aria-label="수비 위치">
+    <svg class="fld-bg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M50 97 L4 47 Q50 -8 96 47 Z" class="fld-grass"/>
+      <path d="M50 92 L27 66 L50 43 L73 66 Z" class="fld-dirt"/>
+      <path d="M50 92 L4 47 M50 92 L96 47" class="fld-line"/>
+      <circle cx="50" cy="67" r="3.2" class="fld-mound"/>
+    </svg>
+    ${Object.keys(FIELD_XY).map(spot).join('')}
+    <div class="fld-p"><small>선발</small><b>${sp?FM.esc(sp.n):'-'}</b></div>
+  </div>
+  <p class="hint fld-hint">포지션을 누르면 그 자리에 설 선수를 고를 수 있어요. 테두리 색: <span style="color:var(--good)">주 포지션</span> · <span style="color:var(--warn)">조금 서툼</span> · <span style="color:var(--bad)">많이 서툼</span></p>`;
+}
+function fieldPickHTML(x){
+  const c=state.cfgs[USER], pos=userPositions(), i=pos.indexOf(x), cur=i>=0?c.lineup[i]:null;
+  const rows=K.ROSTERS[USER].batters.slice().sort((a,b)=>(x==='DH'?0:K.posFit(a,x)-K.posFit(b,x))||K.ovr(b)-K.ovr(a)).map(b=>{
+    const j=c.lineup.indexOf(b.n), fit=x==='DH'?0:K.posFit(b,x), q=b.n.replace(/'/g,"\'");
+    const fitTxt=x==='DH'?'지명타자':fit===0?'<span style="color:var(--good)">주 포지션</span>':`<span style="color:var(${fit<10?'--warn':'--bad'})">수비 -${fit}</span>`;
+    const where=j>=0?`${j+1}번 · ${pos[j]}`:'벤치';
+    return `<button class="fld-opt${b.n===cur?' on':''}" onclick="App.fieldSet('${x}','${q}')"><span><b>${FM.esc(b.n)}</b> <small class="muted">${b.pos} · OVR ${K.ovr(b)}</small></span><span class="fld-opt-r">${fitTxt}<small class="muted">${where}</small></span></button>`; }).join('');
+  return `<h3>${x} 자리에 설 선수 <span class="closeX" onclick="App.closeModal()">✕</span></h3>
+    <p class="hint" style="margin:0 0 8px">타순에 있는 선수를 고르면 두 선수의 수비 위치만 바뀌고, 벤치 선수를 고르면 그 타순 자리에 들어갑니다.</p>
+    <div class="fld-opts">${rows}</div>`;
 }
 function renderLineup(){
   const c=state.cfgs[USER]; const r=K.ROSTERS[USER];
@@ -1422,6 +1463,8 @@ function renderLineup(){
   const luBtn=(v,l)=>`<button class="${luView===v?'active':''}" onclick="App.luView('${v}')">${l}</button>`;
   return banner + `<div class="tabsm lu-switch">${luBtn('bat','타순 · 수비')}${luBtn('pit','투수 · 로테이션')}</div><div class="grid cols2 lu-split lu-show-${luView}">
     <div class="card lu-bat"><h3>타순 · 수비 위치 <span class="tag">8개 수비 위치 + 지명타자</span></h3>
+      ${lineupField()}
+      <h3 class="lu-order-h">타순</h3>
       ${userLineupTable()}
       <button class="btn" style="margin-top:10px" onclick="App.autoLineup()">${FM.icon('lineup')}코치 추천 라인업</button>
     </div>
@@ -1802,6 +1845,7 @@ const App={
   // phone: the menu items that don't fit the bottom bar
   more:()=>modal(`<span class="closeX" onclick="App.closeModal()" role="button" aria-label="닫기">×</span><h2>더보기</h2><div class="more-grid">${TABS.slice(4).map(([id,ic,lbl])=>`<button class="btn${currentTab===id?' primary':''}" onclick="App.tab('${id}')">${FM.icon(ic)}<span>${lbl}</span></button>`).join('')}</div>`),
   squadView:(v)=>{squadView=v;render();},
+  squadSort:(k)=>{ squadSort = squadSort.k===k? {k, d:-squadSort.d} : {k, d:(k==='age'||k==='pos')?1:-1}; render(); },
   leaderCat:(c)=>{leaderCat=c;render();},
   nextGame:()=>startNextUserGame(),
   allTasks:()=>{ showAllTasks=!showAllTasks; render(); },
@@ -1816,6 +1860,13 @@ const App={
     const old=c.lineup.indexOf(v); if(old>=0&&old!==i){ c.lineup[old]=c.lineup[i]; const tp=pos[old]; pos[old]=pos[i]; pos[i]=tp; } c.lineup[i]=v; render(); },
   setPos:(i,v)=>{ const pos=userPositions(); const old=pos.indexOf(v); if(old>=0&&old!==i){ pos[old]=pos[i]; } pos[i]=v; render(); },
   luView:(v)=>{ luView=v; render(); },
+  fieldPick:(x)=>modal(fieldPickHTML(x)),
+  // a hitter already in the order trades positions with the one at x; a bench hitter takes x's order slot
+  fieldSet:(x,v)=>{ const c=state.cfgs[USER], pos=userPositions(), i=pos.indexOf(x), j=c.lineup.indexOf(v);
+    if(i<0){ if(j>=0) pos[j]=x; }
+    else if(j>=0){ if(j!==i){ pos[i]=pos[j]; pos[j]=x; } }
+    else c.lineup[i]=v;
+    closeModal(); render(); },
   setRotation:(i,v)=>{ const c=state.cfgs[USER]; const old=c.rotation.indexOf(v); if(old>=0&&old!==i){c.rotation[old]=c.rotation[i];} c.rotation[i]=v; render(); },
   setCloser:(v)=>{ state.cfgs[USER].closer=v; render(); },
   autoLineup:()=>{ const d=K.defaultLineup(USER); state.cfgs[USER].lineup=d.lineup.slice(); state.cfgs[USER].positions=d.positions.slice(); render(); },

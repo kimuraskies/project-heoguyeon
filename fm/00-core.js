@@ -147,6 +147,7 @@ function ensure(){
   if(state.fm.fans==null) state.fm.fans=50;
   if(!state.fm.farmV){ K.TEAM_IDS.forEach(seedFarm); state.fm.farmV=1; }
   if(!state.fm.aqV){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(p=>{ if(p.f&&K.ASIA_Q.indexOf(p.n)>=0) p.aq=1; })); state.fm.aqV=1; }   // saves from before the Asia quota
+  if(state.fm.aqV<2){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(p=>{ if(p.f&&p.n==='시라카와') p.aq=1; })); state.fm.aqV=2; }   // 시라카와 replaced 데일 as KIA's Asia quota
   if(!state.fm.farmPayV){ const fin=state.fm.fin; if(fin) fin.budget=Math.round(fin.budget+farmOf(USER).reduce((a,p)=>a+(p.sal||0),0)*1.06); state.fm.farmPayV=1; }
 }
 

@@ -214,3 +214,36 @@ nav.tabs button>span{white-space:nowrap}
 .sq-table table{min-width:100%}
 .sq-table td,.sq-table th{white-space:nowrap}
 .sq-table .btn{white-space:nowrap}
+/* squad sort: chips above the list/table; table headers sort too */
+.sq-sort{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 4px}
+.sq-sort>.muted{font-size:12px;margin-right:2px}
+.sq-sort .chip{cursor:pointer;min-height:36px;padding:0 12px;font:inherit;font-size:13px;color:var(--ss-ink2);background:var(--ss-2);border:1px solid var(--ss-3)}
+.sq-sort .chip.on{color:var(--on-team);background:var(--team);border-color:var(--team);font-weight:700}
+.sq-th{cursor:pointer;user-select:none}
+.sq-th.on{color:var(--ss-ink)}
+.sq-pot{display:block;font-size:10px;line-height:1;margin-top:3px;white-space:nowrap}
+/* lineup field: positions on a diamond, tap to change the player there */
+.fld{position:relative;width:100%;max-width:560px;aspect-ratio:10/9;margin:4px auto 0}
+.fld-bg{position:absolute;inset:0;width:100%;height:100%}
+.fld-grass{fill:color-mix(in srgb,var(--good) 14%,var(--ss-1));stroke:var(--ss-3);stroke-width:.4}
+.fld-dirt{fill:color-mix(in srgb,#b8865a 22%,var(--ss-1))}
+.fld-line{stroke:color-mix(in srgb,var(--ss-ink) 35%,transparent);stroke-width:.35;fill:none}
+.fld-mound{fill:color-mix(in srgb,#b8865a 35%,var(--ss-1))}
+.fld-spot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:1px;min-width:64px;max-width:96px;min-height:44px;padding:4px 8px;border-radius:10px;border:2px solid var(--good);background:var(--ss-0);color:var(--ss-ink);font:inherit;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.fld-spot small{font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ss-ink3)}
+.fld-spot b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.fld-spot i{position:absolute;top:-8px;right:-8px;width:20px;height:20px;border-radius:50%;background:var(--team);color:var(--on-team);font:700 11px/20px var(--ss-num);font-style:normal;text-align:center}
+.fld-spot.fit-warn{border-color:var(--warn)}
+.fld-spot.fit-bad{border-color:var(--bad)}
+.fld-spot:hover{background:var(--ss-2)}
+.fld-spot:focus-visible{outline:2px solid var(--ss-ink);outline-offset:2px}
+.fld-p{position:absolute;left:50%;top:76%;transform:translate(-50%,-50%);text-align:center;font-size:11px;color:var(--ss-ink3);line-height:1.2}
+.fld-p b{display:block;color:var(--ss-ink2);font-size:12px}
+.fld-hint{margin:6px 0 4px;font-size:12px}
+.lu-order-h{margin-top:14px}
+.fld-opts{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto}
+.fld-opt{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:48px;padding:6px 12px;border-radius:10px;border:1px solid var(--ss-3);background:var(--ss-1);color:var(--ss-ink);font:inherit;text-align:left;cursor:pointer}
+.fld-opt.on{border-color:var(--team);box-shadow:inset 3px 0 0 var(--team)}
+.fld-opt:hover{background:var(--ss-2)}
+.fld-opt-r{display:flex;flex-direction:column;align-items:flex-end;font-size:12px;white-space:nowrap}
+@media(max-width:420px){.fld-spot{min-width:56px;padding:3px 6px}.fld-spot b{font-size:12px}}

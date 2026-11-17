@@ -136,7 +136,7 @@ function dashTasks(){
   if(tired.length && !f.autoRest) out.push({ic:'lineup', t:`지친 주전 ${tired.length}명`, d:'수석코치 · '+tired.map(p=>p.n).join(', ')+' · 휴식 권장', a:'라인업 확인', go:"App.tab('lineup')"});
   if(state.phase==='stove'){
     if(!c.tac) out.push({ic:'settings', t:'팀 기본 전술 정하기', d:'팀 전술 탭 · 공격·수비·배터리 기본값', a:'전술 설정', go:"App.tab('tactics')"});
-    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
+    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
   }
   if(!out.length && inj.length) out.push({ic:'injury', t:`부상자 ${inj.length}명 회복 중`, d:'의무팀 · '+inj.map(p=>`${p.n} (${p.inj})`).join(', '), a:'선수단 보기', go:"App.tab('squad')"});
   return out;
@@ -247,7 +247,7 @@ function marketCards(){
       ${list.map(({x,i})=>pRow(x.p, `${x.yrs}년 ${x.ask}억 <span class="muted">(전 ${esc(x.from)})</span>`, `<button class="btn" onclick="FM.signFA(${i})">계약</button>`)).join('')}</tbody></table></div></div>`);
   }
   const mine=foreignOf(USER), open=fxWindowOpen(), left=fxSwapsLeft();
-  out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">외국인 ${fxCount(USER).f}/${FX_F} · 아시아쿼터 ${fxCount(USER).aq}/${FX_AQ} · 시즌 중 교체 ${Math.max(0,left)}회 남음 · 비시즌은 제한 없음</span></h3>
+  out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 시즌 중 교체 ${Math.max(0,left)}회 남음 · 비시즌은 제한 없음</span></h3>
     <div class="muted" style="margin-bottom:8px">현재: ${mine.map(p=>`${esc(p.n)}(${p.aq?'아시아쿼터 · ':''}${p.pos||p.role}·${K.ovr(p)}·${p.sal}억${isFarm(USER,p)?' · 2군':''})`).join(', ')||'없음'}</div>
     ${open&&(left>0||state.phase!=='regular')? `<div style="overflow-x:auto"><table><thead><tr><th class="name">후보</th><th>POS</th><th>나이</th><th>OVR</th><th>능력</th><th>연봉</th><th></th></tr></thead><tbody>
       ${scoutList().map((p,i)=>pRow(p, `${p.sal}억`, `<button class="btn" onclick="FM.fxPick(${i})">영입</button>`)).join('')}</tbody></table></div>

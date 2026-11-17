@@ -19,10 +19,16 @@ module.exports = ({assert,test}) => {
       for (const n of cfg.rotation) assert.ok(r.pitchers.some(p=>p.n===n),`${t}: stale rotation ${n}`);
       for (const n of cfg.lineup) assert.ok(r.batters.some(p=>p.n===n),`${t}: stale lineup ${n}`);
     }
-    const ssg = h.K.ROSTERS.SSG;
-    assert.ok(ssg.farm.some(p=>p.n==='해치'&&p.f&&!p.aq),'SSG: Hatch must start in Futures');
-    for (const n of ['에레디아','아빌라','베니지아노','타케다']) {
-      assert.ok(ssg.batters.concat(ssg.pitchers).some(p=>p.n===n),`SSG: retain ${n}`);
+    // each club's latest 2026 signings hold the 1군 slots; the players they replaced start in the 2군
+    const on = t => h.K.ROSTERS[t].batters.concat(h.K.ROSTERS[t].pitchers).map(p=>p.n);
+    const farm = t => h.K.ROSTERS[t].farm.map(p=>p.n);
+    const want = {KIA:[['카스트로','네일','올러','시라카와'],['데일']], SSG:[['에레디아','해치','아빌라','타케다'],['베니지아노']],
+      KT:[['힐리어드','로건','대니엘','스기모토'],['보쉴리','사우어']], 두산:[['세베리노','벤자민','잭로그','타카다'],['카메론']]};
+    for (const [t,[up,down]] of Object.entries(want)) {
+      for (const n of up) assert.ok(on(t).includes(n),`${t}: ${n} should be on the 1군`);
+      for (const n of down) assert.ok(farm(t).includes(n),`${t}: ${n} should start in the 2군`);
     }
+    assert.ok(h.K.ROSTERS.KIA.farm.concat(h.K.ROSTERS.KIA.pitchers).find(p=>p.n==='시라카와').aq,'KIA: 시라카와 is the Asia quota');
+
   });
 };
