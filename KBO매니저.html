@@ -1144,6 +1144,18 @@ function nextSeason(){
 // the first four are the phone bottom bar; the rest open from 더보기 there
 const TABS=[["dash","dashboard","감독실"],["inbox","inbox","받은편지함"],["squad","squad","선수단"],["lineup","lineup","라인업"],["feed","feed","뉴스"],["tactics","settings","팀 전술"],["train","camp","훈련"],["sched","schedule","일정·경기"],["stand","standings","순위"],["leaders","records","기록실"],["trade","trade","트레이드"],["club","club","구단"]];
 
+// tablet and PC: five groups in a slim left menu, the group's pages as tabs on top of the view
+const NAV_GROUPS=[["dash","dashboard","감독실",["dash"]],["mail","inbox","편지함",["inbox","feed"]],["players","squad","선수",["squad","lineup","tactics","train"]],
+  ["league","standings","리그",["sched","stand","leaders"]],["club","club","구단",["club","trade"]]];
+const navLast={};
+function navGroupOf(id){ return NAV_GROUPS.find(g=>g[3].includes(id))||NAV_GROUPS[0]; }
+function navGroupButtons(){ const cur=navGroupOf(currentTab);
+  return NAV_GROUPS.map(([gid,ic,lbl,pages])=>{ const on=cur[0]===gid;
+    return `<button class="tab-grp${on?' active':''}" ${on?'aria-current="page"':''} onclick="App.navGroup('${gid}')">${FM.icon(ic)}<span>${lbl}</span>${pages.map(p=>FM.tabBadge(p)).join('')}</button>`; }).join(''); }
+function navSubTabs(){ const g=navGroupOf(currentTab); if(g[3].length<2) return '';
+  return `<div class="subtabs" role="tablist" aria-label="${g[2]}">${g[3].map(id=>{ const t=TABS.find(x=>x[0]===id), on=id===currentTab;
+    return `<button role="tab" aria-selected="${on}" class="${on?'active':''}" onclick="App.tab('${id}')">${t[2]}${FM.tabBadge(id)}</button>`; }).join('')}</div>`; }
+
 function render(){
   FM.ensure();
   autosave();
@@ -1156,8 +1168,9 @@ function render(){
   $("teaminfo").innerHTML = `${FM.mgrAvatar(26)} ${FM.esc(state.user.name)} 감독`;
   // tabs
   { const moreOn=TABS.slice(4).some(x=>x[0]===currentTab);
-    $("tabs").innerHTML = TABS.map(([id,ic,lbl],i)=>`<button class="${currentTab===id?'active':''}${i>=4?' tab-x':''}" ${currentTab===id?'aria-current="page"':''} onclick="App.tab('${id}')">${FM.icon(ic)}<span>${lbl}</span>${FM.tabBadge(id)}</button>`).join("")
-      + `<button class="tab-more${moreOn?' active':''}" onclick="App.more()" aria-haspopup="dialog">${FM.icon('settings')}<span>${moreOn?TABS.find(x=>x[0]===currentTab)[2]:'더보기'}</span></button>`; }
+    $("tabs").innerHTML = TABS.map(([id,ic,lbl],i)=>`<button class="tab-ph${currentTab===id?' active':''}${i>=4?' tab-x':''}" ${currentTab===id?'aria-current="page"':''} onclick="App.tab('${id}')">${FM.icon(ic)}<span>${lbl}</span>${FM.tabBadge(id)}</button>`).join("")
+      + `<button class="tab-more${moreOn?' active':''}" onclick="App.more()" aria-haspopup="dialog">${FM.icon('settings')}<span>${moreOn?TABS.find(x=>x[0]===currentTab)[2]:'더보기'}</span></button>`
+      + navGroupButtons(); navLast[navGroupOf(currentTab)[0]]=currentTab; }
   const v=$("view");
   if(currentTab==="dash") v.innerHTML=renderDash();
   else if(currentTab==="squad") v.innerHTML=renderSquad();
@@ -1171,6 +1184,7 @@ function render(){
   else if(currentTab==="feed") v.innerHTML=FM.renderFeed();
   else if(currentTab==="club") v.innerHTML=FM.renderClub()+FM.staffCard();
   else if(currentTab==="train") v.innerHTML=FM.renderTraining();
+  if(v.insertAdjacentHTML) v.insertAdjacentHTML('afterbegin', navSubTabs()); else v.innerHTML=navSubTabs()+v.innerHTML;
   if($('prematch')) openPreview(); // lineup edits made from the match page
   FM.refreshProfile();
   if(window.Track && !$('prematch') && !$('relay')) Track.screen(currentTab);
@@ -1860,6 +1874,7 @@ const App={
     const old=c.lineup.indexOf(v); if(old>=0&&old!==i){ c.lineup[old]=c.lineup[i]; const tp=pos[old]; pos[old]=pos[i]; pos[i]=tp; } c.lineup[i]=v; render(); },
   setPos:(i,v)=>{ const pos=userPositions(); const old=pos.indexOf(v); if(old>=0&&old!==i){ pos[old]=pos[i]; } pos[i]=v; render(); },
   luView:(v)=>{ luView=v; render(); },
+  navGroup:(g)=>{ const grp=NAV_GROUPS.find(x=>x[0]===g); if(grp) App.tab(navLast[g]||grp[3][0]); },
   fieldPick:(x)=>modal(fieldPickHTML(x)),
   // a hitter already in the order trades positions with the one at x; a bench hitter takes x's order slot
   fieldSet:(x,v)=>{ const c=state.cfgs[USER], pos=userPositions(), i=pos.indexOf(x), j=c.lineup.indexOf(v);
