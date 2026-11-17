@@ -13,13 +13,27 @@ module.exports=({K,assert,test,seed})=>{
       assert.equal(learned.length,9); assert.equal(new Set(learned.map(t=>t.code)).size,9);
       for(const a of [expected,learned]){
         assert.ok(Math.abs(a.reduce((n,p)=>n+p.use,0)-1)<1e-12);
-        assert.ok(a[0].use>=.35&&a[0].use<=.55);
+        assert.ok(a[0].use>=.2&&a[0].use<=.75); // real mixes: a primary pitch from about 25% (five-pitch mixes) to 70% (power relievers)
         for(const p of a) for(const k of ['use','velo','hb','vb','whiff','zone']) assert.ok(Number.isFinite(p[k]));
       }
       K.arsenal({...pit,hand:'좌'}).forEach((t,i)=>{assert.equal(t.hb,-expected[i].hb);assert.equal(t.vb,expected[i].vb);});
       assert.ok(K.arsenal({...pit,stu:pit.stu+10})[0].velo>expected[0].velo);
       assert.ok(K.arsenal({...pit,ctl:pit.ctl+10})[0].zone>expected[0].zone);
     }finally{Math.random=original;}
+  });
+
+  test('Statcast: real arsenals cover listed pitchers, stay legal, and fix known errors',()=>{
+    const legal=new Set(codes); let real=0, est=0;
+    for(const [n,v] of Object.entries(K.ARSENAL)){
+      const [mix,src]=v.split('|'); assert.ok(src==='m'||src==='k',n+' source');
+      const ps=mix.split(' ').map(x=>[x.slice(0,2),+x.slice(2)]);
+      assert.ok(ps.length>=2,n+' has at least two pitches'); ps.forEach(([c])=>assert.ok(legal.has(c),n+' code '+c));
+      assert.ok(Math.abs(ps.reduce((a,[,v])=>a+v,0)-100)<=2,n+' shares sum to 100');
+    }
+    const yang=K.arsenal({n:'양현종',stu:70,ctl:70,mov:70}).map(t=>t.code);
+    assert.deepEqual(yang,['FF','CH','SL','CU'],'양현종 throws no splitter');
+    assert.ok(!K.arsenal({n:'양현종'})[0].est && K.arsenal({n:'가상투수'})[0].est,'unlisted pitchers are marked as estimates');
+    const generic=K.arsenal({n:'가상투수'}).map(t=>t.code); assert.ok(!generic.includes('SP')&&!generic.includes('SW'),'estimates use common pitches only');
   });
 
   test('Statcast: sequence codes, counts and lengths survive decoration changes without outcome RNG calls',()=>{

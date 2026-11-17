@@ -1,0 +1,103 @@
+# Real pitch mixes for KBO pitchers without MLB/AAA tracking data (those come from data/arsenal-mlb.json).
+# One pitcher per line: name  CODE share  CODE share ...   (shares are rough %, they get normalised)
+# Codes: FF 직구, SI 투심, SL 슬라이더, CU 커브, CH 체인지업, FS 포크, FC 커터, SW 스위퍼, SP 스플리터
+# Source: public broadcasts and press descriptions of each pitcher's repertoire; shares are approximate.
+# Pitchers not listed here (and not in arsenal-mlb.json) get a generic mix and show "추정" in the game.
+
+# KIA
+양현종 FF45 CH25 SL15 CU15
+네일 SW32 SI30 CH18 FC12 CU8
+올러 FF42 SL25 CU18 CH15
+시라카와 FF45 FS25 SL18 CU12
+황동하 FF50 SL25 FS15 CU10
+이의리 FF55 SL20 CU15 CH10
+전상현 FF55 SL25 FS12 CU8
+정해영 FF55 SL25 FS20
+조상우 FF65 SL30 FS5
+한재승 FF60 SL30 FS10
+김태형 FF50 SL25 CU15 FS10
+성영탁 SI50 SL30 CH20
+# NC
+구창모 FF45 SL25 FS20 CU10
+김진호 FF60 CH30 SL10
+김태경 FF50 SL30 FS20
+배재환 FF55 SL30 FS15
+손주환 FF55 SL30 CU15
+송명기 FF50 SL25 FS15 CU10
+신민혁 FF40 CH35 FC15 CU10
+임지민 FF55 SL30 FS15
+전사민 SI45 SL30 FS25
+# 두산
+곽빈 FF48 CU20 SL17 CH15
+김정우 FF55 SL30 FS15
+김택연 FF70 SL15 CU8 SP7
+박치국 SI50 SL25 CU15 CH10
+이병헌 FF50 SL35 CH15
+이영하 FF55 SL35 FS10
+이용찬 FF45 FS40 SL10 CU5
+최민석 SI45 SW25 CH20 SL10
+최승용 FF45 SL20 FS20 CU15
+# KT
+고영표 SI40 CH40 CU15 FC5
+박영현 FF65 SL15 CH12 CU8
+배제성 FF55 SL35 CH10
+소형준 SI35 FC25 CU20 CH15 FF5
+손동현 FF55 FS25 SL20
+오원석 FF50 SL25 CH15 CU10
+주권 FF40 CH45 SL15
+# 키움
+김성진 FF55 SL30 FS15
+박정훈 FF55 SL30 CU15
+박준현 FF60 SL25 CU15
+박지성 FF55 SL30 CU15
+배동현 FF50 SL30 CH10 CU10
+안우진 FF50 SL25 CU15 CH10
+알칸타라 FF45 FS30 SL20 SI5
+원종현 SI50 SL40 CH10
+전준표 FF60 SL25 CU15
+조영건 FF55 SL30 CU15
+하영민 FF45 FC25 FS20 CU10
+# LG
+김진성 FF45 FS40 SL15
+박시원 FF55 SL30 CU15
+손주영 FF55 SL20 CU15 CH10
+송승기 FF55 SL20 CH15 CU10
+우강훈 SI55 SL30 CH15
+웰스 FF45 CU25 CH20 SL10
+이정용 FF50 SL30 FS20
+임찬규 FF35 CH30 CU25 SL10
+장현식 FF55 SL30 FS15
+# 삼성
+김재윤 FF60 SL20 FS20
+배찬승 FF60 SL25 CU15
+양창섭 FF45 SL25 CU15 CH15
+원태인 FF40 CH25 SL20 CU15
+이승민 FF50 SL25 CU15 CH10
+이승현 FF55 SL25 CU20
+임기영 SI35 CH40 SL15 CU10
+최원태 FF35 SI20 SL20 CH15 CU10
+# 한화
+박상원 FF55 FS30 SL15
+이민우 FF50 SL30 FS20
+이상규 FF55 SL30 FS15
+정우주 FF70 SL20 CU10
+조동욱 FF55 SL25 CH20
+황준서 FF55 SP25 SL10 CU10
+# SSG
+김건우 FF55 SL25 CU20
+김민 SI50 SL35 FS15
+문승원 FF45 SL30 CU15 FS10
+이로운 FF55 SL30 CU15
+조병현 FF60 FS20 CU20
+최민준 FF45 SL30 CU15 CH10
+타케다 FF40 CU25 FS20 SL15
+# 롯데
+김원중 FF55 FS35 SL10
+김진욱 FF55 SL20 CU15 FS10
+나균안 FF40 FS35 CU15 SL10
+박세웅 FF40 SL25 CU20 FS15
+이민석 FF60 SL30 CU10
+정철원 FF55 SL35 FS10
+최준용 FF60 SL20 CU10 CH10
+# 한화 (아시아쿼터, 2026 시범경기·정규시즌 보도 기준)
+왕옌청 FF50 FS20 SW15 CU10 SL5

@@ -3192,8 +3192,9 @@ function radar(vals, labels, color){
 // pitcher profile: 보직 숙련도 bars, then the pitches he throws (and the one he's learning)
 function pitcherJobs(p){
   const bars=['SP','RP','CL'].map(j=>{ const v=K.roleSkill(p,j); return `<div class="job-row"><span>${JOB_L[j]}${j===p.role?' <small>주 보직</small>':''}${p.rt===j?' <small>훈련 중</small>':''}</span><div class="pt-bar"><i style="width:${v}%"></i></div><b>${v}%</b></div>`; }).join('');
-  const pit=K.repertoire(p).map(t=>`<span class="pill pos">${t.k}${(p.np||[]).indexOf(t.k)>=0?' · 새로 익힘':''}</span>`).join(' ');
-  return `<div class="job-list">${bars}</div><div class="muted" style="font-weight:700;margin:14px 0 6px">보유 구종</div><div class="row" style="gap:4px;flex-wrap:wrap">${pit}${p.pq&&p.pq.k?` <span class="pill" style="background:var(--panel2);color:var(--dim)">연마 중: ${p.pq.k} ${p.pq.pct||0}%</span>`:''}</div>`; }
+  const rep=K.repertoire(p), pit=rep.map(t=>`<span class="pill pos">${t.k} <small>${Math.round(t.use*100)}%</small>${t.learned?' · 새로 익힘':''}</span>`).join(' ');
+  const src=rep[0]&&rep[0].est? '실제 구종 자료가 없어 같은 손 투수의 흔한 조합으로 정했어요(추정).' : rep[0]&&rep[0].src==='m'? '구사율은 미국 무대 투구 추적 기록 기준이에요.' : '구사율은 중계·보도 기준 대략치예요.';
+  return `<div class="job-list">${bars}</div><div class="muted" style="font-weight:700;margin:14px 0 6px">보유 구종</div><div class="row" style="gap:4px;flex-wrap:wrap">${pit}${p.pq&&p.pq.k?` <span class="pill" style="background:var(--panel2);color:var(--dim)">연마 중: ${p.pq.k} ${p.pq.pct||0}%</span>`:''}</div><div class="hint" style="margin-top:6px">${src}</div>`; }
 function posStars(p){
   if(p.type!=='B') return pitcherJobs(p);
   return ['C','1B','2B','3B','SS','LF','CF','RF','DH'].map(x=>{
