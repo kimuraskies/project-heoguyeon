@@ -114,15 +114,19 @@ function onSeasonEnd(){
     `재정: 잔고 ${f.fin.balance.toFixed(1)}억 원 · 시즌 수입 ${f.fin.rev.toFixed(1)}억 / 지출 ${f.fin.exp.toFixed(1)}억\n\n이사회 신뢰도: ${b.conf} (${d>=0?'+':''}${d})`, []);
   if(b.conf<15 && !s.met){ f.fired=true; }
   // contracts: one year off everyone's deal; the user negotiates expiring ones
-  const toFA=[];
+  const toFA=[], faCands=[];
   f.fa=[];
+  faSeasonTick(); capTax();
   // 2군 players are under contract too; minor-league deals (under 1억) roll over a year on their own
   K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(p=>{
     p.yrs=(p.yrs||1)-1;
+    // FA-eligible: the player decides once the list is published. Non-FA KBO deals are one-year, so only
+    // a multi-year FA contract signed in this game (p.faY) keeps an eligible player from filing.
+    if(faEligible(p) && (p.yrs<=0 || p.faY==null)){ faCands.push([t,p]); return; }
     if(p.yrs>0) return;
     if(isFarm(t,p) && (p.sal||0)<1){ p.yrs=1; return; }
-    if(t!==USER){ // AI clubs re-sign most players; some veterans and imports test the market
-      if((p.age>=28&&p.age<=34&&Math.random()<0.3) || (p.f&&Math.random()<0.25)){ toFA.push([t,p]); return; }
+    if(t!==USER){ // AI clubs re-sign their domestic players (only FAs can leave); some imports aren't kept
+      if(p.f&&Math.random()<0.25){ toFA.push([t,p]); return; }
       p.yrs=2; p.sal=renewSalary(p); return; }
     p.expiring=true;
     const ask=Math.round(renewSalary(p)*(K.mor(p)<40?1.2:K.mor(p)>75?0.95:1.03)*10)/10;
@@ -131,11 +135,13 @@ function onSeasonEnd(){
     acts.push({label:'재계약하지 않는다', fn:'release', arg:{n:p.n}});
     send(`${p.n} 에이전트`,'📝',`${p.n} 계약 만료 — 재계약 협상`,
       `${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})의 계약이 만료됩니다.\n현재 연봉 ${p.sal}억 원 · 요구 연봉 ${ask}억 원 · 사기 ${moraleLabel(K.mor(p))}\n\n` +
-      `다음 시즌 시작 전까지 결정하지 않으면 FA로 팀을 떠납니다.`, acts);
+      `다음 시즌 시작 전까지 결정하지 않으면 요구 조건(1년 ${ask}억)으로 재계약합니다. 재계약하지 않으면 보류선수 명단에서 빠져 자유계약 선수가 됩니다.`, acts);
   }));
-  toFA.forEach(([t,p])=>{ const r=K.ROSTERS[t]; r.batters=r.batters.filter(x=>x!==p); r.pitchers=r.pitchers.filter(x=>x!==p); r.farm=farmOf(t).filter(x=>x!==p); addFA(p,t); });
-  if(f.fa.length) send('단장','🆓',`FA 시장 개장 (${f.fa.length}명)`,
-    `다른 구단과 재계약하지 않은 선수들이 FA 시장에 나왔습니다.\n\n${f.fa.slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).slice(0,6).map(x=>`• ${x.p.n} (${x.p.pos||x.p.role}, ${x.p.age}세, OVR ${K.ovr(x.p)}) 요구 ${x.yrs}년 ${x.ask}억`).join('\n')}\n\n구단 탭의 FA 시장에서 계약할 수 있습니다. 스토브리그가 끝나고 스프링캠프가 시작되면 남은 선수들은 다른 구단과 계약합니다.`, []);
+  faDeclare(faCands);
+  toFA.forEach(([t,p])=>{ const r=K.ROSTERS[t]; r.batters=r.batters.filter(x=>x!==p); r.pitchers=r.pitchers.filter(x=>x!==p); r.farm=farmOf(t).filter(x=>x!==p); addFA(p,t); fillMinimum(t); });
+  const free=f.fa.filter(x=>x.kind!=='fa');
+  if(free.length) send('단장','🌏',`재계약하지 않은 외국인 선수 ${free.length}명`,
+    `각 구단이 보류하지 않은 외국인 선수들이 시장에 나왔습니다.\n\n${free.slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).slice(0,6).map(x=>`• ${x.p.n} (${x.p.pos||x.p.role}, ${x.p.age}세, OVR ${K.ovr(x.p)}) 요구 ${x.yrs}년 ${x.ask}억`).join('\n')}\n\n구단 탭의 FA 시장에서 제안할 수 있습니다.`, []);
 }
 function maybeShowFired(){
   const f=fm(); if(!f||!f.fired) return;
@@ -157,8 +163,9 @@ function offseasonMoves(){
   ensure();
   const f=fm();
   const dr=draftState(); if(dr&&!draftDone(dr)){ const before=dr.picks[USER].length; draftAuto(); f.draftAutoN=DRAFT_ROUNDS-before; } else f.draftAutoN=0;
-  // unanswered contract talks: the player walks
-  f.inbox.forEach(m=>{ if(!m.done && m.actions.some(a=>a.fn==='renew')){ m.done=true; m.read=true; m.result='기한 내 결정하지 않아 FA로 떠났습니다.'; const p=findPlayer(USER,m.actions[0].arg.n); if(p) p.leaving=true; } });
+  // unanswered contract talks: a reserved player can't walk, he signs the one-year ask
+  f.inbox.forEach(m=>{ if(!m.done && m.actions.some(a=>a.fn==='renew')){ const a=m.actions[0].arg, p=findPlayer(USER,a.n); m.done=true; m.read=true;
+    if(p){ p.sal=a.sal; p.yrs=a.years; p.expiring=false; } m.result=`기한 내 결정하지 않아 요구 조건(${a.years}년 ${a.sal}억)으로 재계약했습니다.`; } });
   const left=[], retired=[];
   K.TEAM_IDS.forEach(t=>{
     const r=K.ROSTERS[t];
@@ -183,7 +190,7 @@ function confirmNextSeason(go){
   ensure();
   const open=fm().inbox.filter(m=>!m.done && m.actions.some(a=>a.fn==='renew'));
   if(!open.length){ go(); return; }
-  ask(`재계약 협상 ${open.length}건이 남아 있습니다 (${open.map(m=>m.actions[0].arg.n).join(', ')}).\n지금 다음 시즌을 시작하면 이 선수들은 FA로 떠납니다.`, '다음 시즌 시작', go);
+  ask(`재계약 협상 ${open.length}건이 남아 있습니다 (${open.map(m=>m.actions[0].arg.n).join(', ')}).\n지금 다음 시즌을 시작하면 이 선수들은 요구 조건대로 재계약합니다.`, '다음 시즌 시작', go);
 }
 function onNewSeason(){
   const f=fm(); seasonStart(false);
@@ -193,7 +200,7 @@ function onNewSeason(){
   send('스카우트 팀장','🎓',`${state.year} 신인 입단`,
     `드래프트 지명 신인 ${(f.newRookies||[]).length}명이 2군에 합류했습니다.${f.draftAutoN? ` (스카우트 팀이 ${f.draftAutoN}명을 대신 지명)`:''}\n\n${(f.newRookies||[]).map(x=>'• '+x).join('\n')}` +
     (fn.up.length? `\n\n1군 인원을 채우려 2군에서 올린 선수: ${fn.up.join(', ')}`:'') + (fn.retired.length? `\n2군 은퇴: ${fn.retired.join(', ')}`:'') + (fn.cut.length? `\n2군 정리(방출): ${fn.cut.join(', ')}`:'') +
-    (n.left.length? `\n\nFA로 떠난 선수: ${n.left.join(', ')}`:'') + (n.retired.length? `\n은퇴한 선수: ${n.retired.join(', ')}`:'') +
+    (n.left.length? `\n\n보류선수 명단에서 뺀 선수(자유계약): ${n.left.join(', ')}`:'') + (n.retired.length? `\n은퇴한 선수: ${n.retired.join(', ')}`:'') +
     (n.signed&&n.signed.length? `\n다른 구단의 FA 계약: ${n.signed.join(', ')}`:''), []);
 }
 
@@ -250,12 +257,12 @@ function talk(n, kind){
 function toggleRest(n){ const f=fm(), i=f.restNext.indexOf(n); if(i>=0)f.restNext.splice(i,1); else f.restNext.push(n); closeModal(); showProfile(USER,n); render(); }
 function toggleList(n){ const p=findPlayer(USER,n); if(!p) return; p.listed=!p.listed; closeModal(); showProfile(USER,n); render(); }
 function setAutoRest(v){ fm().autoRest=!!v; render(); }
-// release a player: he leaves now, the club pays half of what's left on his deal
+// release a player: waivers first; a claim takes over his deal, otherwise the club pays what is left
 function releasePlayer(n){
   const p=findPlayer(USER,n); if(!p) return;
   const why=releaseBlock(p); if(why){ notify(why); return; }
-  const cost=Math.round(p.sal*Math.max(1,p.yrs)*0.5*10)/10;
-  ask(`${n}을(를) 방출합니다. 잔여 계약의 절반인 ${cost}억 원을 위약금으로 지급합니다.`, '방출', ()=>doRelease(p,n,cost));
+  const owe=waiverRemaining(p), wait=state.phase==='regular'?`${WAIVER_GAMES}경기`:'스토브리그 1주';
+  ask(`${n}을(를) 웨이버 공시합니다.\n${wait} 안에 다른 구단이 클레임하면 잔여 계약이 함께 넘어가 부담이 없습니다.\n아무도 데려가지 않으면 잔여 연봉 ${owe}억 원을 지급하고 자유계약 선수가 됩니다.`, '웨이버 공시', ()=>doRelease(p,n));
 }
 // a 1군 release must leave a legal roster: the entry minimums, five starters, and enough healthy bodies
 function releaseBlock(p){
@@ -264,19 +271,17 @@ function releaseBlock(p){
   if(p.type==='P' && r.pitchers.filter(x=>!K.isInjured(x)).length<=8) return '투수가 부족해 방출할 수 없습니다 (건강한 투수 최소 8명).';
   const why=entryProblem(USER,[p],[]); return why? why+' 2군 선수를 먼저 올리세요.' : '';
 }
-function doRelease(p,n,cost){
-  const r=K.ROSTERS[USER];
+function doRelease(p,n){
   if(!findPlayer(USER,n)) return;
   const why=releaseBlock(p); if(why){ notify(why); closeModal(); return; }
-  if(p.type==='B') r.batters=r.batters.filter(x=>x!==p); else r.pitchers=r.pitchers.filter(x=>x!==p);
-  r.farm=farmOf(USER).filter(x=>x!==p);
-  const f=fm(); f.fin.balance-=cost; f.fin.exp+=cost;
+  waiverRelease(USER,p);
+  const f=fm();
   f.promises=f.promises.filter(pr=>pr.n!==n); f.restNext=f.restNext.filter(x=>x!==n);
   const c=state.cfgs[USER];
   if(c.lineup.indexOf(n)>=0||c.rotation.indexOf(n)>=0||c.bullpen.indexOf(n)>=0||c.closer===n){
     const d=K.defaultLineup(USER); state.cfgs[USER]={teamId:USER,lineup:d.lineup.slice(),positions:d.positions.slice(),rotation:d.rotation.slice(),bullpen:d.bullpen.slice(),closer:d.closer};
   }
-  send('단장','📤',`${n} 방출`,`${n}을(를) 방출했습니다. 위약금 ${cost}억 원이 지급되었습니다.${c.lineup.indexOf(n)>=0?'\n라인업이 자동 재구성되었습니다.':''}`,[]);
+  send('단장','📤',`${n} 웨이버 공시`,`${n}을(를) 웨이버 공시했습니다. 클레임 결과는 ${state.phase==='regular'?WAIVER_GAMES+'경기':'이번 주'} 뒤에 나옵니다.${c.lineup.indexOf(n)>=0?'\n라인업이 자동 재구성되었습니다.':''}`,[]);
   closeModal(); render();
 }
 

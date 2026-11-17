@@ -240,12 +240,7 @@ function marketCards(){
   const f=fm(), out=[];
   const pRow=(p,extra,btn)=>`<tr><td class="name">${esc(p.n)}${p.f?` <span class="pill pos">${fxLabel(p)}</span>`:''}</td><td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td>
     <td><span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span></td><td>${p.type==='B'?`컨${attrNum(p.con)} 파${attrNum(p.pow)} 선${attrNum(p.eye)} 수${attrNum(p.fld)}`:`구${attrNum(p.stu)} 제${attrNum(p.ctl)} 무${attrNum(p.mov)} 체${attrNum(p.sta)}`}</td><td>${extra}</td><td>${btn}</td></tr>`;
-  if((f.fa||[]).length){
-    const list=f.fa.map((x,i)=>({x,i})).sort((a,b)=>K.ovr(b.x.p)-K.ovr(a.x.p));
-    out.push(`<div class="card" style="margin-top:14px"><h3>🆓 FA 시장 <span class="tag">다음 시즌 시작 전까지 · 계약금 = 연봉×연수×25%</span></h3>
-      <div style="overflow-x:auto"><table><thead><tr><th class="name">선수</th><th>POS</th><th>나이</th><th>OVR</th><th>능력</th><th>요구 조건</th><th></th></tr></thead><tbody>
-      ${list.map(({x,i})=>pRow(x.p, `${x.yrs}년 ${x.ask}억 <span class="muted">(전 ${esc(x.from)})</span>`, `<button class="btn" onclick="FM.signFA(${i})">계약</button>`)).join('')}</tbody></table></div></div>`);
-  }
+  out.push(faCard());
   const mine=foreignOf(USER), open=fxWindowOpen(), left=fxSwapsLeft();
   out.push(`<div class="card" style="margin-top:14px"><h3>🌏 외국인 선수 <span class="tag">1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 시즌 중 교체 ${Math.max(0,left)}회 남음 · 비시즌은 제한 없음</span></h3>
     <div class="muted" style="margin-bottom:8px">현재: ${mine.map(p=>`${esc(p.n)}(${p.aq?'아시아쿼터 · ':''}${p.pos||p.role}·${K.ovr(p)}·${p.sal}억${isFarm(USER,p)?' · 2군':''})`).join(', ')||'없음'}</div>

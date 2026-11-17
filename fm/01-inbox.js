@@ -158,6 +158,7 @@ const ACTIONS={
 function act(id, i){
   const m=fm().inbox.find(x=>x.id===id); if(!m||m.done) return;
   const a=m.actions[i]; const res=ACTIONS[a.fn](m,a.arg||{});
+  if(res==null) return; // the action opened a dialog that finishes the message itself
   if(String(res).startsWith('❌')){ notify(res.replace(/^❌ /,'')); return; } // stays open
   m.done=true; m.result=josa(res); m.read=true; render();
 }

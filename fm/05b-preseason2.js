@@ -30,18 +30,17 @@ function offFill(o){ o.q=[];
   else if(o.stage==='camp'){ const ids=CAMP_EVENTS.filter(id=>o.used.indexOf(id)<0).sort(()=>Math.random()-0.5);
     for(const id of ids){ const r=makeEvent(id,o); if(r){ o.used.push(id); o.q.push(r); break; } } }
   if(!o.q.length&&(o.stage==='stove'||o.stage==='camp')) offWeekEnd(o); }
-// other clubs sign a few free agents every week
-function offAiWeek(){ const f=fm(); (f.fa||[]).slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).forEach(x=>{ if(K.ovr(x.p)>=64&&Math.random()<0.22) offAiSign(x); }); }
-function offAiSign(x){ const f=fm(), p=x.p, t=K.TEAM_IDS.filter(t=>t!==USER).sort((a,b)=>teamStrength(a)-teamStrength(b))
-    .find(t=>(p.type==='B'?K.ROSTERS[t].batters.length<15:K.ROSTERS[t].pitchers.length<13)&&!(p.f&&!fxRoom(t,p)));
-  const i=f.fa.indexOf(x); if(i<0||!t) return null; f.fa.splice(i,1);
-  p.sal=x.ask; p.yrs=x.yrs; ensurePlayer(p); (p.type==='B'?K.ROSTERS[t].batters:K.ROSTERS[t].pitchers).push(p); return t; }
-function faSign(x,b){ const f=fm(), p=x.p; f.fa.splice(f.fa.indexOf(x),1);
-  p.sal=b.sal; p.yrs=b.yrs; p.mor=72; p.cond=100; p.inj=0; p.listed=false; p.bench=0; p.newG=NEW_GAMES; ensurePlayer(p);
-  const where=joinClub(USER,p), bonus=eok(b.sal*b.yrs*0.25); f.fin.balance-=bonus; f.fin.exp+=bonus;
-  return `${p.n}와(과) ${b.yrs}년 연봉 ${b.sal}억에 계약했습니다. 계약금 ${bonus}억.${where==='2군'?' 1군 엔트리가 가득 차 2군에 등록했습니다.':''}`; }
+// every stove week the FA market moves: clubs bid, players decide (fm/04b-fa.js); waivers clear
+function offAiWeek(week){ waiverTick(); faWeek(week||0,false); }
+// another club takes the player: the best bid on the table, else the weakest club that has room
+function offAiSign(x){ const f=fm(); if(f.fa.indexOf(x)<0) return null;
+  const bid=Object.keys(x.bids||{}).filter(t=>t!==USER&&faCanBid(t,x)).sort((a,b)=>x.bids[b].aav*x.bids[b].yrs-x.bids[a].aav*x.bids[a].yrs)[0];
+  const t=bid|| K.TEAM_IDS.filter(t=>t!==USER&&faCanBid(t,x)).sort((a,b)=>teamStrength(a)-teamStrength(b)).find(t=>!(x.p.f&&!fxRoom(t,x.p)));
+  if(!t) return null; faSignWith(x,t,x.bids&&x.bids[t]||{aav:x.ask,yrs:x.yrs}); return t; }
+// signs with us at once (stove events that close a deal on the spot)
+function faSign(x,b){ faSignWith(x,USER,{aav:b.sal,yrs:b.yrs,promise:b.promise}); return `${x.p.n}와(과) ${b.yrs}년 총액 ${eok(b.sal*b.yrs)}억에 계약했습니다.`; }
 function offWeekEnd(o){
-  if(o.stage==='stove'){ offAiWeek(); aiTradeTick(); o.week++; if(o.week>=o.weeks.length){ o.stage='dir'; o.q=[]; o.used=[]; return; } offFill(o); return; }
+  if(o.stage==='stove'){ offAiWeek(o.week); aiTradeTick(); o.week++; if(o.week>=o.weeks.length){ o.stage='dir'; o.q=[]; o.used=[]; return; } offFill(o); return; }
   if(o.stage==='camp'){ const c=campState(); campRunWeek(); if(c.week>=4){ o.stage='done'; o.q=[]; return; } offFill(o); } }
 // applies a choice. Returns the outcome text.
 function offResolve(i){ const o=offState(), e=o.q[0]; if(!e) return '';
@@ -194,7 +193,7 @@ function offBoardAdj(met){ const o=fm().off; if(!o||o.year!==state.year) return 
 
 // ----- events -----
 const byOvr=(a,b)=>K.ovr(b)-K.ovr(a);
-function faTalk(o){ const f=fm(), room=budgetRoom(); const x=(f.fa||[]).filter(x=>o.talked.indexOf(x.p.n)<0&&!(x.p.f&&!fxRoom(USER,x.p))).sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).find(x=>x.ask<=room+2)||null;
+function faTalk(o){ const f=fm(), room=budgetRoom(); const x=(f.fa||[]).filter(x=>o.talked.indexOf(x.p.n)<0&&!(x.p.f&&!fxRoom(USER,x.p))&&(x.kind!=='fa'||x.from===USER||faOutCount(USER)<FA_OUT_MAX)).sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).find(x=>x.ask<=room+2)||null;
   if(!x) return null; o.talked.push(x.p.n); const p=x.p, want=p.type==='B'? ['money','start','term'][hash(p.n)%3] : ['money','term','term'][hash(p.n)%3];
   const wl={money:'가장 좋은 대우를 원합니다',start:'주전 자리를 보장받고 싶어 합니다',term:'긴 계약 기간을 원합니다'}[want];
   const alt=want==='money'? {l:`연봉을 올려 확실히 잡는다 (${x.yrs}년 ${eok(x.ask*1.12)}억)`,d:'수락 가능성 높음 · 예산 부담'} : want==='start'? {l:`주전 보장을 약속한다 (${x.yrs}년 ${eok(x.ask*0.9)}억)`,d:'연봉 10% 절감 · 약속을 어기면 선수단 신뢰 하락'} : {l:`계약 기간을 늘려 준다 (${x.yrs+1}년 ${eok(x.ask*0.95)}억)`,d:'연봉 5% 절감 · 나이 들수록 부담'};

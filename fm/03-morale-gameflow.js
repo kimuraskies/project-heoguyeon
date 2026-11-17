@@ -112,7 +112,7 @@ function afterGame(res){
     offCallbacks();
     maybeMedia(ug);
     maybePress(ug);
-    checkForeignForm(ug);
+    checkForeignForm(ug); marketDaily();
     if(state.phase==='regular'){
       // a Futures hiccup must never undo the 1군 game that was just recorded
       try{ farmGame(); }catch(e){ console.error('Futures game skipped', e); }

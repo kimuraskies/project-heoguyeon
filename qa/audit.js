@@ -10,7 +10,8 @@ function totals(season){
 function rates(b,p,games){return {AVG:b.H/b.AB,OBP:(b.H+b.BB+b.HBP)/(b.AB+b.BB+b.HBP+b.SF),SLG:(b.H+b._2B+2*b._3B+3*b.HR)/b.AB,ERA:27*p.ER/p.OUT,HR_G:b.HR/games,SB_G:b.SB/games,R_G:b.R/games,K_PA:b.SO/b.PA,BB_PA:b.BB/b.PA};}
 function futuresTotals(f){return f?totals({farm:{...f,T:f.T,bat:f.bat,pit:f.pit}}):null;}
 function inventory(h){const m=new Map();for(const {t,bucket,p} of h.players()){const loc=t+'/'+bucket;if(!m.has(p.n))m.set(p.n,[]);m.get(p.n).push({loc,t,bucket,n:p.n,age:p.age,ovr:h.K.ovr(p),pot:p.pot,type:p.type,inj:p.inj,downUg:p.downUg,downYear:p.downYear,attributes:attrs(p).map(k=>p[k])});}
-  for(const {p} of h.state.fm.fa||[]){if(!m.has(p.n))m.set(p.n,[]);m.get(p.n).push({loc:'FA',bucket:'FA',n:p.n,age:p.age,ovr:h.K.ovr(p)});}return m;}
+  for(const {p} of h.state.fm.fa||[]){if(!m.has(p.n))m.set(p.n,[]);m.get(p.n).push({loc:'FA',bucket:'FA',n:p.n,age:p.age,ovr:h.K.ovr(p)});}
+  for(const {p} of h.state.fm.waivers||[]){if(!m.has(p.n))m.set(p.n,[]);m.get(p.n).push({loc:'WAIVER',bucket:'WAIVER',n:p.n,age:p.age,ovr:h.K.ovr(p)});}return m;}
 
 class Audit {
   constructor(out){this.out=out;fs.mkdirSync(path.join(out,'evidence'),{recursive:true});this.fd=fs.openSync(path.join(out,'violations.jsonl'),'w');this.summary={};this.previous=new WeakMap();this.totalChecks=0;this.ledger=[];this.passes={};}
@@ -91,6 +92,7 @@ class Audit {
         let reason=null;const p=loc[0];
         if(p.loc==='FA'&&old.phase==='stove'&&s.phase==='spring')reason='documented unsigned FA departure';
         if(s.year>old.year){if(p.bucket==='farm')reason='offseason farm retirement/cap trim';else if(p.age+1>=39)reason='offseason veteran retirement';}
+        const gone=(s.fm&&s.fm.departed||[]).find(d=>d.n===n);if(gone)reason='recorded departure: '+gone.why;
         if(h.expectedDepartures?.has(n))reason=h.expectedDepartures.get(n);
         if(h.fixtures.length&&label.startsWith('FIXTURE:'))reason='explicit fixture';
         this.ledger.push({...h.context(),n,from:p.loc,reason});if(!reason)h.violation('PLAYER_LOST',{n,previous:loc,label});

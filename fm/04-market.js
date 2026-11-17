@@ -256,7 +256,7 @@ function renewSalary(p){
 // f.fa: [{p, ask, yrs, from}] — players without a club this offseason
 function faAsk(p){ return Math.max(0.5, Math.round(Math.max(renewSalary(p), salaryFor(p))*1.1*10)/10); }
 function faYears(p){ return p.age>=34? 1 : p.age>=30? 2 : 3; }
-function addFA(p, from){ const f=fm(); f.fa=f.fa||[]; delete p.leaving; p.expiring=false; f.fa.push({p, ask:faAsk(p), yrs:faYears(p), from}); }
+function addFA(p, from){ const f=fm(); f.fa=f.fa||[]; delete p.leaving; p.expiring=false; f.fa.push({p, ask:faAsk(p), yrs:faYears(p), from, kind:'free', prevSal:p.sal||0, bids:{}}); }
 function signFA(i){
   const f=fm(), x=(f.fa||[])[i]; if(!x) return;
   if(x.p.f && !fxRoom(USER,x.p)){ notify(`${fxLabel(x.p)} 선수 정원(${fxCap(x.p)}명)이 찼습니다.`); return; }
@@ -273,28 +273,20 @@ function signFA(i){
     render();
   });
 }
-// offseason end: AI clubs pick up the free agents worth signing, the rest leave the league
-function aiSignFAs(){
-  const f=fm(), list=(f.fa||[]).slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)), gone=[];
-  list.forEach(x=>{
-    const p=x.p, teams=K.TEAM_IDS.filter(t=>t!==USER).sort((a,b)=>teamStrength(a)-teamStrength(b));
-    const t=teams.find(t=>(p.type==='B'?K.ROSTERS[t].batters.length<15:K.ROSTERS[t].pitchers.length<13)) ;
-    if(t && K.ovr(p)>=64 && Math.random()<0.8){ p.sal=x.ask; p.yrs=x.yrs; (p.type==='B'?K.ROSTERS[t].batters:K.ROSTERS[t].pitchers).push(p); gone.push(`${p.n} → ${t}`); }
-  });
-  f.fa=[];
-  return gone;
-}
+// spring camp opens: the market's last round, then leftovers take a one-year deal or leave (fm/04b-fa.js)
+function aiSignFAs(){ return faLeftovers(); }
 
 // ---------- foreign players: 3 foreign + 1 Asia quota on the 1군, two replacements a season ----------
 const FX_NAMES=['로페즈','마르테','브리토','오도넬','헤이워드','카펜터','레예스','몬테로','갈비스','스탠튼','라미레스','클라크','파울러','밀러','앤더슨','톰슨','로저스','하퍼','크루즈','벨트레','마차도','가르시아','소토','베탄코트','플로레스','에반스','콜','브룩스','그레이','토레스'];
 const FX_MAX=4, FX_F=3, FX_AQ=1, FX_SWAPS=2;
 const AQ_NAMES=['나카무라','야마다','사토','후지타','린','천','장','오카다','모리','쿡','왓슨','하라'];
-function foreignOf(t){ return allPlayers(t).concat(farmOf(t)).filter(p=>p.f); }
+// a foreigner out on a long injury with a temporary replacement (p.fxHold) doesn't count against the quota
+function foreignOf(t){ return allPlayers(t).concat(farmOf(t)).filter(p=>p.f&&!p.fxHold); }
 function fxKind(p){ return p.aq? 'aq' : 'f'; }
 function fxLabel(p){ return p.aq? '아시아쿼터' : '외국인'; }
 function fxCap(p){ return p.aq? FX_AQ : FX_F; }
 // how many of each kind a club holds (whole club) or has on the 1군
-function fxCount(t,onEntry){ const L=onEntry? allPlayers(t).filter(p=>p.f) : foreignOf(t); return {f:L.filter(p=>!p.aq).length, aq:L.filter(p=>p.aq).length}; }
+function fxCount(t,onEntry){ const L=onEntry? allPlayers(t).filter(p=>p.f&&!p.fxHold) : foreignOf(t); return {f:L.filter(p=>!p.aq).length, aq:L.filter(p=>p.aq).length}; }
 // signing: room in that kind once `out` (if any) leaves. Real records can leave a club over the cap
 // (mid-season replacements); those extras sit in the 2군 and block new signings of that kind.
 // " · 2군 2명" when released or extra foreigners sit in the 2군 (they still count against new signings)
@@ -355,7 +347,8 @@ function makeForeign(type, used, boost, aq){
   if(boost) ['con','pow','eye','fld','stu','ctl','mov'].forEach(k=>{ if(p[k]) p[k]=Math.min(99,p[k]+boost); });
   if(aq){ ['con','pow','eye','fld','stu','ctl','mov'].forEach(k=>{ if(p[k]) p[k]=Math.max(40,p[k]-5); }); if(type==='P'&&Math.random()<0.5) p.role='RP'; }
   Object.assign(p,{f:1, aq:aq?1:0, yrs:1, mor:70, cond:100, inj:0, bench:0, pers:hash(n)%PERS.length});
-  p.sal=aq? clampN(Math.round((1.5+Math.random()*1.4)*10)/10, 1, 3) : clampN(Math.round((4+Math.max(0,K.ovr(p)-70)*0.7+Math.random()*3)*10)/10, 5, 18);   // Asia quota pay is capped low
+  // first-year caps: 100만 달러 (about 14억) for a foreign player, 20만 달러 (about 2.9억) for the Asia quota
+  p.sal=aq? clampN(Math.round((1.5+Math.random()*1.4)*10)/10, 1, 2.9) : clampN(Math.round((4+Math.max(0,K.ovr(p)-70)*0.7+Math.random()*3)*10)/10, 5, 14);
   return p;
 }
 function scoutList(){
@@ -372,32 +365,36 @@ function fxPick(i){
   if(!fxWindowOpen()){ notify('외국인 선수 영입은 비시즌(스토브리그·스프링캠프)과 정규시즌 108경기 전까지만 가능합니다.'); return; }
   if(state.phase==='regular' && fxSwapsLeft()<=0){ notify('이번 시즌 외국인 선수 교체 횟수(2회)를 모두 썼습니다.'); return; }
   const mine=foreignOf(USER).filter(p=>fxKind(p)===fxKind(cand)), room=fxRoom(USER,cand);
-  const btn=p=>`<button class="btn" onclick="FM.fxSign(${i},'${q(p.n)}')">${esc(p.n)} 방출 <span class="muted">(${p.pos||p.role}·OVR ${K.ovr(p)}·잔여 위약금 ${Math.round(p.sal*0.5*10)/10}억)</span></button>`;
+  const btn=p=>`<button class="btn" onclick="FM.fxSign(${i},'${q(p.n)}')">${esc(p.n)} 웨이버 공시 <span class="muted">(${p.pos||p.role}·OVR ${K.ovr(p)}·클레임 없으면 잔여 연봉 ${waiverRemaining(p)}억)</span></button>`;
+  const hurt=foreignOf(USER).filter(p=>fxKind(p)===fxKind(cand)&&p.inj>=30&&!p.tempFor);
+  const tmp=p=>`<button class="btn tonal" onclick="FM.fxSign(${i},'${q(p.n)}',1)">${esc(p.n)} 부상 대체로 영입 <span class="muted">(${p.n} 보류 · 교체 횟수 차감 없음 · 회복 ${p.inj}경기)</span></button>`;
   modal(`<span class="closeX" onclick="App.closeModal()">×</span><h2>🌏 ${esc(cand.n)} 영입 <span class="pill pos">${fxLabel(cand)}</span></h2>
     <div class="muted">${posFull(cand.pos||cand.role)} · ${cand.age}세 · OVR ${K.ovr(cand)} · 연봉 ${cand.sal}억 (계약금 ${Math.round(cand.sal*0.2*10)/10}억)</div>
     <div class="hint" style="margin:10px 0">외국인은 ${FX_F}명, 아시아쿼터는 ${FX_AQ}명까지 둘 수 있습니다. ${room?'자리가 있어 그대로 영입할 수 있습니다.':`${fxLabel(cand)} 자리가 찼습니다. 누구를 내보낼까요?`}</div>
-    <div class="grid" style="gap:8px">${room?`<button class="btn primary" onclick="FM.fxSign(${i},'')">방출 없이 영입</button>`:''}${mine.map(btn).join('')}</div>`);
+    <div class="grid" style="gap:8px">${room?`<button class="btn primary" onclick="FM.fxSign(${i},'')">방출 없이 영입</button>`:''}${hurt.map(tmp).join('')}${mine.map(btn).join('')}</div>
+    <p class="hint" style="margin-top:8px">부상 대체: 6주 이상 다친 선수는 보류한 채 단기 대체 선수를 쓸 수 있습니다. 원래 선수가 돌아오면 둘 중 한 명을 고릅니다.</p>`);
 }
-function fxSign(i,outName){
+function fxSign(i,outName,tempFlag){
   const f=fm(), cand=scoutList()[i]; if(!cand) return;
   const out=outName? findPlayer(USER,outName) : null;
   const limit=f.fin.budget*1.1, after=payroll(USER)-(out?out.sal:0)+cand.sal;
   if(after>limit){ notify(`연봉 총액이 한도를 넘습니다 (${after.toFixed(1)}억 > ${limit.toFixed(1)}억).`); return; }
   if(!fxRoom(USER,cand,out)){ notify(`${fxLabel(cand)} 자리가 찼습니다. 같은 구분의 선수를 내보내야 합니다.`); return; }
-  const fee=Math.round((cand.sal*0.2 + (out?out.sal*0.5:0))*10)/10;
+  const temp=!!(tempFlag&&out&&out.inj>=30), fee=Math.round(cand.sal*0.2*10)/10;
   if(allNames().has(cand.n)){ notify(`같은 이름의 선수(${cand.n})가 이미 리그에 있습니다. 다른 후보를 고르세요.`); return; }
   const r=K.ROSTERS[USER], onEntry=!!out && allPlayers(USER).indexOf(out)>=0;
   const room=entryCount(USER)-(onEntry?1:0)<ENTRY_MAX;
   const why=entryProblem(USER, onEntry?[out]:[], room?[cand]:[]); if(why){ notify(why); return; }
-  if(out){ if(out.type==='B') r.batters=r.batters.filter(x=>x!==out); else r.pitchers=r.pitchers.filter(x=>x!==out); r.farm=farmOf(USER).filter(x=>x!==out); }
+  if(out&&temp){ if(onEntry){ if(out.type==='B') r.batters=r.batters.filter(x=>x!==out); else r.pitchers=r.pitchers.filter(x=>x!==out); farmOf(USER).push(out); } out.fxHold=true; cand.tempFor=out.n; }
+  else if(out) waiverRelease(USER,out);
   cand.newG=NEW_GAMES; joinClub(USER,cand);
   f.scout.list.splice(i,1);
-  f.fxSwaps={year:state.year, n:(f.fxSwaps&&f.fxSwaps.year===state.year?f.fxSwaps.n:0)+(out&&state.phase==='regular'?1:0)};
+  f.fxSwaps={year:state.year, n:(f.fxSwaps&&f.fxSwaps.year===state.year?f.fxSwaps.n:0)+(out&&!temp&&state.phase==='regular'?1:0)};
   f.fin.balance-=fee; f.fin.exp+=fee;
   f.promises=f.promises.filter(pr=>!!findPlayer(USER,pr.n));
   const d=K.defaultLineup(USER); const c=state.cfgs[USER];
   if(out && (c.lineup.indexOf(out.n)>=0||c.rotation.indexOf(out.n)>=0||c.bullpen.indexOf(out.n)>=0||c.closer===out.n)) state.cfgs[USER]={teamId:USER,lineup:d.lineup.slice(),positions:d.positions.slice(),rotation:d.rotation.slice(),bullpen:d.bullpen.slice(),closer:d.closer};
-  send('단장','🌏',`외국인 선수 ${cand.n} 영입`, `${cand.n}(${posFull(cand.pos||cand.role)}, OVR ${K.ovr(cand)})과 연봉 ${cand.sal}억 원에 계약했습니다.${out?`\n${out.n}은(는) 방출되었습니다.`:''}\n비용 ${fee}억 원(계약금${out?'·위약금':''})이 지출되었습니다.${out&&c.lineup.indexOf(out.n)>=0?'\n라인업이 자동 재구성되었습니다.':''}`, []);
+  send('단장','🌏',`외국인 선수 ${cand.n} 영입`, `${cand.n}(${posFull(cand.pos||cand.role)}, OVR ${K.ovr(cand)})과 연봉 ${cand.sal}억 원에 계약했습니다.${temp?`\n${out.n}이(가) 회복할 때까지 쓰는 부상 대체 계약입니다. 교체 횟수는 차감되지 않습니다.`:out?`\n${out.n}은(는) 웨이버 공시되었습니다.`:''}\n계약금 ${fee}억 원이 지출되었습니다.${out&&c.lineup.indexOf(out.n)>=0?'\n라인업이 자동 재구성되었습니다.':''}`, []);
   closeModal(); render();
 }
 // a foreign player who isn't working out: the scouts flag it
