@@ -65,7 +65,7 @@ function offOpen(){ const o=offState();
   const where=o.stage==='stove'?`스토브리그 ${o.week+1}/${o.weeks.length}주차`:`스프링캠프 ${campState().week+1}/4주차`;
   closeModal();
   modal(`${X_BTN}<p class="eyebrow">${where}${o.q.length>1?` · 결정 ${o.q.length}건`:''}</p><h2>${esc(e.title)}</h2>
-    <p class="ev-who">${e.icon} ${esc(e.who)}</p><p class="ev-body">${esc(e.body).replace(/\n/g,'<br>')}</p>
+    <p class="ev-who">${e.icon} ${esc(e.who)}</p>${e.prev?`<div class="ev-prev"><small>지난 선택 · ${esc(e.prev.title||'')}</small><b>▶ ${esc(e.prev.choice||'')}</b></div>`:''}<p class="ev-body">${esc(e.body).replace(/\n/g,'<br>')}</p>
     <div class="ev-opts">${e.opts.map((x,i)=>`<button type="button" class="ev-opt" onclick="FM.offChoose(${i})"><b>${esc(x.l)}</b><small>${esc(x.d)}</small></button>`).join('')}</div>
     <div class="row" style="margin-top:10px"><button class="btn btn-quiet" onclick="FM.offAuto()">단장에게 맡기기</button></div>`); }
 function offShowResult(title,label,res){ const o=offState(); closeModal();

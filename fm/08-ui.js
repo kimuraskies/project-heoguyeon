@@ -58,6 +58,7 @@ function renderInbox(){
   const after = sel&&sel.done&&sel.actions.length? (nextOpen? `<button class="btn primary" style="margin-top:12px" onclick="FM.openMsg(${nextOpen.id})">다음 결정 · ${esc(nextOpen.subject)}</button>` : `<button class="btn primary" style="margin-top:12px" onclick="App.tab('dash')">감독실로</button>`) : '';
   const detail = sel? `<div class="muted" style="font-size:12px">${sel.icon} ${esc(sel.from)} · ${sel.year} 시즌 ${sel.ug?sel.ug+"경기차":"개막 전"}</div>
       <h3 style="margin:6px 0 12px;font-size:17px">${esc(sel.subject)}</h3>
+      ${sel.prev?`<div class="ev-prev"><small>지난 선택 · ${esc(sel.prev.title||'')}</small><b>▶ ${esc(sel.prev.choice||'')}</b></div>`:''}
       <div style="white-space:pre-wrap;line-height:1.7">${esc(sel.body)}</div>
       ${sel.actions.length? (sel.done? `<div class="deal-result deal-ok" style="margin-top:14px">${esc(sel.result||'처리됨')}</div>${after}`
         : `<div class="msg-acts">${sel.actions.map((a,i)=>`<button class="btn" onclick="FM.act(${sel.id},${i})">${esc(a.label)}</button>`).join('')}</div>${defLine}`) : ''}`
@@ -199,6 +200,21 @@ function renderTacticsTab(){
 }
 // rest management lives in 업무 분담 (수석코치); the lineup tab no longer repeats it
 function lineupCard(){ return ''; }
+
+// ---------- UI: promises the manager made (event engine + FA 주전 보장) ----------
+function promiseList(){ const f=fm(), ug=userGamesPlayed(), out=[];
+  (typeof evtPromises==='function'? evtPromises() : []).forEach(x=>out.push(x));
+  (f.promises||[]).forEach(pr=>{
+    out.push({who:pr.n, label:'FA 계약 때 주전 보장', kind:'play', done:pr.played||0, need:pr.need, left:Math.max(0,pr.until-ug)}); });
+  return out; }
+function promiseCard(){ const L=promiseList(); if(!L.length) return '';
+  const unit={starts:'선발', callup:'1군 경기', active:'경기 1군 유지', notrade:'경기 트레이드 없음', play:'경기 출전'};
+  return `<section class="panel promise-card" aria-labelledby="promiseHead"><div class="section-head"><h2 id="promiseHead">약속</h2><span class="chip">${L.length}건 진행 중</span></div>
+    <ul class="promise-list">${L.map(x=>{ const pct=x.need? Math.min(100,Math.round(x.done/x.need*100)) : 100-Math.min(100,Math.round(x.left/Math.max(1,x.left+(x.done||0))*100));
+      const late=x.need&&x.need-x.done>x.left;
+      return `<li><div class="pr-top"><b>${esc(x.who)}</b><span class="muted">${esc(x.label||'')}</span></div>
+        <div class="pr-bar${late?' late':''}"><i style="width:${pct}%"></i></div>
+        <small>${x.need? `${unit[x.kind]||''} ${x.done}/${x.need}` : (unit[x.kind]||'')} · 남은 경기 ${x.left}${late?' · 이대로는 못 지켜요':''}</small></li>`; }).join('')}</ul></section>`; }
 
 // ---------- UI: club tab (board, finances, contracts) ----------
 function renderClub(){

@@ -1340,7 +1340,7 @@ function renderDash(){
       <div><small>타점 1위</small><b>${topRBI.s.RBI}</b><small>${topRBI.n}</small></div></div>` : ''}
     <p class="hint" style="margin:14px 0 0">${FM.teamPitch(USER)}</p></section>`;
 
-  return hero + taskHtml + (state.phase==="spring"? FM.preseasonCard() : '')
+  return hero + taskHtml + FM.promiseCard() + (state.phase==="spring"? FM.preseasonCard() : '')
     + `<div class="reference"><div class="stack">${standHtml}${leaders}</div>${FM.dashBrief()}</div>`;
 }
 
