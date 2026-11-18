@@ -208,13 +208,13 @@ function promiseList(){ const f=fm(), ug=userGamesPlayed(), out=[];
     out.push({who:pr.n, label:'FA 계약 때 주전 보장', kind:'play', done:pr.played||0, need:pr.need, left:Math.max(0,pr.until-ug)}); });
   return out; }
 function promiseCard(){ const L=promiseList(); if(!L.length) return '';
-  const unit={starts:'선발', callup:'1군 경기', active:'경기 1군 유지', notrade:'경기 트레이드 없음', play:'경기 출전'};
+  const unit={starts:'선발 출전', callup:'1군 등록', active:'1군 유지', notrade:'트레이드 없이', play:'출전'};
   return `<section class="panel promise-card" aria-labelledby="promiseHead"><div class="section-head"><h2 id="promiseHead">약속</h2><span class="chip">${L.length}건 진행 중</span></div>
     <ul class="promise-list">${L.map(x=>{ const pct=x.need? Math.min(100,Math.round(x.done/x.need*100)) : 100-Math.min(100,Math.round(x.left/Math.max(1,x.left+(x.done||0))*100));
       const late=x.need&&x.need-x.done>x.left;
       return `<li><div class="pr-top"><b>${esc(x.who)}</b><span class="muted">${esc(x.label||'')}</span></div>
         <div class="pr-bar${late?' late':''}"><i style="width:${pct}%"></i></div>
-        <small>${x.need? `${unit[x.kind]||''} ${x.done}/${x.need}` : (unit[x.kind]||'')} · 남은 경기 ${x.left}${late?' · 이대로는 못 지켜요':''}</small></li>`; }).join('')}</ul></section>`; }
+        <small>${unit[x.kind]||''} ${x.done}/${x.need}경기 · 기한까지 ${x.left}경기${late?' · 이대로는 못 지켜요':''}</small></li>`; }).join('')}</ul></section>`; }
 
 // ---------- UI: club tab (board, finances, contracts) ----------
 function renderClub(){
