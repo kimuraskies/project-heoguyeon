@@ -549,7 +549,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
   start(){
     const g=pendingMatch(); if(!g) return;
     this.idx=state.pendingGame; this.ps=g.ps; this.spring=!!g.spring;
-    this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away), {maxInnings:g.ps?15:g.spring?9:12});
+    this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away), {maxInnings:g.ps?15:g.spring?9:12}); this.game.live={[USER]:true};
     this.wpLog=[]; this._ended=false; this.paused=false; this.panel=null; this.logOpen=window.innerWidth>=1000; this.commentaryOpen=false; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
     closeModal(); closePreview();
     let o=document.getElementById('relay'); if(o)o.remove();
@@ -563,7 +563,11 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
   _tick(){ if(this.paused) return; this._do(); if(!this._ended) this.timer=setTimeout(()=>this._tick(), this.speed*(this._mult||1)); },
   _say(line){ this.comm.unshift(line); this.comm.length=Math.min(this.comm.length,4); this._mult=line.wait||1; },
   // one beat of the broadcast: batter intro → (lead-in line → pitch) × n → [batted-ball suspense] → result
+  // 직접 교체: the pitching coach's advice stops the broadcast so the manager can decide
+  _advise(){ const g=this.game, a=g&&g.advice&&g.advice[USER]; if(!a||!a.fresh) return; a.fresh=false;
+    this.feed.unshift({sysmsg:`투수코치: ${a.why}. ${a.n} 몸 풀고 있습니다 — 바꾸려면 [투수 교체]`}); if(!this.paused){ this.paused=true; clearTimeout(this.timer); return true; } },
   _do(){
+    if(this._advise()){ this.renderLive(); return; }
     const g=this.game, ab=this.ab;
     if(g.over && (!ab || ab.committed)){ this.end(); return; }
     if(!ab){ const p=g.prepareAB(); if(!p){ this.end(); return; }
@@ -587,7 +591,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
   stepOne(){ this.paused=true; clearTimeout(this.timer); this._do(); while(!this._ended&&this.ab&&(this.ab.pre||(this.ab.susp&&!this.ab.committed))) this._do(); if(this.game.over&&!this._ended&&(!this.ab||this.ab.committed)) this.end(); },
   // plays the rest of this at-bat (or the next one, if this one is finished) and stops on its result
   stepPA(){ this.paused=true; clearTimeout(this.timer); let g=0; while(!this._ended&&g++<5&&(!this.ab||this.ab.committed)) this._do(); while(!this._ended&&g++<80&&this.ab&&!this.ab.committed) this._do(); if(this.game.over&&!this._ended) this.end(); else this.renderLive(); },
-  toEnd(){ this.paused=true; clearTimeout(this.timer);
+  toEnd(){ this.paused=true; clearTimeout(this.timer); this.game.live=null; // the rest is simulated: the coach makes the changes
     if(this.ab && !this.ab.committed){ const ev=this.game.commitAB(); if(ev)this.feed.unshift(ev); }
     this.ab=null; this._flush();
     let n=0; while(!this.game.over && n<3000){ const ev=this.game.step(); if(ev){ this.feed.unshift(ev); const w=winProb(this.game); this.wpLog.push(Math.round((this.game.h===USER?w:1-w)*100)/100); } n++; }
@@ -932,7 +936,7 @@ function relayHTML(game,feed,M){
         ${groups.map(([c,l])=>`<div class="sign-group"><span>${c}</span><div>${l.map(s=>signBtn(s,K.SIGNS[s])).join('')}</div></div>`).join('')}
         <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:8px">${userBatting
           ? sel('atk',['normal','aggr','patient'])+sel('dir',['normal','pull','oppo'])+sel('run',['normal','aggr','hold'])+sel('adv',['normal','aggr','hold'])+sel('teamBat',[false,true])
-          : sel('shift',['normal','dp','infieldIn','deep'])+sel('bat',['normal','attack','nibble','inside','outside','breaking'])+sel('pick',['normal','often','rare'])+sel('hook',['normal','quick','long','platoon','opener'])}</div></div>`;
+          : sel('shift',['normal','dp','infieldIn','deep'])+sel('bat',['normal','attack','nibble','inside','outside','breaking'])+sel('pick',['normal','often','rare'])+sel('hook',['normal','quick','long','platoon','opener','manual'])}</div></div>`;
     }
     if(M.panel==='pinch'&&userBatting&&(game.bases[0]||game.bases[1]||game.bases[2])){
       const fast=game.bench(USER).sort((x,y)=>y.spd-x.spd).slice(0,6);

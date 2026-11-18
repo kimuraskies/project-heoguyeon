@@ -405,7 +405,7 @@ var TAC_LABELS={
   bunt:{normal:"접전 후반만", often:"적극 희생번트", never:"번트 없음"},
   shift:{normal:"정상 수비", dp:"병살 시프트", infieldIn:"전진 수비", deep:"외야 깊게"},
   bat:{normal:"보통", attack:"정면 승부", nibble:"유인구 위주", inside:"몸쪽 승부", outside:"바깥쪽 승부", breaking:"변화구 위주"},
-  hook:{normal:"보통", quick:"빠른 교체", long:"길게 맡김", platoon:"좌우 맞춤 교체", opener:"오프너"},
+  hook:{normal:"보통", quick:"빠른 교체", long:"길게 맡김", platoon:"좌우 맞춤 교체", opener:"오프너", manual:"직접 교체(중계)"},
   dir:{normal:"보통", pull:"당겨치기", oppo:"밀어치기"},
   adv:{normal:"보통", aggr:"한 베이스 더", hold:"안전 주루"},
   pick:{normal:"보통", often:"견제 자주", rare:"견제 줄임"}
@@ -993,7 +993,7 @@ IP.bench=function(t){var lu=this.lineup[t], gone=this.removed[t];return ROSTERS[
 IP.availPitchers=function(t){var used=this.pUsed[t];return ROSTERS[t].pitchers.filter(function(p){return used.indexOf(p.n)<0 && !isInjured(p);});};
 IP.cancelPending=function(){ this._pending=null; };
 IP.subPitcher=function(t,name){ if(this.pUsed[t].indexOf(name)>=0)return false; var p=getP(t,name); if(!p)return false;
-  this._pending=null;
+  this._pending=null; if(this.advice) this.advice[t]=null;
   this.pitcher[t]=name; this.pUsed[t].push(name); this.pBF[t]=0; this.pRuns[t]=0; this.ptot[t]=0; this.pstr[t]=0; this.pball[t]=0;
   this.pOuts[t]=0; this.pInn[t]=this.inning; this.entryLead[t][name]=this.score[t]-this.score[this.opp(t)]; this._ensurePit(t,name); return true;};
 // a faster runner takes over the base and the spot in the order
@@ -1018,9 +1018,23 @@ IP._run=function(off,def,runner,unearned){
   if(before===0) this.goAhead={team:off, winP:this.pitcher[off], loseP:rp};
   if(before===-1) this.blown[def+'|'+this.pitcher[def]]=true;
 };
+// "직접 교체": while the manager watches the broadcast, the pitching coach only advises; past this many
+// pitches (or on an injury) he makes the change himself
+var MANUAL_FORCE=130;
 IP._autoManage=function(){
   var def=this.defId(), off=this.offId(); var p=getP(def,this.pitcher[def]);
-  var lead=this.score[def]-this.score[off], cfg=this.cfg[def];
+  var lead=this.score[def]-this.score[off], cfg=this.cfg[def], self=this;
+  if(this.tac[def].hook==="manual" && this.live && this.live[def] && this.ptot[def]<MANUAL_FORCE && !isInjured(p)){
+    var real=this.subPitcher; this.advice=this.advice||{};
+    this.subPitcher=function(t,n){ var why=self.inning>=9&&n===cfg.closer?'세이브 상황입니다':self.pRuns[def]>=3?self.pRuns[def]+'실점했습니다':'투구수 '+self.ptot[def]+'개입니다';
+      if(!self.advice[t]||self.advice[t].n!==n) self.advice[t]={n:n, why:why, fresh:true}; return false; };
+    var bp=this.bpIdx[def];
+    try{ this._autoManageCore(def,off,p,lead,cfg); } finally { this.subPitcher=real; this.bpIdx[def]=bp; }
+    return;
+  }
+  this._autoManageCore(def,off,p,lead,cfg);
+};
+IP._autoManageCore=function(def,off,p,lead,cfg){
   // closer for the save: 9th inning or later, ahead by 1-3
   if(this.inning>=9 && lead>=1 && lead<=3 && this.pitcher[def]!==cfg.closer && closerReady(def,cfg.closer,this.pUsed[def])){ this.subPitcher(def,cfg.closer); return; }
   var isSP=p.role==='SP' && this.pitcher[def]===this.sp[def];
@@ -1330,7 +1344,7 @@ global.KBO = {
   ROSTERS:ROSTERS, TEAM_IDS:TEAM_IDS, LEAGUE:LEAGUE, ovr:ovr, simPA:simPA, simGame:simGame,
   defaultLineup:defaultLineup, battingOrder:battingOrder, batValue:batValue, obpValue:obpValue,
   newBatStat:newBatStat, newPitStat:newPitStat,
-  getB:getB, getP:getP, InteractiveGame:InteractiveGame,
+  getB:getB, getP:getP, InteractiveGame:InteractiveGame, MANUAL_FORCE:MANUAL_FORCE,
   cond:cond, mor:mor, isInjured:isInjured, applyFatigue:applyFatigue, restAdjust:restAdjust,
   DEFAULT_TAC:DEFAULT_TAC, TAC_LABELS:TAC_LABELS, tacOf:tacOf, handsOf:handsOf, repertoire:repertoire, arsenal:arsenal, arsenalMix:arsenalMix, ARSENAL:ARSENAL, pickType:pickType, genPitchSeq:genPitchSeq, statRNG:statRNG, statFence:statFence, battedBall:battedBall, bbDirection:bbDirection, inPitchZone:inPitchZone, xwOBA:xwOBA, XW_EV:XW_EV, XW_LA:XW_LA, XW_TABLE:XW_TABLE, roleSkill:roleSkill, PITCH_TYPES:PITCH_TYPES, ASIA_Q:ASIA_Q, posFitBase:posFitBase, SIGNS:SIGNS, planMods:planMods,
   POS_LIST:POS_LIST, posFit:posFit, fieldVal:fieldVal, teamDefense:teamDefense, autoPositions:autoPositions, positionIssues:positionIssues

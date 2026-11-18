@@ -61,9 +61,9 @@
     try {
       const r = await rpc('gate_enter', {p_code: code});
       busy = false;
-      if (!r || !r.ok) return render(r && r.err || '다시 시도해 주세요.');
-      const s = {token: r.token, id: r.id || null, code: code.trim().toUpperCase()}; save(s); finish(s);
-    } catch (e) { busy = false; render('서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.'); }
+      if (!r || !r.ok) { if (window.Track) Track.action('gate_fail', {why: 'code'}); return render(r && r.err || '다시 시도해 주세요.'); }
+      const s = {token: r.token, id: r.id || null, code: code.trim().toUpperCase()}; save(s); if (window.Track) Track.action('gate_ok'); finish(s);
+    } catch (e) { busy = false; if (window.Track) Track.action('gate_fail', {why: 'net'}); render('서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.'); }
   }
   async function logout() {
     const s = load(); save(null);

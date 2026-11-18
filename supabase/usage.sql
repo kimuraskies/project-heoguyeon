@@ -78,3 +78,30 @@ select coalesce(data->>'code', '(none)') as invite_code,
 from public.events
 group by 1 order by 2 desc;
 revoke all on public.usage_by_code from anon, authenticated;
+
+-- ---- migration "usage_funnel_daily" (2026-11-18): the first-game funnel by each device's first day (KST) ----
+-- gate_stuck = typed a wrong invite code (design/gate.js sends gate_fail) and never got in
+create or replace view public.usage_funnel_daily with (security_invoker = true) as
+with d as (
+  select device,
+    min(created_at) as first_at,
+    bool_or(kind='screen' and data->>'name'='gate') as s1_gate,
+    bool_or(kind='action' and data->>'name'='gate_fail') as gate_fail,
+    bool_or((kind='action' and data->>'name'='gate_ok') or (kind='screen' and data->>'name' <> 'gate') or kind='open') as s2_entered,
+    bool_or(kind='action' and data->>'name'='pick_club') as s3_club,
+    bool_or(kind='screen' and data->>'name'='dash') as s4_dash,
+    bool_or(kind='match' and data->>'stage'='start') as s5_match_start,
+    bool_or(kind='match' and data->>'stage'='commit') as s6_match_done,
+    bool_or(kind='match' and data->>'stage'='commit' and data->>'type'='regular') as s7_regular_done
+  from public.events where data ? 'sid' group by device)
+select (first_at at time zone 'Asia/Seoul')::date as day, count(*) as devices,
+  count(*) filter (where s1_gate) as gate,
+  count(*) filter (where gate_fail and not s2_entered) as gate_stuck,
+  count(*) filter (where s2_entered) as entered,
+  count(*) filter (where s3_club) as picked_club,
+  count(*) filter (where s4_dash) as dashboard,
+  count(*) filter (where s5_match_start) as first_match_started,
+  count(*) filter (where s6_match_done) as first_match_done,
+  count(*) filter (where s7_regular_done) as regular_game_done
+from d group by 1 order by 1 desc;
+revoke all on public.usage_funnel_daily from anon, authenticated;

@@ -1184,12 +1184,14 @@ function takeJob(t){
 // ---------- KBO FA (2026 rules): eligibility, grades, a week-by-week market, compensation, cap, waivers ----------
 // Eligibility: 8 registered seasons (7 for college graduates), again 4 seasons after each FA contract.
 // Grades by the last three salaries: A = team top 3 and league top 30, B = team top 10 and league top 60,
-// C = the rest and anyone 35 or older. Compensation from the signing club to the old club:
+// C = the rest and anyone 35 or older at a first FA. Re-FA: the second FA is graded B, the third and later C
+// (and C again for a player who was C at his first FA). Compensation from the signing club to the old club:
 // A = 200% of last salary + one player outside a 20-man protected list, or 300%; B = 100% + one outside 25,
 // or 200%; C = 150%. A club signs at most two outside FAs a winter. Competitive-balance cap (경쟁균형세):
 // 143.97억 in 2026, +5% a year to 2028; going over costs 50% / 100% / 150% of the excess in a row.
 // Waivers: a released player waits 7 days (7 games, or a stove week) for a claim from the clubs in reverse
-// standings order; a claim takes over the contract, otherwise the old club pays what is left of it.
+// standings order; a claim takes over the contract, otherwise the old club pays what is left of it and the player
+// becomes a free agent no club may sign that year (KBO 규약).
 const FA_CAP_Y={2025:137.12,2026:143.97,2027:151.17,2028:158.73};
 const FA_GR={A:{prot:20,pay:2,cash:3},B:{prot:25,pay:1,cash:2},C:{prot:0,pay:0,cash:1.5}};
 const FA_OUT_MAX=2, FA_REPEAT=4, WAIVER_GAMES=7, FA_BONUS_SHARE=0.3;
@@ -1203,7 +1205,9 @@ function svcFromCareer(p){ const c=window.KBO_CAREER&&window.KBO_CAREER[p.n]; if
 function faInit(p){ if(p.svc!=null) return p;
   if(p.f){ p.svc=0; p.faAt=99; return p; }
   const c=svcFromCareer(p), svc=c? c.svc : 0, debut=c? p.age-(state.year-c.first) : (p.college? 22 : p.age), thr=debut>=22? 7 : 8;
-  p.svc=svc; p.faAt= svc<thr? thr : thr+FA_REPEAT*Math.ceil((svc-thr)/FA_REPEAT); return p; }
+  p.svc=svc; p.faAt= svc<thr? thr : thr+FA_REPEAT*Math.ceil((svc-thr)/FA_REPEAT); faGuessN(p,thr); return p; }
+// FAs a player has already had: from his service time when the game first sees him
+function faGuessN(p,thr){ if(p.faN!=null||p.f) return; thr=thr||8; const s=p.svc||0; p.faN= s>thr? 1+Math.floor((s-thr-1)/FA_REPEAT) : 0; }
 function faInitAll(){ K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(faInit)); }
 function faLeft(p){ faInit(p); return p.f? null : Math.max(0,p.faAt-p.svc); }
 function faEligible(p){ faInit(p); return !p.f && p.svc>=p.faAt; }
@@ -1217,7 +1221,7 @@ function avgSal(p){ const h=(p.salH&&p.salH.length)? p.salH : [p.sal||0]; return
 function faGradeMap(){ const all=[]; K.TEAM_IDS.forEach(t=>allPlayers(t).concat(farmOf(t)).forEach(p=>{ if(!p.f) all.push({t,p,s:avgSal(p)}); }));
   all.sort((a,b)=>b.s-a.s); const lg=new Map(), tm=new Map(), per={};
   all.forEach((x,i)=>{ lg.set(x.p,i+1); per[x.t]=(per[x.t]||0)+1; tm.set(x.p,per[x.t]); });
-  return p=>{ if(p.age>=35) return 'C'; const l=lg.get(p)||999, k=tm.get(p)||999; return k<=3&&l<=30? 'A' : k<=10&&l<=60? 'B' : 'C'; }; }
+  return p=>{ faGuessN(p); const n=p.faN||0; if(n>=2||(n===1&&p.faG==='C')) return 'C'; if(n===1) return 'B'; if(p.age>=35) return 'C'; const l=lg.get(p)||999, k=tm.get(p)||999; return k<=3&&l<=30? 'A' : k<=10&&l<=60? 'B' : 'C'; }; }
 function faWantYears(p){ return p.age<=29? 4 : p.age<=32? 3 : p.age<=34? 2 : 1; }
 function faAskOf(p,grade){ const base=Math.max(renewSalary(p), salaryFor(p))*1.1; return Math.max(0.5, eok(base*(grade==='A'?1.5:grade==='B'?1.25:1))); }
 
@@ -1251,7 +1255,7 @@ function faGain(t,p){ const r=K.ROSTERS[t], o=K.ovr(p);
   if(p.type==='B'){ const same=r.batters.filter(x=>x.pos===p.pos).map(K.ovr).sort((a,b)=>b-a); return o-(same[0]||55); }
   if(p.role==='SP'){ const sp=r.pitchers.filter(x=>x.role==='SP').map(K.ovr).sort((a,b)=>b-a); return o-(sp[4]||55); }
   const rp=r.pitchers.filter(x=>x.role!=='SP').map(K.ovr).sort((a,b)=>b-a); return o-(rp[3]||55); }
-function faCanBid(t,x){ if(t===x.from) return true; if(x.p.f&&!fxRoom(t,x.p)) return false; return x.kind!=='fa'||faOutCount(t)<FA_OUT_MAX; }
+function faCanBid(t,x){ if(x.blockY!=null&&x.blockY>=state.year) return false; if(t===x.from) return true; if(x.p.f&&!fxRoom(t,x.p)) return false; return x.kind!=='fa'||faOutCount(t)<FA_OUT_MAX; }
 // other clubs bid: the three that gain most, within a loose budget; old clubs try to keep their own
 function faAiBids(){ const f=fm();
   (f.fa||[]).forEach(x=>{ const p=x.p, ovr=K.ovr(p);
@@ -1281,7 +1285,7 @@ function faStatus(x){ const n=Object.keys(x.bids).filter(t=>t!==USER).length, mi
 // signs x with club t on bid b; returns the news line
 function faSignWith(x,t,b){ const f=fm(), p=x.p, i=f.fa.indexOf(x); if(i<0) return ''; f.fa.splice(i,1);
   const isFA=x.kind==='fa', total=eok(b.aav*b.yrs);
-  if(isFA){ p.sal=eok(b.aav*(1-FA_BONUS_SHARE)); p.bonusY=eok(b.aav*FA_BONUS_SHARE); p.faAt=(p.svc||0)+FA_REPEAT; p.faN=(p.faN||0)+1; p.faY=state.year; }
+  if(isFA){ p.sal=eok(b.aav*(1-FA_BONUS_SHARE)); p.bonusY=eok(b.aav*FA_BONUS_SHARE); p.faAt=(p.svc||0)+FA_REPEAT; p.faN=(p.faN||0)+1; p.faG=x.grade||'C'; p.faY=state.year; }
   else { p.sal=b.aav; p.bonusY=0; }
   p.yrs=b.yrs; p.mor=b.promise?78:72; p.cond=100; p.inj=0; p.listed=false; p.bench=0; p.newG=NEW_GAMES; p.expiring=false; ensurePlayer(p);
   const where=joinClub(t,p);
@@ -1310,7 +1314,7 @@ function faLeftovers(){ const f=fm(), out=[];
   faWeek(9,true);
   (f.fa||[]).slice().forEach(x=>{ const p=x.p, t=x.from&&K.ROSTERS[x.from]&&x.from!==USER? x.from : null;
     if(t&&K.ovr(p)>=60&&!(p.f&&!fxRoom(t,p))){ out.push(faSignWith(x,t,{aav:eok(x.ask*0.75),yrs:1})); } });
-  f.fa=[]; compAuto(true); return out; }
+  f.fa=(f.fa||[]).filter(x=>x.blockY!=null); compAuto(true); return out; }
 
 // ---- the user's offer ----
 function faOffer(i){ faDraft=null; faOfferModal(i); }
@@ -1333,6 +1337,7 @@ function faOfferModal(i){ const f=fm(), x=(f.fa||[])[i]; if(!x) return; const p=
 let faDraft=null;
 function faSetYears(i,y){ faDraft={i,y}; faOfferModal(i); }
 function faBid(i,aav,yrs){ const f=fm(), x=(f.fa||[])[i]; if(!x) return; const p=x.p;
+  if(x.blockY!=null&&x.blockY>=state.year){ notify(`웨이버에서 풀린 선수는 ${x.blockY}년에는 계약할 수 없습니다.`); return; }
   if(p.f&&!fxRoom(USER,p)){ notify(`${fxLabel(p)} 선수 정원(${fxCap(p)}명)이 찼습니다.`); return; }
   if(x.kind==='fa'&&x.from!==USER&&faOutCount(USER)>=FA_OUT_MAX){ notify(`외부 FA는 한 해 ${FA_OUT_MAX}명까지 영입할 수 있습니다.`); return; }
   const sal=x.kind==='fa'? eok(aav*(1-FA_BONUS_SHARE)) : aav, limit=f.fin.budget*1.1, after=payroll(USER)+sal;
@@ -1352,10 +1357,10 @@ function faCard(){ const f=fm(), list=(f.fa||[]).map((x,i)=>({x,i})).sort((a,b)=
     const mine= st.mine? `<span class="chip ${st.lead?'good':'warn'}">${st.lead?'우리 제안 선두':'경쟁 제안 우위'}</span>` : '';
     return `<tr><td class="name"><a href="javascript:void(0)" onclick="FM.faOffer(${i})">${esc(p.n)}</a>${x.grade?` <span class="pill pos">${x.grade}</span>`:p.f?` <span class="pill pos">${fxLabel(p)}</span>`:''}</td><td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td>
       <td><span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span></td><td>${x.from||'-'}</td><td>${x.yrs}년 ${eok(x.ask*x.yrs)}억</td><td>${st.n}곳 ${mine}</td>
-      <td><button class="btn btn-sm" onclick="FM.faOffer(${i})">${st.mine?'제안 수정':'제안'}</button></td></tr>`; }).join('');
+      <td>${x.blockY!=null&&x.blockY>=state.year? `<span class="muted" title="웨이버 공시 후 클레임이 없던 선수는 그해 계약할 수 없습니다">${x.blockY+1}년부터</span>` : `<button class="btn btn-sm" onclick="FM.faOffer(${i})">${st.mine?'제안 수정':'제안'}</button>`}</td></tr>`; }).join('');
   return `<div class="card" style="margin-top:14px">${head}${gauge}
     <div class="sq-table" style="display:block"><table><thead><tr><th class="name">선수</th><th>POS</th><th>나이</th><th>OVR</th><th>원소속</th><th>요구</th><th>관심 구단</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="hint" style="margin-top:8px">등급 보상: A = 직전 연봉 200% + 보호선수 20인 외 1명 (또는 300%) · B = 100% + 25인 외 1명 (또는 200%) · C = 150%. 계약금은 총액의 ${Math.round(FA_BONUS_SHARE*100)}%를 바로 지급합니다.</p></div>`; }
+    <p class="hint" style="margin-top:8px">등급 보상: A = 직전 연봉 200% + 보호선수 20인 외 1명 (또는 300%) · B = 100% + 25인 외 1명 (또는 200%) · C = 150%. 재자격 FA는 두 번째 B등급, 세 번째부터 C등급. 계약금은 총액의 ${Math.round(FA_BONUS_SHARE*100)}%를 바로 지급합니다.</p></div>`; }
 
 // ---- compensation ----
 // who a club may lose: no foreigners, no FA signed this winter, no rookie of this year's draft
@@ -1447,8 +1452,8 @@ function waiverTick(force){ const f=fm(); if(!(f.waivers||[]).length) return;
     const owe= w.from===USER? waiverRemaining(p) : 0;
     if(w.from===USER){ f.fin.balance-=owe; f.fin.exp+=owe; }
     if(p.f){ depart(p,'waiver unclaimed import'); if(w.from===USER) send('단장','📋',`${p.n} 웨이버 기간 종료`, `아무 구단도 ${p.n}을(를) 데려가지 않았습니다. 잔여 연봉 ${owe}억 원을 지급했고, 선수는 리그를 떠납니다.`, []); return false; }
-    f.fa=f.fa||[]; f.fa.push({p, from:null, kind:'free', prevSal:p.sal||0, ask:eok(Math.max(0.3,salaryFor(p)*0.8)), yrs:1, bids:{}});
-    if(w.from===USER) send('단장','📋',`${p.n} 자유계약 공시`, `웨이버 기간에 클레임이 없어 ${p.n}은(는) 자유계약 선수가 됐습니다. 잔여 연봉 ${owe}억 원을 지급했습니다.`, []);
+    f.fa=f.fa||[]; f.fa.push({p, from:null, kind:'free', prevSal:p.sal||0, ask:eok(Math.max(0.3,salaryFor(p)*0.8)), yrs:1, bids:{}, blockY:state.year});
+    if(w.from===USER) send('단장','📋',`${p.n} 자유계약 공시`, `웨이버 기간에 클레임이 없어 ${p.n}은(는) 자유계약 선수가 됐습니다. 잔여 연봉 ${owe}억 원을 지급했습니다. 규약에 따라 올해는 어느 구단과도 계약할 수 없습니다.`, []);
     return false; }); }
 
 // ---- foreign players: injury replacements and AI clubs changing a struggling import ----
@@ -1496,10 +1501,10 @@ const TAC_HELP={
   adv:{normal:'안전한 범위에서', aggr:'1루→3루, 태그업 시도↑, 주루사 위험', hold:'무리하지 않는다'},
   pick:{normal:'상황에 맞게', often:'상대 도루 시도↓ 성공률↓', rare:'타자에 집중, 상대 도루 성공률↑'},
   ibb:{false:'거르지 않는다', true:'7회 이후 접전, 1루가 비면 강타자를 거른다'},
-  hook:{normal:'투구수 기준 교체', quick:'선발을 일찍 내리고 불펜 가동 (5실점 → 4실점 기준)', long:'선발에게 더 길게 맡긴다', platoon:'7회 이후 접전에서 타자와 같은 손 불펜 투입', opener:'선발을 2이닝 안팎으로 끊고 불펜으로 이어 간다'}
+  hook:{normal:'투구수 기준 교체', quick:'선발을 일찍 내리고 불펜 가동 (5실점 → 4실점 기준)', long:'선발에게 더 길게 맡긴다', platoon:'7회 이후 접전에서 타자와 같은 손 불펜 투입', opener:'선발을 2이닝 안팎으로 끊고 불펜으로 이어 간다', manual:'중계를 보는 동안은 투수코치가 교체를 권하고 멈출 뿐, 바꾸는 건 감독이 직접 (130구가 넘거나 다치면 코치가 교체 · 빠르게 넘긴 경기는 보통 기준)'}
 };
 const TAC_OPTS={atk:['normal','aggr','patient'], dir:['normal','pull','oppo'], run:['normal','aggr','hold'], adv:['normal','aggr','hold'], bunt:['normal','often','never'], teamBat:[false,true],
-  shift:['normal','dp','infieldIn','deep'], bat:['normal','attack','nibble','inside','outside','breaking'], pick:['normal','often','rare'], ibb:[false,true], hook:['normal','quick','long','platoon','opener']};
+  shift:['normal','dp','infieldIn','deep'], bat:['normal','attack','nibble','inside','outside','breaking'], pick:['normal','often','rare'], ibb:[false,true], hook:['normal','quick','long','platoon','opener','manual']};
 function tacName(k){ return TAC_NAMES[k]||k; }
 function tacLabel(k,v){
   if(k==='teamBat') return String(v)==='true'?'진루타 우선':'자율';

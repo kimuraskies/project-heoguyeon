@@ -11,10 +11,10 @@ const TAC_HELP={
   adv:{normal:'안전한 범위에서', aggr:'1루→3루, 태그업 시도↑, 주루사 위험', hold:'무리하지 않는다'},
   pick:{normal:'상황에 맞게', often:'상대 도루 시도↓ 성공률↓', rare:'타자에 집중, 상대 도루 성공률↑'},
   ibb:{false:'거르지 않는다', true:'7회 이후 접전, 1루가 비면 강타자를 거른다'},
-  hook:{normal:'투구수 기준 교체', quick:'선발을 일찍 내리고 불펜 가동 (5실점 → 4실점 기준)', long:'선발에게 더 길게 맡긴다', platoon:'7회 이후 접전에서 타자와 같은 손 불펜 투입', opener:'선발을 2이닝 안팎으로 끊고 불펜으로 이어 간다'}
+  hook:{normal:'투구수 기준 교체', quick:'선발을 일찍 내리고 불펜 가동 (5실점 → 4실점 기준)', long:'선발에게 더 길게 맡긴다', platoon:'7회 이후 접전에서 타자와 같은 손 불펜 투입', opener:'선발을 2이닝 안팎으로 끊고 불펜으로 이어 간다', manual:'중계를 보는 동안은 투수코치가 교체를 권하고 멈출 뿐, 바꾸는 건 감독이 직접 (130구가 넘거나 다치면 코치가 교체 · 빠르게 넘긴 경기는 보통 기준)'}
 };
 const TAC_OPTS={atk:['normal','aggr','patient'], dir:['normal','pull','oppo'], run:['normal','aggr','hold'], adv:['normal','aggr','hold'], bunt:['normal','often','never'], teamBat:[false,true],
-  shift:['normal','dp','infieldIn','deep'], bat:['normal','attack','nibble','inside','outside','breaking'], pick:['normal','often','rare'], ibb:[false,true], hook:['normal','quick','long','platoon','opener']};
+  shift:['normal','dp','infieldIn','deep'], bat:['normal','attack','nibble','inside','outside','breaking'], pick:['normal','often','rare'], ibb:[false,true], hook:['normal','quick','long','platoon','opener','manual']};
 function tacName(k){ return TAC_NAMES[k]||k; }
 function tacLabel(k,v){
   if(k==='teamBat') return String(v)==='true'?'진루타 우선':'자율';
