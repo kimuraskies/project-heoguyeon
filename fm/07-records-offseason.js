@@ -141,7 +141,7 @@ function onSeasonEnd(){
   toFA.forEach(([t,p])=>{ const r=K.ROSTERS[t]; r.batters=r.batters.filter(x=>x!==p); r.pitchers=r.pitchers.filter(x=>x!==p); r.farm=farmOf(t).filter(x=>x!==p); addFA(p,t); fillMinimum(t); });
   const free=f.fa.filter(x=>x.kind!=='fa');
   if(free.length) send('단장','🌏',`재계약하지 않은 외국인 선수 ${free.length}명`,
-    `각 구단이 보류하지 않은 외국인 선수들이 시장에 나왔습니다.\n\n${free.slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).slice(0,6).map(x=>`• ${x.p.n} (${x.p.pos||x.p.role}, ${x.p.age}세, OVR ${K.ovr(x.p)}) 요구 ${x.yrs}년 ${x.ask}억`).join('\n')}\n\n구단 탭의 FA 시장에서 제안할 수 있습니다.`, []);
+    `각 구단이 보류하지 않은 외국인 선수들이 시장에 나왔습니다.\n\n${free.slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).slice(0,6).map(x=>`• ${x.p.n} (${x.p.pos||x.p.role}, ${x.p.age}세, OVR ${K.ovr(x.p)}) 요구 ${x.yrs}년 ${x.ask}억`).join('\n')}\n\n구단 → 스카우트 탭의 FA 시장에서 제안할 수 있습니다.`, []);
 }
 function maybeShowFired(){
   const f=fm(); if(!f||!f.fired) return;

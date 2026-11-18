@@ -404,8 +404,8 @@ function checkForeignForm(ug){
   if(!bad) return;
   f.lastFxNote=ug;
   send('스카우트 팀장','🌏',`${bad.p.n} 교체를 검토할 시점입니다`,
-    `${bad.p.n}의 평균 평점이 ${(bad.rt.sum/bad.rt.cnt).toFixed(2)}에 그치고 있습니다. 스카우트 팀이 대체 후보 ${scoutList().length}명을 추렸습니다.\n\n구단 탭의 '외국인 선수 시장'에서 후보를 확인하세요. (교체 가능 ${fxSwapsLeft()}회, 108경기 전까지)`,
-    [{label:'구단 탭에서 후보 보기', fn:'openClub'}, {label:'더 지켜본다', fn:'ok'}]);
+    `${bad.p.n}의 평균 평점이 ${(bad.rt.sum/bad.rt.cnt).toFixed(2)}에 그치고 있습니다. 스카우트 팀이 대체 후보 ${scoutList().length}명을 추렸습니다.\n\n스카우트 탭의 외국인 선수 목록에서 후보를 확인하세요. (교체 가능 ${fxSwapsLeft()}회, 108경기 전까지)`,
+    [{label:'스카우트 탭에서 후보 보기', fn:'openClub'}, {label:'더 지켜본다', fn:'ok'}]);
 }
 
 // ---------- postseason hooks ----------

@@ -10,7 +10,7 @@
 (function () {
   const URL_ = 'https://tshwgeczwwslsoeygajz.supabase.co/rest/v1/events';
   const KEY = 'sb_publishable_5v5mTgm-G5IEotu5lojHRA_6fhQjxQ0';
-  const DEV = 'kbo-device', PLAY_EVERY = 10 * 60 * 1000, VERSION = '2026.11.17-0.72', MAX_EVENTS = 400;
+  const DEV = 'kbo-device', PLAY_EVERY = 10 * 60 * 1000, VERSION = '2026.11.18-0.73', MAX_EVENTS = 400;
   const SID = Math.random().toString(36).slice(2, 10);
   let lastPlay = 0, seq = 0, curScreen = null, visibleSince = Date.now(), visibleSec = 0, lastLeave = 0;
   function enabled() {

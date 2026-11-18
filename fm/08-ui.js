@@ -74,8 +74,8 @@ function renderInbox(){
 // ---------- first-career guide: the head coach explains five things, once ----------
 const GUIDE=[
   {sel:'#nextStep', t:'취임을 축하드립니다, 감독님. 오른쪽 위 버튼이 언제나 <b>다음 할 일</b>입니다. 모르겠으면 이것만 눌러도 시즌이 굴러갑니다.'},
-  {sel:'#tabs button[onclick*="inbox"]', t:'구단 소식과 결정할 일은 <b>받은편지함</b>에 모입니다. 급하지 않아요. 기한이 지나면 제가 기본값으로 처리합니다.'},
-  {sel:'#tabs button[onclick*="lineup"]', t:'타순과 로테이션은 제가 <b>이미 짜 뒀습니다</b>. 바꾸고 싶을 때만 라인업 탭을 보세요.'},
+  {sel:'#tabs button[onclick*="mail"]', t:'구단 소식과 결정할 일은 <b>받은편지함</b>에 모입니다. 급하지 않아요. 기한이 지나면 제가 기본값으로 처리합니다.'},
+  {sel:'#tabs button[onclick*="players"]', t:'타순과 로테이션은 제가 <b>이미 짜 뒀습니다</b>. 바꾸고 싶을 때만 선수단 → 라인업 탭을 보세요.'},
   {sel:'.hero-more .gold', dash:true, skip:()=>!canQuickStart(), t:'준비 과정이 번거로우면 <b>추천 준비로 개막전까지</b>를 누르세요. 캠프와 시범경기를 제가 맡고 바로 개막전으로 모시겠습니다.'},
   {relay:true, t:'경기가 시작됐습니다. 위쪽 버튼으로 <b>재생·정지·끝까지</b>를, 대타·투수 교체·작전은 그 옆 메뉴에서 지시하세요. 바쁘면 끝까지를 눌러도 됩니다.'}
 ];
@@ -136,7 +136,7 @@ function dashTasks(){
   if(tired.length && !f.autoRest) out.push({ic:'lineup', t:`지친 주전 ${tired.length}명`, d:'수석코치 · '+tired.map(p=>p.n).join(', ')+' · 휴식 권장', a:'라인업 확인', go:"App.tab('lineup')"});
   if(state.phase==='stove'){
     if(!c.tac) out.push({ic:'settings', t:'팀 기본 전술 정하기', d:'팀 전술 탭 · 공격·수비·배터리 기본값', a:'전술 설정', go:"App.tab('tactics')"});
-    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
+    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 교체 횟수 차감 없음`, a:'스카우트', go:"App.tab('scout')"});
   }
   if(!out.length && inj.length) out.push({ic:'injury', t:`부상자 ${inj.length}명 회복 중`, d:'의무팀 · '+inj.map(p=>`${p.n} (${p.inj})`).join(', '), a:'선수단 보기', go:"App.tab('squad')"});
   return out;
@@ -206,18 +206,12 @@ function renderClub(){
   const f=fm(), b=f.board, s=boardStatus(), pay=payroll(USER);
   const confCol=b.conf>=60?'var(--good)':b.conf>=35?'var(--warn)':'var(--bad)';
   const avgAtt=f.fin.homeGames? Math.round(f.fin.attTotal/f.fin.homeGames) : 0;
-  const rows=allPlayers(USER).slice().sort((a,b)=>b.sal-a.sal).map(p=>`<tr${p.expiring?' style="background:rgba(240,160,32,.1)"':''}>
-    <td class="name">${pname(USER,p.n)}${p.listed?' <span class="pill pos">트레이드 리스트</span>':''}${p.rookie?' <span class="pill pos">신인</span>':''}</td>
-    <td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td><td><span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span></td>
-    <td><b>${p.sal}</b>억</td><td>${p.expiring?'<b style="color:var(--warn)">만료</b>':p.yrs+'년'}</td><td>${marketValue(p)}억</td><td>${moraleFace(K.mor(p))}</td></tr>`).join('');
   return `<div class="grid cols2">
     <div class="card"><h3>🏛 이사회 <span class="tag">${state.year} 시즌</span></h3>
       <div class="kpi">
         <div class="k"><div class="v" style="color:${confCol}">${b.conf}</div><div class="l">이사회 신뢰도 · ${confLabel(b.conf)}</div></div>
         <div class="k"><div class="v">${s.rank}위</div><div class="l">현재 순위 (전력 평가 ${b.strengthRank}위)</div></div>
-        <div class="k"><div class="v">${Math.round(fans())}</div><div class="l">팬 여론 · ${fansLabel(fans())}</div></div></div>
-      ${f.pledge&&f.pledge.year===state.year?`<div class="hint" style="margin-top:8px">🎤 공약: <b>${esc(f.pledge.label)}</b> — 시즌 종료 후 평가</div>`:''}
-      ${f.rival&&f.rival.year===state.year?`<div class="hint">⚔ 라이벌 ${K.ROSTERS[f.rival.t].name}: ${f.rival.w}승 ${f.rival.l}패</div>`:''}
+        </div>
       <div style="margin-top:12px">시즌 목표: <b>${esc(b.expect.label)}</b> ${s.met?'<span class="win">✅ 달성 중</span>':'<span style="color:var(--bad)">⚠️ 미달</span>'}</div>
       <div class="progress"><i style="width:${b.conf}%;background:${confCol}"></i></div>
       <div class="hint" style="margin-top:8px">12경기마다 이사회 평가가 받은편지함으로 옵니다. 시즌 종료 시 신뢰도가 15 미만이면 경질됩니다.</div>
@@ -231,10 +225,34 @@ function renderClub(){
       <div class="muted" style="margin-top:8px">이번 시즌 수입 ${f.fin.rev.toFixed(1)}억 · 지출 ${f.fin.exp.toFixed(1)}억</div>
       <div class="hint" style="margin-top:6px">홈 관중 수입은 승률과 선수단 사기에 따라 달라집니다.</div></div>
   </div>
-  ${marketCards()}
-  <div class="card" style="margin-top:14px"><h3>📝 계약 현황 <span class="tag">연봉순 · 만료 선수는 시즌 종료 후 협상</span></h3>
-    <table><thead><tr><th class="name">선수</th><th>POS</th><th>나이</th><th>OVR</th><th>연봉</th><th>잔여</th><th>시장가치</th><th>사기</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  ${fanCard(avgAtt)}`;
 }
+// 이사회실: the fan base, what moves it and what it is waiting for
+function fanCard(avgAtt){
+  const f=fm(), v=fans(), col=v>=62?'var(--good)':v>=40?'var(--warn)':'var(--bad)';
+  const st=standings(), me=st.find(x=>x.t===USER), pct=me&&me.gp? me.pct : null;
+  return `<div class="card" style="margin-top:14px"><h3>📣 팬덤 <span class="tag">${fansLabel(v)}</span></h3>
+    <div class="kpi">
+      <div class="k"><div class="v" style="color:${col}">${Math.round(v)}</div><div class="l">팬 여론 (0~100)</div></div>
+      <div class="k"><div class="v">${avgAtt? avgAtt.toLocaleString():'-'}</div><div class="l">평균 홈 관중</div></div>
+      <div class="k"><div class="v">${pct==null?'-':fmtAvg(pct)}</div><div class="l">승률</div></div></div>
+    <div class="progress" style="margin-top:10px"><i style="width:${v}%;background:${col}"></i></div>
+    ${f.pledge&&f.pledge.year===state.year?`<div style="margin-top:10px">🎤 공약: <b>${esc(f.pledge.label)}</b> <span class="muted">— 시즌 종료 후 평가</span></div>`:''}
+    ${f.rival&&f.rival.year===state.year?`<div style="margin-top:6px">⚔ 라이벌 ${K.ROSTERS[f.rival.t].name}: <b>${f.rival.w}승 ${f.rival.l}패</b></div>`:''}
+    <div class="hint" style="margin-top:8px">팬 여론은 성적, 인터뷰 답변, 라이벌전, 큰 영입과 이적에 따라 움직입니다. 여론이 높을수록 홈 관중과 입장 수입이 늘어납니다.</div></div>`;
+}
+// 단장실: every contract on the club, by salary
+function contractsCard(){
+  const rows=allPlayers(USER).slice().sort((a,b)=>b.sal-a.sal).map(p=>`<tr${p.expiring?' style="background:rgba(240,160,32,.1)"':''}>
+    <td class="name">${pname(USER,p.n)}${p.listed?' <span class="pill pos">트레이드 리스트</span>':''}${p.rookie?' <span class="pill pos">신인</span>':''}</td>
+    <td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td><td><span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span></td>
+    <td><b>${p.sal}</b>억</td><td>${p.expiring?'<b style="color:var(--warn)">만료</b>':p.yrs+'년'}</td><td>${marketValue(p)}억</td><td>${moraleFace(K.mor(p))}</td></tr>`).join('');
+  const pay=payroll(USER), b=fm().fin.budget;
+  return `<div class="card" style="margin-top:14px"><h3>📝 계약 현황 <span class="tag">연봉 총액 ${pay}억 / 예산 ${b}억 · 연봉순 · 만료 선수는 시즌 종료 후 협상</span></h3>
+    <div style="overflow-x:auto"><table><thead><tr><th class="name">선수</th><th>POS</th><th>나이</th><th>OVR</th><th>연봉</th><th>잔여</th><th>시장가치</th><th>사기</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+// 스카우트: the FA market and foreign-player scouting
+function scoutRoom(){ ensure(); return marketCards().replace('<div class="card" style="margin-top:14px">','<div class="card">'); }
 
 function marketCards(){
   const f=fm(), out=[];

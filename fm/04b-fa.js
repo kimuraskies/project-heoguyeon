@@ -53,7 +53,7 @@ function faDeclare(cands){ const f=fm(), g=faGradeMap(), filed=[], stayed=[];
       filed.slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).slice(0,8).map(x=>`• ${x.p.n} (${x.t} · ${FA_GR_LABEL[x.grade]} · ${x.p.age}세 · OVR ${K.ovr(x.p)})`).join('\n')});
   const mine=filed.filter(x=>x.t===USER), kept=stayed.filter(x=>x.t===USER);
   if(mine.length||kept.length) send('단장','🆓',`FA 자격 선수 ${mine.length+kept.length}명 — 권리 행사 결과`,
-    (mine.length? `FA를 신청한 선수:\n${mine.map(x=>`• ${x.p.n} (${FA_GR_LABEL[x.grade]}, OVR ${K.ovr(x.p)}, 직전 연봉 ${x.p.sal}억)`).join('\n')}\n\n이 선수들은 다른 구단과도 협상합니다. 잡으려면 구단 탭 FA 시장에서 우리도 제안을 넣어야 합니다. 다른 구단으로 가면 등급에 따라 보상을 받습니다.` : '')+
+    (mine.length? `FA를 신청한 선수:\n${mine.map(x=>`• ${x.p.n} (${FA_GR_LABEL[x.grade]}, OVR ${K.ovr(x.p)}, 직전 연봉 ${x.p.sal}억)`).join('\n')}\n\n이 선수들은 다른 구단과도 협상합니다. 잡으려면 구단 → 스카우트 탭 FA 시장에서 우리도 제안을 넣어야 합니다. 다른 구단으로 가면 등급에 따라 보상을 받습니다.` : '')+
     (kept.length? `${mine.length?'\n\n':''}FA를 신청하지 않고 1년 재계약한 선수: ${kept.map(x=>x.p.n).join(', ')}` : ''),
     mine.length? [{label:'FA 시장 보기', fn:'openClub'}] : []);
   faAiBids();   // the first bids are on the table the day the market opens

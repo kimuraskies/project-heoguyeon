@@ -215,12 +215,21 @@ nav.tabs button>span{white-space:nowrap}
 .sq-table td,.sq-table th{white-space:nowrap}
 .sq-table .btn{white-space:nowrap}
 /* squad sort: chips above the list/table; table headers sort too */
-.sq-sort{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 4px}
-.sq-sort>.muted{font-size:12px;margin-right:2px}
-.sq-sort .chip{cursor:pointer;min-height:36px;padding:0 12px;font:inherit;font-size:13px;color:var(--ss-ink2);background:var(--ss-2);border:1px solid var(--ss-3)}
-.sq-sort .chip.on{color:var(--on-team);background:var(--team);border-color:var(--team);font-weight:700}
 .sq-th{cursor:pointer;user-select:none}
-.sq-th.on{color:var(--ss-ink)}
+.sq-th:hover{color:var(--ss-ink)}
+.sq-th.on{color:var(--ss-ink);box-shadow:inset 0 -2px 0 var(--team)}
+.sq-ar{font-size:9px;margin-left:3px;color:var(--team)}
+/* phones: the card list gets the same sortable header strip as the table */
+.sq-listhead{display:flex;flex-wrap:wrap;gap:0;margin:12px 0 2px;border-bottom:1px solid var(--ss-3)}
+.sq-lh{flex:1 1 auto;min-height:40px;padding:0 6px;font:inherit;font-size:12px;font-weight:600;color:var(--ss-ink2);background:none;border:0;cursor:pointer;white-space:nowrap}
+.sq-lh.on{color:var(--ss-ink);box-shadow:inset 0 -2px 0 var(--team)}
+@media(min-width:768px){.sq-listhead{display:none}}
+.bp-st{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.bp-st.ok{color:var(--good);background:color-mix(in srgb,var(--good) 14%,transparent)}
+.bp-st.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent)}
+.bp-st.bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.bp-table td,.bp-table th{white-space:nowrap}
+.bp-out td{opacity:.6}
 .sq-pot{display:block;font-size:10px;line-height:1;margin-top:3px;white-space:nowrap}
 /* lineup field: positions on a diamond, tap to change the player there */
 .fld{position:relative;width:100%;max-width:560px;aspect-ratio:10/9;margin:4px auto 0}
@@ -247,9 +256,16 @@ nav.tabs button>span{white-space:nowrap}
 .fld-opt:hover{background:var(--ss-2)}
 .fld-opt-r{display:flex;flex-direction:column;align-items:flex-end;font-size:12px;white-space:nowrap}
 @media(max-width:420px){.fld-spot{min-width:56px;padding:3px 6px}.fld-spot b{font-size:12px}}
-/* ---- 0.8 menu: phones keep the bottom bar; tablet and PC get five groups in a slim rail + page tabs on top ---- */
-nav.tabs .tab-grp{display:none}
-.subtabs{display:none}
+/* ---- menu: five groups everywhere (phone bottom bar, tablet/PC slim rail) + the group's pages as tabs on top ---- */
+nav.tabs .tab-ph,nav.tabs .tab-more{display:none!important}
+@media(max-width:767px){
+  nav.tabs .tab-grp .count~.count{display:none}
+  .subtabs{display:flex;gap:4px;margin:0 0 12px;padding:4px;border-radius:12px;background:var(--ss-1);overflow-x:auto;scrollbar-width:none}
+  .subtabs::-webkit-scrollbar{display:none}
+  .subtabs button{flex:1 0 auto;min-height:40px;padding:0 12px;border:0;border-radius:9px;background:none;color:var(--ss-ink3);font:inherit;font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+  .subtabs button.active{background:var(--ss-3);color:var(--ss-ink)}
+  .subtabs .count{margin:0}
+}
 @media(min-width:768px){
   .shell{grid-template-columns:84px minmax(0,1fr)!important;gap:20px!important}
   .shell:has(> nav.tabs[hidden]){grid-template-columns:minmax(0,1fr)!important}
@@ -272,3 +288,5 @@ nav.tabs .tab-grp{display:none}
 .fa-opt{display:flex!important;flex-direction:column;align-items:flex-start!important;gap:3px;text-align:left;min-height:56px;padding:8px 14px!important;border-radius:12px!important}
 .fa-opt b{font-size:15px}
 .fa-opt small{font-size:12px;color:var(--ss-ink3);font-weight:500}
+
+@media(max-width:767px){.bp-table .bp-wide{display:none}}

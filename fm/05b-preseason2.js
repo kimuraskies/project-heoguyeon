@@ -239,14 +239,14 @@ const EV={
       memo('trade',x.give,`트레이드: ${x.want} ↔ ${x.give}`); return `트레이드 성사: ${x.txt}. 라인업을 다시 짰습니다.`; }},
   coach:{safe:2, make(){ const s=staffOf(USER); let worst=null; COACH_ROLES.forEach(([r,l])=>{ const c=coachInit(s[r]), v=c.a[ROLE_MAIN[r]]; if(!worst||v<worst.v) worst={r,l,v,n:c.n}; });
       return {who:'단장',icon:'🧢',title:'코치진 정비',body:`캠프 전에 코치진을 점검할 시간입니다.\n가장 약한 자리: ${worst.l} ${worst.n} (핵심 능력 ${worst.v})`,
-        opts:[{l:'보직을 다시 나눈다',d:'코치들을 가장 잘 맞는 자리로 옮긴다'},{l:`${worst.l} 후보를 면접한다`,d:'결정 뒤 구단 탭에서 영입 · 위약금과 연봉 발생'},{l:'지금 체제를 신임한다',d:'코치 전원 만족도 +4'}],data:{r:worst.r}}; },
+        opts:[{l:'보직을 다시 나눈다',d:'코치들을 가장 잘 맞는 자리로 옮긴다'},{l:`${worst.l} 후보를 면접한다`,d:'결정 뒤 코칭스태프 탭에서 영입 · 위약금과 연봉 발생'},{l:'지금 체제를 신임한다',d:'코치 전원 만족도 +4'}],data:{r:worst.r}}; },
     pick(i,d){ const s=staffOf(USER);
       if(i===2){ COACH_ROLES.forEach(([r])=>{ const c=coachInit(s[r]); c.sat=clampN(c.sat+4,0,100); }); return '코치진이 감독의 신임에 고마워합니다.'; }
-      if(i===1) return `구단 탭의 코칭스태프에서 ${Object.fromEntries(COACH_ROLES)[d.r]} 카드의 교체 버튼을 누르면 후보를 면접할 수 있습니다.`;
+      if(i===1) return `구단 → 코칭스태프 탭에서 ${Object.fromEntries(COACH_ROLES)[d.r]} 카드의 교체 버튼을 누르면 후보를 면접할 수 있습니다.`;
       let moves=0; for(let k=0;k<6;k++){ let best=null; COACH_ROLES.forEach(([ra])=>COACH_ROLES.forEach(([rb])=>{ if(ra>=rb) return; const A=coachInit(s[ra]), B=coachInit(s[rb]);
           const gain=A.a[ROLE_MAIN[rb]]+B.a[ROLE_MAIN[ra]]-A.a[ROLE_MAIN[ra]]-B.a[ROLE_MAIN[rb]]; if(gain>1&&(!best||gain>best.gain)) best={ra,rb,gain}; }));
         if(!best) break; const A=s[best.ra], B=s[best.rb]; s[best.rb]=A; s[best.ra]=B; coachSetRole(A,best.rb); coachSetRole(B,best.ra); moves++; }
-      return moves? `코치 ${moves*2}명의 보직을 바꿨습니다. 구단 탭에서 확인하세요.` : '지금 배치가 이미 가장 낫습니다.'; }},
+      return moves? `코치 ${moves*2}명의 보직을 바꿨습니다. 코칭스태프 탭에서 확인하세요.` : '지금 배치가 이미 가장 낫습니다.'; }},
   raise:{safe:1, make(){ const p=allPlayers(USER).filter(p=>!p.f&&(p.yrs||1)>=1).sort(byOvr)[0]; if(!p) return null; const up=eok((p.sal||1)*0.15);
       return {who:`${p.n} 에이전트`,icon:'💰',title:`${p.n}, 연봉 인상 요구`,body:`팀의 간판 ${p.n}(OVR ${K.ovr(p)}, 연봉 ${p.sal}억)이(가) 계약 중인데도 연봉을 올려 달라고 합니다.\n요구: +${up}억 · 예산 여유 ${budgetRoom()}억`,
         opts:[{l:'요구를 들어준다',d:`연봉 +${up}억 · 사기 크게 상승`},{l:'시즌 뒤에 다시 얘기하자고 한다',d:'사기 조금 하락'},{l:'거절한다',d:'사기 크게 하락 · 트레이드를 요구할 수 있음'}],data:{n:p.n,up}}; },

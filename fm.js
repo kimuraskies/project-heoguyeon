@@ -306,7 +306,7 @@ const ACTIONS={
     f.board.conf=clampN(f.board.conf+1,0,100); return '승부욕 강한 선수들은 자극을 받았지만, 일부는 서운해합니다.'; },
   interview(m,a){ return interviewAnswer(a); },
   press(m,a){ return pressApply(m,a); },
-  openClub(){ setTimeout(()=>App.tab('club'),0); return '구단 탭에서 외국인 선수 후보를 확인합니다.'; },
+  openClub(){ setTimeout(()=>App.tab('scout'),0); return '스카우트 탭에서 후보를 확인합니다.'; },
   ok(){ return '확인했습니다.'; }
 };
 function act(id, i){
@@ -450,7 +450,7 @@ function onCareerStart(){
   seedFAs();
   K.TEAM_IDS.forEach(t=>fxQuotaFix(t));   // real records include mid-season replacements: extras start in the 2군
   send('구단 사무국','💾','세이브는 이 브라우저에만 저장됩니다','커리어는 자동으로 저장되지만, 이 기기의 이 브라우저 안에만 있습니다.\n브라우저 데이터를 지우거나 기기를 바꾸면 사라집니다.\n\n설정 → 세이브 관리에서 세이브 파일을 받아 두면 다른 기기에서도 이어서 할 수 있습니다.',[]);
-  send('단장','🔥',`${state.year} 스토브리그가 시작됐습니다`, `개막까지 준비할 시간이 있습니다.\n\n• FA 시장과 외국인 선수 후보는 구단 탭에서\n• 트레이드는 트레이드 탭에서\n• 타순·로테이션은 라인업 탭, 팀 기본 전술은 팀 전술 탭에서\n• 전지훈련 방향을 정하면 스프링캠프 → 시범경기 ${SPRING_GAMES}경기 → 정규시즌 개막 순서로 진행됩니다.`, []);
+  send('단장','🔥',`${state.year} 스토브리그가 시작됐습니다`, `개막까지 준비할 시간이 있습니다.\n\n• FA 시장과 외국인 선수 후보는 구단 → 스카우트 탭에서\n• 트레이드는 트레이드 탭에서\n• 타순·로테이션은 라인업 탭, 팀 기본 전술은 팀 전술 탭에서\n• 전지훈련 방향을 정하면 스프링캠프 → 시범경기 ${SPRING_GAMES}경기 → 정규시즌 개막 순서로 진행됩니다.`, []);
   const bonus=(MGR_BG[state.user.bg]||MGR_BG.coach).mor;
   if(bonus) allPlayers(USER).forEach(p=>{ p.mor=clampN(K.mor(p)+bonus,5,99); });
 }
@@ -1123,8 +1123,8 @@ function checkForeignForm(ug){
   if(!bad) return;
   f.lastFxNote=ug;
   send('스카우트 팀장','🌏',`${bad.p.n} 교체를 검토할 시점입니다`,
-    `${bad.p.n}의 평균 평점이 ${(bad.rt.sum/bad.rt.cnt).toFixed(2)}에 그치고 있습니다. 스카우트 팀이 대체 후보 ${scoutList().length}명을 추렸습니다.\n\n구단 탭의 '외국인 선수 시장'에서 후보를 확인하세요. (교체 가능 ${fxSwapsLeft()}회, 108경기 전까지)`,
-    [{label:'구단 탭에서 후보 보기', fn:'openClub'}, {label:'더 지켜본다', fn:'ok'}]);
+    `${bad.p.n}의 평균 평점이 ${(bad.rt.sum/bad.rt.cnt).toFixed(2)}에 그치고 있습니다. 스카우트 팀이 대체 후보 ${scoutList().length}명을 추렸습니다.\n\n스카우트 탭의 외국인 선수 목록에서 후보를 확인하세요. (교체 가능 ${fxSwapsLeft()}회, 108경기 전까지)`,
+    [{label:'스카우트 탭에서 후보 보기', fn:'openClub'}, {label:'더 지켜본다', fn:'ok'}]);
 }
 
 // ---------- postseason hooks ----------
@@ -1236,7 +1236,7 @@ function faDeclare(cands){ const f=fm(), g=faGradeMap(), filed=[], stayed=[];
       filed.slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).slice(0,8).map(x=>`• ${x.p.n} (${x.t} · ${FA_GR_LABEL[x.grade]} · ${x.p.age}세 · OVR ${K.ovr(x.p)})`).join('\n')});
   const mine=filed.filter(x=>x.t===USER), kept=stayed.filter(x=>x.t===USER);
   if(mine.length||kept.length) send('단장','🆓',`FA 자격 선수 ${mine.length+kept.length}명 — 권리 행사 결과`,
-    (mine.length? `FA를 신청한 선수:\n${mine.map(x=>`• ${x.p.n} (${FA_GR_LABEL[x.grade]}, OVR ${K.ovr(x.p)}, 직전 연봉 ${x.p.sal}억)`).join('\n')}\n\n이 선수들은 다른 구단과도 협상합니다. 잡으려면 구단 탭 FA 시장에서 우리도 제안을 넣어야 합니다. 다른 구단으로 가면 등급에 따라 보상을 받습니다.` : '')+
+    (mine.length? `FA를 신청한 선수:\n${mine.map(x=>`• ${x.p.n} (${FA_GR_LABEL[x.grade]}, OVR ${K.ovr(x.p)}, 직전 연봉 ${x.p.sal}억)`).join('\n')}\n\n이 선수들은 다른 구단과도 협상합니다. 잡으려면 구단 → 스카우트 탭 FA 시장에서 우리도 제안을 넣어야 합니다. 다른 구단으로 가면 등급에 따라 보상을 받습니다.` : '')+
     (kept.length? `${mine.length?'\n\n':''}FA를 신청하지 않고 1년 재계약한 선수: ${kept.map(x=>x.p.n).join(', ')}` : ''),
     mine.length? [{label:'FA 시장 보기', fn:'openClub'}] : []);
   faAiBids();   // the first bids are on the table the day the market opens
@@ -1671,8 +1671,8 @@ function stoveTasks(){
   const renew=f.inbox.filter(m=>!m.done && m.actions.some(a=>a.fn==='renew')).length;
   return [
     {done:!renew, t:'재계약 협상', d: renew? `미결 ${renew}건 (받은편지함)` : '완료', go:"App.tab('inbox')"},
-    {done:false, opt:true, t:'FA 시장', d:`${(f.fa||[]).length}명 시장에 있음`, go:"App.tab('club')"},
-    {done:false, opt:true, t:'외국인 선수', d:`1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 스토브리그엔 교체 횟수 차감 없음`, go:"App.tab('club')"},
+    {done:false, opt:true, t:'FA 시장', d:`${(f.fa||[]).length}명 시장에 있음`, go:"App.tab('scout')"},
+    {done:false, opt:true, t:'외국인 선수', d:`1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 스토브리그엔 교체 횟수 차감 없음`, go:"App.tab('scout')"},
     {done:false, opt:true, t:'트레이드', d:'다른 구단과 협상', go:"App.tab('trade')"},
     {done:!!(f.camp&&f.camp.year===state.year&&f.camp.focus), t:'이번 주 결정', d: offHero().title, go:"FM.offOpen()"},
     {done:!!state.cfgs[USER].tac, opt:true, t:'팀 기본 전술', d: state.cfgs[USER].tac? '설정됨' : '팀 전술 탭', go:"App.tab('tactics')"}
@@ -2036,14 +2036,14 @@ const EV={
       memo('trade',x.give,`트레이드: ${x.want} ↔ ${x.give}`); return `트레이드 성사: ${x.txt}. 라인업을 다시 짰습니다.`; }},
   coach:{safe:2, make(){ const s=staffOf(USER); let worst=null; COACH_ROLES.forEach(([r,l])=>{ const c=coachInit(s[r]), v=c.a[ROLE_MAIN[r]]; if(!worst||v<worst.v) worst={r,l,v,n:c.n}; });
       return {who:'단장',icon:'🧢',title:'코치진 정비',body:`캠프 전에 코치진을 점검할 시간입니다.\n가장 약한 자리: ${worst.l} ${worst.n} (핵심 능력 ${worst.v})`,
-        opts:[{l:'보직을 다시 나눈다',d:'코치들을 가장 잘 맞는 자리로 옮긴다'},{l:`${worst.l} 후보를 면접한다`,d:'결정 뒤 구단 탭에서 영입 · 위약금과 연봉 발생'},{l:'지금 체제를 신임한다',d:'코치 전원 만족도 +4'}],data:{r:worst.r}}; },
+        opts:[{l:'보직을 다시 나눈다',d:'코치들을 가장 잘 맞는 자리로 옮긴다'},{l:`${worst.l} 후보를 면접한다`,d:'결정 뒤 코칭스태프 탭에서 영입 · 위약금과 연봉 발생'},{l:'지금 체제를 신임한다',d:'코치 전원 만족도 +4'}],data:{r:worst.r}}; },
     pick(i,d){ const s=staffOf(USER);
       if(i===2){ COACH_ROLES.forEach(([r])=>{ const c=coachInit(s[r]); c.sat=clampN(c.sat+4,0,100); }); return '코치진이 감독의 신임에 고마워합니다.'; }
-      if(i===1) return `구단 탭의 코칭스태프에서 ${Object.fromEntries(COACH_ROLES)[d.r]} 카드의 교체 버튼을 누르면 후보를 면접할 수 있습니다.`;
+      if(i===1) return `구단 → 코칭스태프 탭에서 ${Object.fromEntries(COACH_ROLES)[d.r]} 카드의 교체 버튼을 누르면 후보를 면접할 수 있습니다.`;
       let moves=0; for(let k=0;k<6;k++){ let best=null; COACH_ROLES.forEach(([ra])=>COACH_ROLES.forEach(([rb])=>{ if(ra>=rb) return; const A=coachInit(s[ra]), B=coachInit(s[rb]);
           const gain=A.a[ROLE_MAIN[rb]]+B.a[ROLE_MAIN[ra]]-A.a[ROLE_MAIN[ra]]-B.a[ROLE_MAIN[rb]]; if(gain>1&&(!best||gain>best.gain)) best={ra,rb,gain}; }));
         if(!best) break; const A=s[best.ra], B=s[best.rb]; s[best.rb]=A; s[best.ra]=B; coachSetRole(A,best.rb); coachSetRole(B,best.ra); moves++; }
-      return moves? `코치 ${moves*2}명의 보직을 바꿨습니다. 구단 탭에서 확인하세요.` : '지금 배치가 이미 가장 낫습니다.'; }},
+      return moves? `코치 ${moves*2}명의 보직을 바꿨습니다. 코칭스태프 탭에서 확인하세요.` : '지금 배치가 이미 가장 낫습니다.'; }},
   raise:{safe:1, make(){ const p=allPlayers(USER).filter(p=>!p.f&&(p.yrs||1)>=1).sort(byOvr)[0]; if(!p) return null; const up=eok((p.sal||1)*0.15);
       return {who:`${p.n} 에이전트`,icon:'💰',title:`${p.n}, 연봉 인상 요구`,body:`팀의 간판 ${p.n}(OVR ${K.ovr(p)}, 연봉 ${p.sal}억)이(가) 계약 중인데도 연봉을 올려 달라고 합니다.\n요구: +${up}억 · 예산 여유 ${budgetRoom()}억`,
         opts:[{l:'요구를 들어준다',d:`연봉 +${up}억 · 사기 크게 상승`},{l:'시즌 뒤에 다시 얘기하자고 한다',d:'사기 조금 하락'},{l:'거절한다',d:'사기 크게 하락 · 트레이드를 요구할 수 있음'}],data:{n:p.n,up}}; },
@@ -3099,7 +3099,7 @@ function onSeasonEnd(){
   toFA.forEach(([t,p])=>{ const r=K.ROSTERS[t]; r.batters=r.batters.filter(x=>x!==p); r.pitchers=r.pitchers.filter(x=>x!==p); r.farm=farmOf(t).filter(x=>x!==p); addFA(p,t); fillMinimum(t); });
   const free=f.fa.filter(x=>x.kind!=='fa');
   if(free.length) send('단장','🌏',`재계약하지 않은 외국인 선수 ${free.length}명`,
-    `각 구단이 보류하지 않은 외국인 선수들이 시장에 나왔습니다.\n\n${free.slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).slice(0,6).map(x=>`• ${x.p.n} (${x.p.pos||x.p.role}, ${x.p.age}세, OVR ${K.ovr(x.p)}) 요구 ${x.yrs}년 ${x.ask}억`).join('\n')}\n\n구단 탭의 FA 시장에서 제안할 수 있습니다.`, []);
+    `각 구단이 보류하지 않은 외국인 선수들이 시장에 나왔습니다.\n\n${free.slice().sort((a,b)=>K.ovr(b.p)-K.ovr(a.p)).slice(0,6).map(x=>`• ${x.p.n} (${x.p.pos||x.p.role}, ${x.p.age}세, OVR ${K.ovr(x.p)}) 요구 ${x.yrs}년 ${x.ask}억`).join('\n')}\n\n구단 → 스카우트 탭의 FA 시장에서 제안할 수 있습니다.`, []);
 }
 function maybeShowFired(){
   const f=fm(); if(!f||!f.fired) return;
@@ -3319,8 +3319,8 @@ function renderInbox(){
 // ---------- first-career guide: the head coach explains five things, once ----------
 const GUIDE=[
   {sel:'#nextStep', t:'취임을 축하드립니다, 감독님. 오른쪽 위 버튼이 언제나 <b>다음 할 일</b>입니다. 모르겠으면 이것만 눌러도 시즌이 굴러갑니다.'},
-  {sel:'#tabs button[onclick*="inbox"]', t:'구단 소식과 결정할 일은 <b>받은편지함</b>에 모입니다. 급하지 않아요. 기한이 지나면 제가 기본값으로 처리합니다.'},
-  {sel:'#tabs button[onclick*="lineup"]', t:'타순과 로테이션은 제가 <b>이미 짜 뒀습니다</b>. 바꾸고 싶을 때만 라인업 탭을 보세요.'},
+  {sel:'#tabs button[onclick*="mail"]', t:'구단 소식과 결정할 일은 <b>받은편지함</b>에 모입니다. 급하지 않아요. 기한이 지나면 제가 기본값으로 처리합니다.'},
+  {sel:'#tabs button[onclick*="players"]', t:'타순과 로테이션은 제가 <b>이미 짜 뒀습니다</b>. 바꾸고 싶을 때만 선수단 → 라인업 탭을 보세요.'},
   {sel:'.hero-more .gold', dash:true, skip:()=>!canQuickStart(), t:'준비 과정이 번거로우면 <b>추천 준비로 개막전까지</b>를 누르세요. 캠프와 시범경기를 제가 맡고 바로 개막전으로 모시겠습니다.'},
   {relay:true, t:'경기가 시작됐습니다. 위쪽 버튼으로 <b>재생·정지·끝까지</b>를, 대타·투수 교체·작전은 그 옆 메뉴에서 지시하세요. 바쁘면 끝까지를 눌러도 됩니다.'}
 ];
@@ -3381,7 +3381,7 @@ function dashTasks(){
   if(tired.length && !f.autoRest) out.push({ic:'lineup', t:`지친 주전 ${tired.length}명`, d:'수석코치 · '+tired.map(p=>p.n).join(', ')+' · 휴식 권장', a:'라인업 확인', go:"App.tab('lineup')"});
   if(state.phase==='stove'){
     if(!c.tac) out.push({ic:'settings', t:'팀 기본 전술 정하기', d:'팀 전술 탭 · 공격·수비·배터리 기본값', a:'전술 설정', go:"App.tab('tactics')"});
-    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 교체 횟수 차감 없음`, a:'구단 화면', go:"App.tab('club')"});
+    out.push({ic:'money', t:'FA·외국인 선수 시장 살펴보기', d:`FA ${(f.fa||[]).length}명 · 1군 외국인 ${fxCount(USER,true).f}/${FX_F} · 아시아쿼터 ${fxCount(USER,true).aq}/${FX_AQ}${fxFarmNote()} · 교체 횟수 차감 없음`, a:'스카우트', go:"App.tab('scout')"});
   }
   if(!out.length && inj.length) out.push({ic:'injury', t:`부상자 ${inj.length}명 회복 중`, d:'의무팀 · '+inj.map(p=>`${p.n} (${p.inj})`).join(', '), a:'선수단 보기', go:"App.tab('squad')"});
   return out;
@@ -3451,18 +3451,12 @@ function renderClub(){
   const f=fm(), b=f.board, s=boardStatus(), pay=payroll(USER);
   const confCol=b.conf>=60?'var(--good)':b.conf>=35?'var(--warn)':'var(--bad)';
   const avgAtt=f.fin.homeGames? Math.round(f.fin.attTotal/f.fin.homeGames) : 0;
-  const rows=allPlayers(USER).slice().sort((a,b)=>b.sal-a.sal).map(p=>`<tr${p.expiring?' style="background:rgba(240,160,32,.1)"':''}>
-    <td class="name">${pname(USER,p.n)}${p.listed?' <span class="pill pos">트레이드 리스트</span>':''}${p.rookie?' <span class="pill pos">신인</span>':''}</td>
-    <td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td><td><span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span></td>
-    <td><b>${p.sal}</b>억</td><td>${p.expiring?'<b style="color:var(--warn)">만료</b>':p.yrs+'년'}</td><td>${marketValue(p)}억</td><td>${moraleFace(K.mor(p))}</td></tr>`).join('');
   return `<div class="grid cols2">
     <div class="card"><h3>🏛 이사회 <span class="tag">${state.year} 시즌</span></h3>
       <div class="kpi">
         <div class="k"><div class="v" style="color:${confCol}">${b.conf}</div><div class="l">이사회 신뢰도 · ${confLabel(b.conf)}</div></div>
         <div class="k"><div class="v">${s.rank}위</div><div class="l">현재 순위 (전력 평가 ${b.strengthRank}위)</div></div>
-        <div class="k"><div class="v">${Math.round(fans())}</div><div class="l">팬 여론 · ${fansLabel(fans())}</div></div></div>
-      ${f.pledge&&f.pledge.year===state.year?`<div class="hint" style="margin-top:8px">🎤 공약: <b>${esc(f.pledge.label)}</b> — 시즌 종료 후 평가</div>`:''}
-      ${f.rival&&f.rival.year===state.year?`<div class="hint">⚔ 라이벌 ${K.ROSTERS[f.rival.t].name}: ${f.rival.w}승 ${f.rival.l}패</div>`:''}
+        </div>
       <div style="margin-top:12px">시즌 목표: <b>${esc(b.expect.label)}</b> ${s.met?'<span class="win">✅ 달성 중</span>':'<span style="color:var(--bad)">⚠️ 미달</span>'}</div>
       <div class="progress"><i style="width:${b.conf}%;background:${confCol}"></i></div>
       <div class="hint" style="margin-top:8px">12경기마다 이사회 평가가 받은편지함으로 옵니다. 시즌 종료 시 신뢰도가 15 미만이면 경질됩니다.</div>
@@ -3476,10 +3470,34 @@ function renderClub(){
       <div class="muted" style="margin-top:8px">이번 시즌 수입 ${f.fin.rev.toFixed(1)}억 · 지출 ${f.fin.exp.toFixed(1)}억</div>
       <div class="hint" style="margin-top:6px">홈 관중 수입은 승률과 선수단 사기에 따라 달라집니다.</div></div>
   </div>
-  ${marketCards()}
-  <div class="card" style="margin-top:14px"><h3>📝 계약 현황 <span class="tag">연봉순 · 만료 선수는 시즌 종료 후 협상</span></h3>
-    <table><thead><tr><th class="name">선수</th><th>POS</th><th>나이</th><th>OVR</th><th>연봉</th><th>잔여</th><th>시장가치</th><th>사기</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  ${fanCard(avgAtt)}`;
 }
+// 이사회실: the fan base, what moves it and what it is waiting for
+function fanCard(avgAtt){
+  const f=fm(), v=fans(), col=v>=62?'var(--good)':v>=40?'var(--warn)':'var(--bad)';
+  const st=standings(), me=st.find(x=>x.t===USER), pct=me&&me.gp? me.pct : null;
+  return `<div class="card" style="margin-top:14px"><h3>📣 팬덤 <span class="tag">${fansLabel(v)}</span></h3>
+    <div class="kpi">
+      <div class="k"><div class="v" style="color:${col}">${Math.round(v)}</div><div class="l">팬 여론 (0~100)</div></div>
+      <div class="k"><div class="v">${avgAtt? avgAtt.toLocaleString():'-'}</div><div class="l">평균 홈 관중</div></div>
+      <div class="k"><div class="v">${pct==null?'-':fmtAvg(pct)}</div><div class="l">승률</div></div></div>
+    <div class="progress" style="margin-top:10px"><i style="width:${v}%;background:${col}"></i></div>
+    ${f.pledge&&f.pledge.year===state.year?`<div style="margin-top:10px">🎤 공약: <b>${esc(f.pledge.label)}</b> <span class="muted">— 시즌 종료 후 평가</span></div>`:''}
+    ${f.rival&&f.rival.year===state.year?`<div style="margin-top:6px">⚔ 라이벌 ${K.ROSTERS[f.rival.t].name}: <b>${f.rival.w}승 ${f.rival.l}패</b></div>`:''}
+    <div class="hint" style="margin-top:8px">팬 여론은 성적, 인터뷰 답변, 라이벌전, 큰 영입과 이적에 따라 움직입니다. 여론이 높을수록 홈 관중과 입장 수입이 늘어납니다.</div></div>`;
+}
+// 단장실: every contract on the club, by salary
+function contractsCard(){
+  const rows=allPlayers(USER).slice().sort((a,b)=>b.sal-a.sal).map(p=>`<tr${p.expiring?' style="background:rgba(240,160,32,.1)"':''}>
+    <td class="name">${pname(USER,p.n)}${p.listed?' <span class="pill pos">트레이드 리스트</span>':''}${p.rookie?' <span class="pill pos">신인</span>':''}</td>
+    <td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td><td><span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span></td>
+    <td><b>${p.sal}</b>억</td><td>${p.expiring?'<b style="color:var(--warn)">만료</b>':p.yrs+'년'}</td><td>${marketValue(p)}억</td><td>${moraleFace(K.mor(p))}</td></tr>`).join('');
+  const pay=payroll(USER), b=fm().fin.budget;
+  return `<div class="card" style="margin-top:14px"><h3>📝 계약 현황 <span class="tag">연봉 총액 ${pay}억 / 예산 ${b}억 · 연봉순 · 만료 선수는 시즌 종료 후 협상</span></h3>
+    <div style="overflow-x:auto"><table><thead><tr><th class="name">선수</th><th>POS</th><th>나이</th><th>OVR</th><th>연봉</th><th>잔여</th><th>시장가치</th><th>사기</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+// 스카우트: the FA market and foreign-player scouting
+function scoutRoom(){ ensure(); return marketCards().replace('<div class="card" style="margin-top:14px">','<div class="card">'); }
 
 function marketCards(){
   const f=fm(), out=[];
@@ -3786,7 +3804,7 @@ function entryProblem(t, outP, inP, who){
 // a new signing joins the 1군 when there is room, otherwise the farm
 // squad tab: the 1군's foreign slots at a glance
 function fxCard(){ const on=allPlayers(USER).filter(p=>p.f), off=farmOf(USER).filter(p=>p.f);
-  const slot=(p,lab)=>p? `<div class="fx-slot"><small>${lab}</small><b><a href="javascript:void(0)" onclick="FM.showProfile('${USER}','${q(p.n)}')">${esc(p.n)}</a></b><span>${posFull(p.pos||p.role)} · OVR ${K.ovr(p)}</span></div>` : `<div class="fx-slot empty"><small>${lab}</small><b>빈 자리</b><span>구단 탭에서 영입</span></div>`;
+  const slot=(p,lab)=>p? `<div class="fx-slot"><small>${lab}</small><b><a href="javascript:void(0)" onclick="FM.showProfile('${USER}','${q(p.n)}')">${esc(p.n)}</a></b><span>${posFull(p.pos||p.role)} · OVR ${K.ovr(p)}</span></div>` : `<div class="fx-slot empty"><small>${lab}</small><b>빈 자리</b><span>스카우트 탭에서 영입</span></div>`;
   const F=on.filter(p=>!p.aq), A=on.filter(p=>p.aq);
   return `<div class="card fx-card"><h3>1군 보유 외국인 선수 <span class="tag"${F.length>FX_F?' style="color:var(--bad)"':''}>외국인 ${F.length}/${FX_F} · 아시아쿼터 ${A.length}/${FX_AQ}</span></h3>
     <div class="fx-slots">${[0,1,2].map(i=>slot(F[i],'외국인 '+(i+1))).join('')}${slot(A[0],'아시아쿼터')}</div>
@@ -4111,7 +4129,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeValue, packageValue, tradeVerdict, tradeLog, teamMode, aiTradeTick, clubTradeBudget, playerValue:p=>playerValue(p), tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   sprayTake, tradeHistoryCard, setTradeHist, tradeReact, tradeGrade, showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,

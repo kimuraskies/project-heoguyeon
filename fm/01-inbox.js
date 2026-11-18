@@ -152,7 +152,7 @@ const ACTIONS={
     f.board.conf=clampN(f.board.conf+1,0,100); return '승부욕 강한 선수들은 자극을 받았지만, 일부는 서운해합니다.'; },
   interview(m,a){ return interviewAnswer(a); },
   press(m,a){ return pressApply(m,a); },
-  openClub(){ setTimeout(()=>App.tab('club'),0); return '구단 탭에서 외국인 선수 후보를 확인합니다.'; },
+  openClub(){ setTimeout(()=>App.tab('scout'),0); return '스카우트 탭에서 후보를 확인합니다.'; },
   ok(){ return '확인했습니다.'; }
 };
 function act(id, i){
