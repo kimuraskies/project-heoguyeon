@@ -110,6 +110,7 @@ function afterGame(res){
     coachReport(ug);
     coachDesk(ug);
     offCallbacks();
+    evtAfterGame(res);
     maybeMedia(ug);
     maybePress(ug);
     checkForeignForm(ug); marketDaily();

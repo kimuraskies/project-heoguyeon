@@ -24,11 +24,8 @@ function campState(){ const f=fm(); if(!f.camp||f.camp.year!==state.year) f.camp
 function makeEvent(id,o){ const e=EV[id]&&EV[id].make(o); if(!e) return null; e.id=id;
   e.title=josa(e.title); e.body=josa(e.body); e.opts.forEach(x=>{ x.l=josa(x.l); x.d=josa(x.d); }); return e; }
 function offFill(o){ o.q=[];
-  if(o.stage==='stove'){ const e=makeEvent(o.weeks[o.week],o); if(e) o.q.push(e);
-    if(o.week>0&&Math.random()<0.55){ const ids=STOVE_RANDOM.filter(id=>o.used.indexOf(id)<0).sort(()=>Math.random()-0.5);
-      for(const id of ids){ const r=makeEvent(id,o); if(r){ o.used.push(id); o.q.push(r); break; } } } }
-  else if(o.stage==='camp'){ const ids=CAMP_EVENTS.filter(id=>o.used.indexOf(id)<0).sort(()=>Math.random()-0.5);
-    for(const id of ids){ const r=makeEvent(id,o); if(r){ o.used.push(id); o.q.push(r); break; } } }
+  if(o.stage==='stove'){ const e=makeEvent(o.weeks[o.week],o); if(e) o.q.push(e); }
+  if(o.stage==='camp'||(o.stage==='stove'&&o.week>0)){ const e=evtOff(o); if(e) o.q.push(e); }
   if(!o.q.length&&(o.stage==='stove'||o.stage==='camp')) offWeekEnd(o); }
 // every stove week the FA market moves: clubs bid, players decide (fm/04b-fa.js); waivers clear
 function offAiWeek(week){ waiverTick(); faWeek(week||0,false); }

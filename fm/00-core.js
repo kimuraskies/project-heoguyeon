@@ -143,6 +143,7 @@ function ensure(){
       lastWarn:-99, lastOffer:-99, lastTalk:{}, rt:{}, board:null, fin:null, fired:false, lastChance:false };
     seasonStart(true);
   }
+  evtState(); // events: initialize old saves without changing FA promises
   if(!Array.isArray(state.fm.tradeLog)) state.fm.tradeLog=[];
   if(state.fm.fans==null) state.fm.fans=50;
   if(!state.fm.farmV){ K.TEAM_IDS.forEach(seedFarm); state.fm.farmV=1; }
