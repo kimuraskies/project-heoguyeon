@@ -172,7 +172,7 @@ function tacticsCard(scope){
 }
 
 // ---------- stove league -> spring camp -> exhibition games ----------
-const SPRING_GAMES=6;
+const SPRING_GAMES=9;
 const CAMP={
   bat:{label:'타격 강화', d:'컨택·파워·선구안', keys:['con','pow','eye'], type:'B'},
   pit:{label:'투수 강화', d:'구위·제구·무브먼트', keys:['stu','ctl','mov'], type:'P'},
@@ -242,7 +242,7 @@ function startSpring(){
   const gc={}; K.TEAM_IDS.forEach(t=>gc[t]=0);
   state.spring={games:games.map(g=>Object.assign(g,{played:false,hr:0,ar:0})), played:0, gc, W:0, L:0, T:0, stats:{bat:{},pit:{}}, camp:campTxt};
   state.phase='spring';
-  offBattles();
+  if(!offState().battles) offBattles();   // normally named at camp week 4 (the press interview)
   closeModal(); render(); saveNow();
 }
 function springNext(){ const sp=state.spring; if(!sp) return null; const i=sp.games.findIndex(g=>!g.played); if(i<0) return null; const g=sp.games[i]; return {home:g.home, away:g.away, label:`시범경기 ${i+1}차전`, i}; }
@@ -279,6 +279,7 @@ function quickStart(){
   const f=fm();
   if(window.Track) Track.action('quick_start');
   if(state.phase==='stove'){
+    leaderAuto();
     if(!(f.camp&&f.camp.year===state.year&&f.camp.focus)) f.camp={year:state.year, focus:'bal'};
     startSpring();
   }

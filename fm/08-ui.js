@@ -77,6 +77,7 @@ const GUIDE=[
   {sel:'#nextStep', t:'취임을 축하드립니다, 감독님. 오른쪽 위 버튼이 언제나 <b>다음 할 일</b>입니다. 모르겠으면 이것만 눌러도 시즌이 굴러갑니다.'},
   {sel:'#tabs button[onclick*="mail"]', t:'구단 소식과 결정할 일은 <b>받은편지함</b>에 모입니다. 급하지 않아요. 기한이 지나면 제가 기본값으로 처리합니다.'},
   {sel:'#tabs button[onclick*="players"]', t:'타순과 로테이션은 제가 <b>이미 짜 뒀습니다</b>. 바꾸고 싶을 때만 선수단 → 라인업 탭을 보세요.'},
+  {shots:true, t:'경기가 시작되면 <b>중계 화면 아래 버튼</b>으로 직접 지시합니다. 실제 화면을 미리 보여 드릴게요.'},
   {sel:'.hero-more .gold', dash:true, skip:()=>!canQuickStart(), t:'준비 과정이 번거로우면 <b>추천 준비로 개막전까지</b>를 누르세요. 캠프와 시범경기를 제가 맡고 바로 개막전으로 모시겠습니다.'},
   {relay:true, t:'경기가 시작됐습니다. 위쪽 버튼으로 <b>재생·정지·끝까지</b>를, 대타·투수 교체·작전은 그 옆 메뉴에서 지시하세요. 바쁘면 끝까지를 눌러도 됩니다.'}
 ];
@@ -91,13 +92,23 @@ function guideRender(){
   const relay=document.getElementById('relay'), cover=document.getElementById('prematch')||document.getElementById('result');
   if(s.relay? !relay||cover : relay||cover) return;
   if(s.dash&&currentTab!=='dash') return;
-  if(!s.relay){ const t=document.querySelector(s.sel); if(t) t.classList.add('guide-hl'); } else document.body.classList.add('guide-relay');
+  if(!s.relay){ const t=s.sel&&document.querySelector(s.sel); if(t) t.classList.add('guide-hl'); } else document.body.classList.add('guide-relay');
   const name=(staffOf(USER).head||{}).n||'수석코치', last=g.step>=GUIDE.length-1;
-  const tip=document.createElement('aside'); tip.id='coachTip'; tip.className='coach-tip'+(s.relay?' on-relay':''); tip.setAttribute('role','status');
-  tip.innerHTML=`<small>${esc(name)} 수석코치 · ${g.step+1}/${GUIDE.length}</small><p>${s.t}</p>
+  const tip=document.createElement('aside'); tip.id='coachTip'; tip.className='coach-tip'+(s.relay?' on-relay':'')+(s.shots?' with-shots':''); tip.setAttribute('role','status');
+  tip.innerHTML=`<small>${esc(name)} 수석코치 · ${g.step+1}/${GUIDE.length}</small><p>${s.t}</p>${s.shots?guideShots():''}
     <div><button type="button" class="btn btn-quiet btn-sm" onclick="FM.guideSkip()">건너뛰기</button><button type="button" class="btn primary btn-sm" onclick="FM.guideNext()">${last?'알겠어요':'다음'}</button></div>`;
   document.body.appendChild(tip);
 }
+// captured broadcast screens (design/guide/*.webp): the real controls, shown before the first game is reached
+const GUIDE_SHOTS=[
+  {l:'작전', f:'relay-tac.webp', c:'공격 때는 번트·도루·히트앤런, 수비 때는 고의4구·견제·시프트를 코치에게 지시해요.'},
+  {l:'투수 교체', f:'relay-sub.webp', c:'수비 중에 불펜 투수를 골라 바로 바꿔요. 투구 수가 쌓이면 투수코치가 먼저 알려 줘요.'},
+  {l:'야수 교체', f:'relay-pinch.webp', c:'공격 때는 대타와 대주자, 수비 때는 수비 강화 교체를 지시해요.'}];
+let guideShotI=0;
+function guideShots(){ const x=GUIDE_SHOTS[guideShotI]||GUIDE_SHOTS[0];
+  return `<div class="guide-shots"><div class="gs-tabs" role="tablist">${GUIDE_SHOTS.map((s,i)=>`<button type="button" role="tab" aria-selected="${i===guideShotI}" class="${i===guideShotI?'on':''}" onclick="FM.guideShot(${i})">${s.l}</button>`).join('')}</div>
+    <img src="design/guide/${x.f}" alt="중계 화면의 ${x.l} 메뉴" width="390" decoding="async"><p class="gs-cap">${x.c}</p></div>`; }
+function guideShot(i){ guideShotI=i; guideRender(); }
 function guideNext(){ const g=fm().guide; if(!g) return; g.step++; if(g.step>=GUIDE.length) g.done=true; if(window.Track) Track.action('guide_'+g.step); guideRender(); }
 function guideSkip(){ const g=fm().guide; if(!g) return; g.done=true; if(window.Track) Track.action('guide_skip'); guideRender(); }
 

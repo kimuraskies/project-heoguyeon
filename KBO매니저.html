@@ -336,7 +336,7 @@ function ovrClass(v){ return v>=90?'s90':v>=80?'s80':v>=70?'s70':v>=60?'s60':'s0
 function ratColor(v){ return v>=85?'#ffd200':v>=75?'#36c275':v>=65?'#7fd0ff':v>=55?'#9aa7b6':'#6b7785'; }
 function bar(v){ return `<span class="bar"><i style="width:${Math.max(4,(v-30)/0.7)}%;background:${ratColor(v)}"></i></span>`; }
 function ratNum(v){ return FM.attrNum(v); } // FM 1..20 scale
-function pname(team,n){ return `<a href="javascript:void(0)" onclick="App.player('${team}','${n.replace(/'/g,"\\'")}')" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--dim)">${n}</a>`; }
+function pname(team,n){ return `<a href="javascript:void(0)" onclick="App.player('${team}','${n.replace(/'/g,"\\'")}')" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--dim)">${n}</a>${team===USER&&FM.leaderTag?FM.leaderTag(n):""}`; }
 function teamDot(t){ return `<span class="teamdot" style="background:${K.ROSTERS[t].color}"></span>`; }
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 

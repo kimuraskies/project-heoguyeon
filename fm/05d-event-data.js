@@ -7,6 +7,7 @@ const EV_B=p=>p&&p.type==='B', EV_P=p=>p&&p.type!=='B';
 const EV_POS=p=>posFull(p.pos||p.role);
 const EV_OPS=x=>x&&x.PA? x.OPS : null;
 const EV_L=(c,p)=>c.seasonLine(p)||{PA:0,OPS:0,HR:0,IP:0,ERA:0,G:0};
+
 const EVT_DATA=[
 
 // =============================== 스토브리그 ===============================
@@ -147,13 +148,6 @@ const EVT_DATA=[
    body:`한 구단이 우리 투수코치에게 수석코치 자리를 제안했어요. 에이스 ${c.ace.n}이(가) 가장 믿고 따르는 코치예요.`,
    opts:[{l:'연봉을 올려 붙잡는다', d:'돈 -2억 · 에이스 사기 +4', fx:[['money',-2],['mor',c.ace,4]], res:'코치가 남기로 했어요.'},
          {l:'좋은 기회라며 보내 준다', d:'에이스 사기 -6 · 이사회 신뢰 +1', fx:[['mor',c.ace,-6],['conf',1]], res:'코치가 고마워하며 떠났어요. 투수조가 아쉬워해요.'}]})},
-{id:'captain-vote', stage:'stove', rarity:'common', cool:2,
- pick:c=>({vet:c.find(p=>!p.f&&c.age(p)>=31&&c.ovr(p)>=68), young:c.find(p=>!p.f&&c.age(p)<=27&&c.ovr(p)>=70)}),
- when:c=>c.vet.n!==c.young.n,
- make:c=>({who:'선수단', icon:'🎖', title:'새 주장 선임',
-   body:`선수단 투표에서 베테랑 ${c.vet.n}과(와) 젊은 간판 ${c.young.n}이(가) 동점이에요. 감독이 정해야 해요.`,
-   opts:[{l:`${c.vet.n}에게 맡긴다`, d:`${c.vet.n} 사기 +8 · ${c.young.n} 사기 -2`, fx:[['mor',c.vet,8],['mor',c.young,-2]], res:'안정을 택했어요.'},
-         {l:`${c.young.n}에게 맡긴다`, d:`${c.young.n} 사기 +8 · ${c.vet.n} 사기 -3 · 팬 여론 +1`, fx:[['mor',c.young,8],['mor',c.vet,-3],['fans',1]], res:'새 시대를 알렸어요.'}]})},
 {id:'charity-event', stage:'stove', rarity:'common', cool:2,
  pick:c=>({star:c.find(p=>!p.f)}), when:c=>true,
  make:c=>({who:'홍보팀', icon:'🎁', title:'연말 자선 행사',
@@ -194,6 +188,18 @@ const EVT_DATA=[
          {l:'구단 시설에서 훈련하게 한다', d:'사기 -2 · 컨디션 +5', fx:[['mor',c.p,-2],['cond',c.p,5]], res:'국내에서 몸을 만들기로 했어요.'}]})},
 
 // =============================== 스프링캠프 ===============================
+// --- 주장의 건의: camp week 2, fixed (fm/05b-preseason2.js offFill). Needs a captain named in the stove league.
+{id:'camp-captain-voice', stage:'camp', rarity:'common', cool:0, chain:true,
+ pick:c=>{ const p=c.find(p=>p.n===c.flag('captain')); if(!p) return {p:null};
+   return {p, v:c.find(x=>x!==p&&c.age(x)>=31&&!c.isFarm(x)), y:c.find(x=>x!==p&&c.age(x)<=24&&!c.isFarm(x)&&c.pot(x)>c.ovr(x))}; },
+ when:c=>!!(c.v&&c.y),
+ make:c=>({who:'수석코치', icon:'🎖', title:`주장 ${c.p.n}의 건의`,
+   body:`주장 ${c.p.n}이(가) 캠프 2주차에 선수단 의견을 모아 왔어요.
+베테랑들은 훈련량이 많다고 하고(${c.v.n} ${c.age(c.v)}세), 젊은 선수들은 실전 연습을 더 원해요(${c.y.n} ${c.age(c.y)}세).
+주장은 감독의 답을 선수단에 그대로 전하겠다고 해요.`,
+   opts:[{l:'베테랑 훈련량을 줄인다', d:`주장 사기 +5 · ${c.v.n} 컨디션 +10 · ${c.y.n} 사기 -2`, fx:[['mor',c.p,5],['cond',c.v,10],['mor',c.y,-2]], res:`${c.p.n}: "베테랑들이 고마워합니다. 시즌 길게 보겠습니다."`},
+         {l:'젊은 선수 실전 연습을 늘린다', d:`주장 사기 +4 · ${c.y.n} 50%: 핵심 능력 +1 · ${c.v.n} 사기 -3`, fx:[['mor',c.p,4],['mor',c.v,-3],['chance',0.5,[['stat',c.y,EV_B(c.y)?'con':'ctl',1]],[]]], res:`${c.p.n}: "어린 선수들 눈빛이 달라졌어요."`},
+         {l:'지금 계획대로 간다', d:'주장 사기 -1', fx:[['mor',c.p,-1]], res:`${c.p.n}: "알겠습니다. 그대로 전하겠습니다."`}]})},
 // --- chain: 포지션 경쟁 → 시범경기에서 결론 ---
 {id:'camp-position-battle', stage:'camp', rarity:'common', cool:1,
  pick:c=>{ const a=c.find(p=>EV_B(p)&&!c.isFarm(p)&&p.pos!=='DH'&&!c.injured(p)); if(!a) return {a:null};
@@ -219,8 +225,8 @@ const EVT_DATA=[
  pick:c=>({p:c.find(p=>!c.isFarm(p)&&c.ovr(p)>=72&&c.age(p)>=30)}), when:c=>true,
  make:c=>({who:'트레이너', icon:'🩹', title:`${c.p.n}의 몸 상태`,
    body:`${c.p.n}(${c.age(c.p)}세)이(가) 허리에 뻐근함을 느껴요. 트레이너가 훈련량 조절을 권해요.`,
-   opts:[{l:'일주일 쉬게 한다', d:'컨디션 +10 · 개막 준비는 조금 늦어요', fx:[['cond',c.p,10]], res:'천천히 몸을 만들기로 했어요.'},
-         {l:'그대로 진행한다', d:'15%: 부상 7일 · 85%: 문제없음', fx:[['chance',0.15,[['inj',c.p,7]],[]]], res:'훈련을 이어 갔어요.'}]})},
+   opts:[{l:'그대로 진행한다', d:'15%: 부상 7일 · 85%: 문제없음', fx:[['chance',0.15,[['inj',c.p,7]],[]]], res:'훈련을 이어 갔어요.'},
+         {l:'일주일 쉬게 한다', d:'컨디션 +10 · 개막 준비는 조금 늦어요', fx:[['cond',c.p,10]], res:'천천히 몸을 만들기로 했어요.'}]})},
 {id:'camp-mentor', stage:'camp', rarity:'common', cool:2,
  pick:c=>{ const v=c.find(p=>c.age(p)>=32&&c.ovr(p)>=68); if(!v) return {v:null}; return {v, k:c.find(p=>c.age(p)<=23&&p.type===v.type&&c.pot(p)>c.ovr(p))}; },
  when:c=>true,

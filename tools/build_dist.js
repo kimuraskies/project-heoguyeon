@@ -15,6 +15,9 @@ for (const css of refs.filter(r => r.endsWith('.css'))) {
   const dir = path.dirname(css), text = fs.readFileSync(path.join(root, css), 'utf8');
   for (const m of text.matchAll(/url\(['"]?([^)'"]+\.(?:webp|png|jpe?g|svg))['"]?\)/g)) if (!/^(data:|https?:)/.test(m[1])) refs.push(path.posix.join(dir, m[1]));
 }
+// screens the head coach's guide shows (fm/08-ui.js GUIDE_SHOTS): referenced from script, so copied as a folder
+const guideDir = path.join(root, 'design', 'guide');
+if (fs.existsSync(guideDir)) for (const n of fs.readdirSync(guideDir)) if (/\.(webp|png)$/.test(n)) refs.push('design/guide/' + n);
 for (const r of new Set(refs)) {
   fs.mkdirSync(path.dirname(path.join(out, r)), {recursive: true});
   fs.copyFileSync(path.join(root, r), path.join(out, r));

@@ -450,6 +450,9 @@ function onCareerStart(){
   { const f0=fm(); f0.firstYear=state.year; f0.guide={step:0, done:false}; }
   seedFAs();
   K.TEAM_IDS.forEach(t=>fxQuotaFix(t));   // real records include mid-season replacements: extras start in the 2군
+  // every staff and the first stove week exist before the first autosave (render saves before it draws),
+  // so a reload right after the career starts finds the same coaches and the same week-1 cards
+  K.TEAM_IDS.forEach(t=>staffOf(t)); offState();
   send('구단 사무국','💾','세이브는 이 브라우저에만 저장됩니다','커리어는 자동으로 저장되지만, 이 기기의 이 브라우저 안에만 있습니다.\n브라우저 데이터를 지우거나 기기를 바꾸면 사라집니다.\n\n설정 → 세이브 관리에서 세이브 파일을 받아 두면 다른 기기에서도 이어서 할 수 있습니다.',[]);
   send('단장','🔥',`${state.year} 스토브리그가 시작됐습니다`, `개막까지 준비할 시간이 있습니다.\n\n• FA 시장과 외국인 선수 후보는 구단 → 스카우트 탭에서\n• 트레이드는 트레이드 탭에서\n• 타순·로테이션은 라인업 탭, 팀 기본 전술은 팀 전술 탭에서\n• 전지훈련 방향을 정하면 스프링캠프 → 시범경기 ${SPRING_GAMES}경기 → 정규시즌 개막 순서로 진행됩니다.`, []);
   const bonus=(MGR_BG[state.user.bg]||MGR_BG.coach).mor;
@@ -1664,7 +1667,7 @@ function tacticsCard(scope){
 }
 
 // ---------- stove league -> spring camp -> exhibition games ----------
-const SPRING_GAMES=6;
+const SPRING_GAMES=9;
 const CAMP={
   bat:{label:'타격 강화', d:'컨택·파워·선구안', keys:['con','pow','eye'], type:'B'},
   pit:{label:'투수 강화', d:'구위·제구·무브먼트', keys:['stu','ctl','mov'], type:'P'},
@@ -1734,7 +1737,7 @@ function startSpring(){
   const gc={}; K.TEAM_IDS.forEach(t=>gc[t]=0);
   state.spring={games:games.map(g=>Object.assign(g,{played:false,hr:0,ar:0})), played:0, gc, W:0, L:0, T:0, stats:{bat:{},pit:{}}, camp:campTxt};
   state.phase='spring';
-  offBattles();
+  if(!offState().battles) offBattles();   // normally named at camp week 4 (the press interview)
   closeModal(); render(); saveNow();
 }
 function springNext(){ const sp=state.spring; if(!sp) return null; const i=sp.games.findIndex(g=>!g.played); if(i<0) return null; const g=sp.games[i]; return {home:g.home, away:g.away, label:`시범경기 ${i+1}차전`, i}; }
@@ -1771,6 +1774,7 @@ function quickStart(){
   const f=fm();
   if(window.Track) Track.action('quick_start');
   if(state.phase==='stove'){
+    leaderAuto();
     if(!(f.camp&&f.camp.year===state.year&&f.camp.focus)) f.camp={year:state.year, focus:'bal'};
     startSpring();
   }
@@ -1803,12 +1807,14 @@ function seedFAs(){
 }
 
 // ---------- offseason as weekly decisions (docs/offseason-redesign-plan.md) ----------
-// Stove league (6 weeks, 3 in a first season), camp (4 weeks) and the exhibition games each put one
-// decision in front of the manager. Events are plain data in the save: {id, who, icon, title, body,
+// Stove league (3 weeks), camp (4 weeks) and the exhibition games (9) put the
+// manager's decisions in front of him. Events are plain data in the save: {id, who, icon, title, body,
 // opts:[{l,d}], data}. EV[id].pick(i, data) applies a choice and returns the outcome text.
+// Stove weeks: 1 단장 미팅 + 코치진 · 2 리더 선임 · 3 보강 과제 (later seasons add 재계약, 트레이드, FA talks);
+// from week 2 a drawn event joins in. A later season's market still moves six times (two ticks a week).
 const POS_NEXT={SS:'2B','2B':'3B','3B':'1B',LF:'RF',RF:'CF',CF:'LF','1B':'LF',C:'1B'};
 const CAMP_DEF={fit:3,skill:4,tac:2,rest:1};
-const STOVE_FULL=['owner','renew','fa','trade','fa','coach'], STOVE_FIRST=['owner','fa','coach'];
+const STOVE_FULL=[['owner','renew','coach'],['leaders','trade'],['needs','fa']], STOVE_FIRST=[['owner','coach'],['leaders'],['needs']];
 const STOVE_RANDOM=['raise','rival','prospect','mentor','star','foreign'];
 const CAMP_EVENTS=['newpitch','intensity','posswitch','form','feud','surprise','injury'];
 function saveNow(){ try{ if(typeof autosave==='function') autosave(); }catch(e){} }
@@ -1820,17 +1826,45 @@ function budgetRoom(){ const f=fm(); return eok(f.fin.budget*1.1-payroll(USER));
 // ----- state -----
 function offState(){ const f=fm();
   if(!f.off||f.off.year!==state.year){ const first=f.firstYear===state.year;
-    f.off={year:state.year, stage:'stove', week:0, weeks:(first?STOVE_FIRST:STOVE_FULL).slice(), q:[], used:[], talked:[], mode:null, battles:null, mod:null};
+    f.off={year:state.year, stage:'stove', week:0, weeks:(first?STOVE_FIRST:STOVE_FULL).map(w=>w.slice()), ticks:first?1:2, q:[], used:[], talked:[], mode:null, battles:null, mod:null};
     offFill(f.off); }
   return f.off; }
 function campState(){ const f=fm(); if(!f.camp||f.camp.year!==state.year) f.camp={year:state.year,focus:null};
   const c=f.camp; c.week=c.week||0; c.log=c.log||[]; c.gain=c.gain||{}; c.notes=c.notes||[]; return c; }
 function makeEvent(id,o){ const e=EV[id]&&EV[id].make(o); if(!e) return null; e.id=id;
   e.title=josa(e.title); e.body=josa(e.body); e.opts.forEach(x=>{ x.l=josa(x.l); x.d=josa(x.d); }); return e; }
-function offFill(o){ o.q=[];
-  if(o.stage==='stove'){ const e=makeEvent(o.weeks[o.week],o); if(e) o.q.push(e); }
-  if(o.stage==='camp'||(o.stage==='stove'&&o.week>0)){ const e=evtOff(o); if(e) o.q.push(e); }
+// camp: week 1 is the training direction itself, week 2 the captain's word, week 3 a drawn event,
+// week 4 the press asks which jobs the exhibition games will settle (plus one more event). Stories due in camp still arrive.
+// Stove: a drawn event joins every week but a first season's week 1, which stays light.
+function offFill(o){ o.q=[]; const add=e=>{ if(e) o.q.push(e); };
+  if(o.stage==='stove'){ [].concat(o.weeks[o.week]||[]).forEach(id=>add(makeEvent(id,o))); if(o.week>0||(o.ticks||1)>1) add(evtOff(o)); }
+  if(o.stage==='camp'){ const w=campState().week;
+    if(w===1){ add(fixedEvt('camp-captain-voice','camp')||evtDraw('camp')); add(evtPending('camp')); }
+    else if(w===2) add(evtOff(o));
+    else if(w===3){ add(makeEvent('interview',o)); add(evtOff(o)); } }
   if(!o.q.length&&(o.stage==='stove'||o.stage==='camp')) offWeekEnd(o); }
+// one engine event by id, outside the random draw (chain:true templates the season calls for itself)
+function fixedEvt(id,stage){ if(typeof evtTemplates!=='function') return null; const t=evtTemplates().find(x=>x.id===id), card=t&&evtBuild(t,stage,null); return card? evtMark(card) : null; }
+// ----- 리더 선임: 주장·투수조장·야수조장, one card in stove week 2, every season -----
+// The head coach's slate comes first (age and ability); the manager approves it or taps another name.
+const LEAD_ROLES=[{key:'captain',role:'주장',ok:p=>p.age>=28,say:'팀이 한 방향으로 가게 하겠습니다.'},
+  {key:'pitchCap',role:'투수조장',ok:p=>p.type!=='B'&&p.age>=26,say:'투수들 컨디션은 제가 챙기겠습니다.'},
+  {key:'fieldCap',role:'야수조장',ok:p=>p.type==='B'&&p.age>=26,say:'야수들 훈련은 제가 앞장서겠습니다.'}];
+function leadCands(ok,skip){ return allPlayers(USER).filter(p=>!p.f&&!isFarm(USER,p)&&ok(p)&&skip.indexOf(p.n)<0)
+  .sort((a,b)=>(K.ovr(b)+b.age*0.6)-(K.ovr(a)+a.age*0.6)).slice(0,3).map(p=>p.n); }
+function leadPick(ri,k){ const e=offState().q[0]; if(!e||e.id!=='leaders'||!e.data.roles[ri]) return; e.data.roles[ri].pick=k; offOpen(); }
+function leadersBody(e){ return e.data.roles.map((r,ri)=>`<h4 class="st-group">${r.role}${r.was?` <span class="muted" style="font-weight:400">· 지난 시즌 ${esc(r.was)}</span>`:''}</h4>
+    <div class="ev-opts lead-opts">${r.c.map((n,k)=>{ const p=findPlayer(USER,n); if(!p) return '';
+      return `<button type="button" class="ev-opt${r.pick===k?' sel':''}" aria-pressed="${r.pick===k}" onclick="FM.leadPick(${ri},${k})"><b>${esc(n)}${k===0?' <span class="lead-rec">추천</span>':''}</b><small>${p.age}세 · ${posFull(p.pos||p.role)}<br>OVR ${K.ovr(p)}</small></button>`; }).join('')}</div>`).join('')
+    +`<div class="row" style="margin-top:12px"><button class="btn primary" onclick="FM.offChoose(0)">${e.data.roles.some(r=>r.pick)?'이대로 맡긴다':'추천안 승인'}</button></div>`; }
+// 빠른 시작 skips the stove league: the head coach's slate stands
+function leaderAuto(){ const o=fm().off&&fm().off.year===state.year? fm().off : null;
+  if(o) o.q=o.q.filter(e=>e.id!=='leaders');
+  if(o&&o.leadY===state.year) return; const e=makeEvent('leaders',o); if(e) EV.leaders.pick(0,e.data,o); }
+// who leads the club this season: {captain, pitchCap, fieldCap} names
+function leaders(){ const f=evtState().flags; return {captain:f.captain||null, pitchCap:f.pitchCap||null, fieldCap:f.fieldCap||null}; }
+function leaderTag(n){ if(!state||!state.fm) return ''; const L=leaders(), t=n===L.captain?['C','주장']:n===L.pitchCap?['투','투수조장']:n===L.fieldCap?['야','야수조장']:null;
+  return t? ` <span class="lead-tag" title="${t[1]}" aria-label="${t[1]}">${t[0]}</span>` : ''; }
 // every stove week the FA market moves: clubs bid, players decide (fm/04b-fa.js); waivers clear
 function offAiWeek(week){ waiverTick(); faWeek(week||0,false); }
 // another club takes the player: the best bid on the table, else the weakest club that has room
@@ -1841,7 +1875,7 @@ function offAiSign(x){ const f=fm(); if(f.fa.indexOf(x)<0) return null;
 // signs with us at once (stove events that close a deal on the spot)
 function faSign(x,b){ faSignWith(x,USER,{aav:b.sal,yrs:b.yrs,promise:b.promise}); return `${x.p.n}와(과) ${b.yrs}년 총액 ${eok(b.sal*b.yrs)}억에 계약했습니다.`; }
 function offWeekEnd(o){
-  if(o.stage==='stove'){ offAiWeek(o.week); aiTradeTick(); o.week++; if(o.week>=o.weeks.length){ o.stage='dir'; o.q=[]; o.used=[]; return; } offFill(o); return; }
+  if(o.stage==='stove'){ const n=o.ticks||1; for(let k=0;k<n;k++){ offAiWeek(o.week*n+k); aiTradeTick(); } o.week++; if(o.week>=o.weeks.length){ o.stage='dir'; o.q=[]; o.used=[]; return; } offFill(o); return; }
   if(o.stage==='camp'){ const c=campState(); campRunWeek(); if(c.week>=4){ o.stage='done'; o.q=[]; return; } offFill(o); } }
 // applies a choice. Returns the outcome text.
 function offResolve(i){ const o=offState(), e=o.q[0]; if(!e) return '';
@@ -1867,8 +1901,8 @@ function offOpen(){ const o=offState();
   closeModal();
   modal(`${X_BTN}<p class="eyebrow">${where}${o.q.length>1?` · 결정 ${o.q.length}건`:''}</p><h2>${esc(e.title)}</h2>
     <p class="ev-who">${e.icon} ${esc(e.who)}</p>${e.prev?`<div class="ev-prev"><small>지난 선택 · ${esc(e.prev.title||'')}</small><b>▶ ${esc(e.prev.choice||'')}</b></div>`:''}<p class="ev-body">${esc(e.body).replace(/\n/g,'<br>')}</p>
-    <div class="ev-opts">${e.opts.map((x,i)=>`<button type="button" class="ev-opt" onclick="FM.offChoose(${i})"><b>${esc(x.l)}</b><small>${esc(x.d)}</small></button>`).join('')}</div>
-    <div class="row" style="margin-top:10px"><button class="btn btn-quiet" onclick="FM.offAuto()">단장에게 맡기기</button></div>`); }
+    ${e.id==='leaders'? leadersBody(e) : `<div class="ev-opts">${e.opts.map((x,i)=>`<button type="button" class="ev-opt" onclick="FM.offChoose(${i})"><b>${esc(x.l)}</b><small>${esc(x.d)}</small></button>`).join('')}</div>
+    <div class="row" style="margin-top:10px"><button class="btn btn-quiet" onclick="FM.offAuto()">${o.stage==='camp'?'수석코치에게':'단장에게'} 맡기기</button></div>`}`); }
 function offShowResult(title,label,res){ const o=offState(); closeModal();
   const next=o.stage==='dir'?'캠프 방향 정하기':o.stage==='done'?'캠프 결산 보기':'다음 결정';
   modal(`${X_BTN}<h2>${esc(title)}</h2><p class="ev-who">▶ ${esc(label)}</p><p class="ev-body">${esc(res).replace(/\n/g,'<br>')}</p>
@@ -1943,13 +1977,15 @@ function offBattles(){ const o=offState(), c=state.cfgs[USER], r=K.ROSTERS[USER]
     const b=r.batters.filter(p=>fit(p)&&c.lineup.indexOf(p.n)<0&&(p.pos===pos[i]||p.alt===pos[i])&&K.ovr(p)>=K.ovr(s)-3).sort((x,y)=>K.ovr(y)-K.ovr(x))[0];
     if(b) cand.push({k:'POS',slot:i,label:`주전 ${pos[i]}`,a:n,b:b.n,gap:K.ovr(s)-K.ovr(b)}); });
   const seen={}; cand.sort((x,y)=>x.gap-y.gap).forEach(x=>{ if(out.length<3&&!seen[x.b]){ seen[x.b]=1; delete x.gap; out.push(x); } });
-  o.battles=out.map(x=>Object.assign(x,{pick:null})); }
-// who plays today: the two candidates take turns
-function springBattleCfg(cfg){ const o=fm().off, sp=state.spring; if(!o||!o.battles||!sp) return cfg; const i=sp.played, ok=n=>{ const p=findPlayer(USER,n); return p&&!K.isInjured(p); };
+  o.battles=out.map(x=>Object.assign(x,{pick:null,plan:'even'})); }
+// who plays today, by the plan the manager stated at the camp interview: 'b' the challenger plays two games in three
+// (and two of the three 5th-starter turns), 'a' the incumbent does, 'even' they take turns.
+function springBattleCfg(cfg){ const o=fm().off, sp=state.spring; if(!o||!o.battles||!sp) return cfg; const i=sp.played, j=i%3, ok=n=>{ const p=findPlayer(USER,n); return p&&!K.isInjured(p); };
   let out=cfg;
-  o.battles.forEach(b=>{ if(!ok(b.a)||!ok(b.b)) return;
-    if(b.k==='POS'&&i%2===1&&out.lineup[b.slot]===b.a&&out.lineup.indexOf(b.b)<0){ const lu=out.lineup.slice(); lu[b.slot]=b.b; out=Object.assign({},out,{lineup:lu}); }
-    if(b.k==='SP5'&&i%3===1) out=Object.assign({},out,{spName:Math.floor(i/3)%2? b.b : b.a}); });
+  o.battles.forEach(b=>{ if(!ok(b.a)||!ok(b.b)) return; const plan=b.plan||'even';
+    const turn=Math.floor(i/3), useB=b.k==='SP5'? (plan==='b'? turn!==2 : plan==='a'? turn===2 : turn%2===0) : plan==='b'? j!==1 : plan==='a'? j===1 : i%2===1;
+    if(b.k==='POS'&&useB&&out.lineup[b.slot]===b.a&&out.lineup.indexOf(b.b)<0){ const lu=out.lineup.slice(); lu[b.slot]=b.b; out=Object.assign({},out,{lineup:lu}); }
+    if(b.k==='SP5'&&j===1) out=Object.assign({},out,{spName:useB? b.b : b.a}); });
   return out; }
 function springLine(n){ const sp=state.spring, p=findPlayer(USER,n); if(!sp||!p) return {txt:'기록 없음',v:0};
   if(p.type==='B'){ const s=sp.stats.bat[n]; if(!s||!s.AB) return {txt:'기록 없음',v:0}; const ops=(s.H+s.BB)/Math.max(1,s.AB+s.BB)+(s.H+s._2B+2*s._3B+3*s.HR)/s.AB;
@@ -2008,9 +2044,22 @@ function faPick(i,d){ const f=fm(), x=(f.fa||[]).find(x=>x.p.n===d.n); if(!x) re
   const txt=faSign(x,{sal,yrs});
   if(alt&&d.want==='start'){ const ug=userGamesPlayed(); f.promises.push({n:d.n,from:ug,until:ug+40,need:28}); memo('fa',d.n,`FA ${d.n} 영입 (주전 보장 약속)`); return txt+'\n개막 후 40경기 중 28경기 이상 출전을 약속했습니다.'; }
   memo('fa',d.n,`FA ${d.n} 영입 (${yrs}년 ${sal}억)`); return txt; }
+// the club's thin spots, worst first: {label, why, ok(p) for a fix, ovr to beat, mine: who holds it now}
+function teamNeeds(){ const c=state.cfgs[USER], fit=p=>p&&!K.isInjured(p), L=n=>K.handsOf(n).t==='좌', out=[];
+  const pen=(c.bullpen||[]).map(n=>findPlayer(USER,n)).filter(fit), lefty=pen.filter(p=>L(p.n));
+  if(lefty.length<2) out.push({gap:lefty.length?5:9, label:'좌완 불펜', why:`1군 불펜에 왼손 투수가 ${lefty.length}명뿐이에요. 경기 후반 상대 좌타자를 막을 카드가 필요해요.`,
+    ok:p=>p.type!=='B'&&p.role!=='SP'&&L(p.n), ovr:55, mine:lefty.map(p=>p.n)});
+  const sp5=findPlayer(USER,c.rotation[4]), rot=c.rotation.slice(0,4).map(n=>findPlayer(USER,n)).filter(Boolean);
+  if(sp5&&rot.length){ const gap=rot.reduce((a,p)=>a+K.ovr(p),0)/rot.length-K.ovr(sp5);
+    if(gap>=6) out.push({gap, label:'5선발', why:`5선발 ${sp5.n}(OVR ${K.ovr(sp5)})의 능력이 1~4선발 평균보다 ${Math.round(gap)} 낮아요. 로테이션 끝자리가 약해요.`, ok:p=>p.type!=='B'&&p.role==='SP', ovr:K.ovr(sp5), mine:[sp5.n]}); }
+  const pos=c.positions||K.autoPositions(USER,c.lineup), st=c.lineup.map((n,i)=>({p:findPlayer(USER,n),pos:pos[i]})).filter(x=>x.p&&x.pos!=='DH');
+  if(st.length){ const avg=st.reduce((a,x)=>a+K.ovr(x.p),0)/st.length, w=st.slice().sort((a,b)=>K.ovr(a.p)-K.ovr(b.p))[0], gap=avg-K.ovr(w.p);
+    if(gap>=5) out.push({gap, label:`주전 ${posFull(w.pos)}`, why:`주전 ${posFull(w.pos)} ${w.p.n}(OVR ${K.ovr(w.p)})의 능력이 주전 야수 평균보다 ${Math.round(gap)} 낮아요.`,
+      ok:p=>p.type==='B'&&(p.pos===w.pos||p.alt===w.pos), ovr:K.ovr(w.p), mine:[w.p.n]}); }
+  return out.sort((a,b)=>b.gap-a.gap); }
 const tierOf=r=>r<=2?0:r<=4?1:r<=6?2:3, TIER_RANK=[1,3,5,8];
 const EV={
-  owner:{safe:1, make(){ const f=fm(); return {who:'구단주',icon:'🏛',title:`${state.year} 시즌 방향`,body:`구단주가 올 시즌의 방향을 묻습니다.\n현재 이사회 목표: ${f.board.expect.label} · 예산 ${eok(f.fin.budget)}억`,
+  owner:{safe:1, make(){ const f=fm(); return {who:'단장',icon:'🏛',title:`단장 미팅: ${state.year} 시즌 방향`,body:`단장이 구단주의 뜻을 전하며 올 시즌 방향을 함께 정하자고 합니다.\n현재 이사회 목표: ${f.board.expect.label} · 예산 ${eok(f.fin.budget)}억${f.board.strengthRank?` · 전력 평가 ${f.board.strengthRank}위`:''}`,
       opts:[{l:'우승에 도전한다',d:'예산 +15% · 목표 한 단계 상향 · 실패하면 신뢰 크게 하락'},{l:'균형을 유지한다',d:'예산과 목표 그대로'},{l:'리빌딩한다',d:'예산 -10% · 목표 한 단계 하향 · 25세 이하 성장 +5%'}],data:{}}; },
     pick(i,d,o){ const f=fm(), b=f.board, t=tierOf(b.strengthRank||5); o.mode=['win','keep','rebuild'][i];
       if(i===1) return '올해도 지금 기조를 이어 갑니다.';
@@ -2027,6 +2076,57 @@ const EV={
       ms.forEach((m,k)=>{ const a=k<keep? m.actions[0] : m.actions[m.actions.length-1]; const res=ACTIONS[a.fn](m,a.arg||{}); if(String(res).startsWith('❌')&&k<keep){ out.push(`${a.arg.n}: 예산 초과로 실패`); return; } m.done=true; m.read=true; m.result=josa(res); out.push(`${a.arg.n}: ${a.fn==='renew'?'재계약':'결별'}`); });
       return out.join('\n'); }},
   fa:{safe:2, make(o){ return faTalk(o); }, pick(i,d){ return faPick(i,d); }},
+  leaders:{safe:0, make(){ const L=leaders(), roles=[], used=[];
+      LEAD_ROLES.forEach(r=>{ const c=leadCands(r.ok,used); if(!c.length) return; used.push(c[0]); roles.push({key:r.key,role:r.role,c,pick:0,was:L[r.key]||null}); });
+      if(!roles.length) return null;
+      return {who:'수석코치',icon:'🎖',title:`${state.year} 시즌 리더 선임`,body:`${L.captain?'새 시즌을 앞두고 리더를 다시 정해요.':'감독님이 선수단을 이끌 사람을 처음 정하는 자리예요.'} 나이와 실력을 보고 추천안을 짰어요. 이름을 누르면 바꿀 수 있어요.\n주장은 라커룸을, 투수조장과 야수조장은 각 조의 훈련과 컨디션 이야기를 코치진에 전해요.`,
+        opts:[{l:'추천안 승인',d:'리더 사기 +6 · 추천에서 바꾸면 빠진 추천 후보 사기 -2'}],data:{roles}}; },
+    pick(i,d,o){ const f=evtState().flags, out=[];
+      d.roles.forEach(r=>{ const n=r.c[r.pick]||r.c[0], p=findPlayer(USER,n); if(!p) return; f[r.key]=n; addMor(p,6);
+        if(r.pick){ const rec=findPlayer(USER,r.c[0]); if(rec) addMor(rec,-2); }
+        out.push(`${r.role} ${n}: "${(LEAD_ROLES.find(x=>x.key===r.key)||{}).say}"`); });
+      if(o) o.leadY=state.year; memo('leaders',null,'리더 선임: '+d.roles.map(r=>r.role+' '+(r.c[r.pick]||r.c[0])).join(', '));
+      return out.join('\n'); }},
+  // 보강 과제: the club's thinnest spot, and what the GM can do about it this week
+  needs:{safe:9, make(o){ const f=fm(), room=budgetRoom();
+      for(const need of teamNeeds()){
+        const fa=(f.fa||[]).filter(x=>need.ok(x.p)&&o.talked.indexOf(x.p.n)<0&&!(x.p.f&&!fxRoom(USER,x.p))&&(typeof faCanBid!=='function'||faCanBid(USER,x))
+          &&(x.kind!=='fa'||x.from===USER||faOutCount(USER)<FA_OUT_MAX)&&x.ask<=room+2&&K.ovr(x.p)>need.ovr).sort((a,b)=>K.ovr(b.p)-K.ovr(a.p))[0];
+        const farm=farmOf(USER).filter(p=>need.ok(p)&&!K.isInjured(p)&&!promoteBlock(p)).sort((a,b)=>((b.pot||0)+K.ovr(b))-((a.pot||0)+K.ovr(a)))[0];
+        if(!fa&&!farm) continue;
+        const opts=[], data={need:need.label, mine:need.mine, ks:[]};
+        if(fa){ o.talked.push(fa.p.n); Object.assign(data,{fa:fa.p.n,ask:fa.ask,yrs:fa.yrs}); data.ks.push('fa');
+          opts.push({l:`FA ${fa.p.n}을(를) 영입한다 (${fa.yrs}년 연봉 ${fa.ask}억)`, d:`${fa.p.age}세 · OVR ${K.ovr(fa.p)} · 수락 80% · 예산 여유 ${room}억`}); }
+        if(farm){ data.farm=farm.n; data.ks.push('farm'); opts.push({l:`2군 ${farm.n}에게 기회를 준다`, d:`${farm.age}세 · OVR ${K.ovr(farm)}${farm.pot?' · 잠재 '+farm.pot:''} · 1군 등록 · 사기 +8`}); }
+        data.ks.push('keep'); opts.push({l:'지금 선수들을 믿는다', d:need.mine.length? `${need.mine.join(', ')} 사기 +3` : '변화 없음'});
+        return {who:'단장',icon:'🧩',title:`보강 과제: ${need.label}`, body:`${need.why}\n\n지금 이 자리: ${need.mine.length?need.mine.join(', '):'맡길 선수가 없어요'}\n스카우트와 단장실에서 직접 찾아봐도 돼요. 이번 주 안에 방향을 정해 주세요.`, opts, data}; }
+      return null; },
+    pick(i,d){ const k=d.ks[i]||'keep', f=fm();
+      if(k==='fa'){ const x=(f.fa||[]).find(x=>x.p.n===d.fa); if(!x) return `${d.fa}은(는) 이미 다른 구단과 계약했습니다.`;
+        if(payroll(USER)+d.ask>f.fin.budget*1.1) return '연봉 총액 한도를 넘어 제안을 넣지 못했습니다.';
+        if(Math.random()>0.8){ const t=offAiSign(x); return `${d.fa}은(는) 고민 끝에 ${t?K.ROSTERS[t].name:'다른 구단'}을(를) 택했습니다. ${d.need} 고민은 이어집니다.`; }
+        memo('fa',d.fa,`보강 과제(${d.need}): FA ${d.fa} 영입`); return faSign(x,{sal:d.ask,yrs:d.yrs})+`\n${d.need} 자리를 채웠습니다.`; }
+      if(k==='farm'){ const p=farmOf(USER).find(p=>p.n===d.farm); if(!p) return `${d.farm}은(는) 이미 2군에 없습니다.`; const why=promoteBlock(p); if(why) return why;
+        doPromote(USER,p); memo('needs',d.farm,`보강 과제(${d.need}): 2군 ${d.farm} 등록`); return `${d.farm}이(가) 1군에 올라왔습니다. 캠프에서 ${d.need} 자리를 놓고 경쟁합니다.`; }
+      (d.mine||[]).forEach(n=>{ const p=findPlayer(USER,n); if(p) addMor(p,3); });
+      return `${d.need}은(는) 지금 선수들에게 맡깁니다. 코치진이 캠프에서 따로 챙기겠다고 합니다.`; }},
+  // camp week 4: the press asks which jobs the exhibition games will settle; the answer sets the first block's plan
+  interview:{safe:2, make(o){ if(!o.battles) offBattles(); const B=(o.battles||[]).filter(b=>findPlayer(USER,b.a)&&findPlayer(USER,b.b));
+      const plan='감독의 답에 따라 시범경기 9경기의 기용이 달라져요.';
+      if(!B.length) return {who:'기자단',icon:'🎤',title:'캠프 마무리 인터뷰',body:`캠프 마지막 주, 기자들이 시범경기 구상을 물어요.\n코치진은 개막 라인업이 거의 정해졌다고 봐요.\n\n${plan}`,
+        opts:[{l:'"주전들의 실전 감각을 끌어올리겠습니다"',d:'주전 야수 사기 +2'},{l:'"새 얼굴도 눈여겨보겠습니다"',d:'팬 여론 +1 · 벤치 야수 사기 +2'},{l:'말을 아낀다',d:'변화 없음'}],data:{none:true}};
+      return {who:'기자단',icon:'🎤',title:'캠프 마무리 인터뷰: 시범경기에서 확인할 자리',body:`캠프 마지막 주, 기자들이 시범경기 구상을 물어요. 코치진이 꼽은 경쟁 자리는 이래요.\n${B.map(b=>`• ${b.label}: ${b.a} vs ${b.b}`).join('\n')}\n\n${plan}`,
+        opts:[{l:'"똑같이 경쟁시키겠습니다"',d:'후보 모두 사기 +3 · 시범경기에서 도전자에게 더 많은 기회'},{l:'"기존 주전에게 무게를 두겠습니다"',d:'기존 주전 사기 +4 · 도전자 사기 -3 · 시범경기는 기존 주전 위주'},{l:'말을 아낀다',d:'변화 없음 · 번갈아 기용'}],data:{}}; },
+    pick(i,d,o){ const c=state.cfgs[USER];
+      if(d.none){ if(i===0) c.lineup.forEach(n=>{ const p=findPlayer(USER,n); if(p) addMor(p,2); });
+        if(i===1){ addFans(1); K.ROSTERS[USER].batters.filter(p=>c.lineup.indexOf(p.n)<0).forEach(p=>addMor(p,2)); }
+        return ['주전들이 고개를 끄덕입니다.','벤치 선수들의 눈빛이 달라졌습니다.','기자들은 짧은 답만 받아 적었습니다.'][i]||''; }
+      const B=(o&&o.battles)||[], out=[];
+      B.forEach(b=>{ const A=findPlayer(USER,b.a), C=findPlayer(USER,b.b); b.plan=['b','a','even'][i]||'even';
+        if(i===0){ if(A) addMor(A,3); if(C) addMor(C,3); } if(i===1){ if(A) addMor(A,4); if(C) addMor(C,-3); }
+        out.push(`${b.label}: ${i===0?`${b.b}부터 기회`:i===1?`${b.a} 위주`:'번갈아 기용'}`); });
+      if(i<2) feedPush({title:i===0?'감독 "시범경기에서 똑같이 경쟁시키겠다"':'감독 "기존 주전에게 무게를 두겠다"', body:`캠프 마무리 인터뷰에서 시범경기 구상을 밝혔습니다.\n${B.map(b=>`${b.label}: ${b.a} vs ${b.b}`).join('\n')}`, year:state.year, kind:'press', ug:0});
+      return '시범경기 기용 계획\n'+out.join('\n'); }},
   trade:{safe:9, make(){ const offers=[], teams=K.TEAM_IDS.filter(t=>t!==USER).sort(()=>Math.random()-0.5);
       for(const t of teams){ if(offers.length>=2) break; const x=findTradeOffer(t); if(!x||offers.some(o=>o.want===x.want.n)) continue;
         const {want,give}=x;
@@ -2368,6 +2468,7 @@ const EV_B=p=>p&&p.type==='B', EV_P=p=>p&&p.type!=='B';
 const EV_POS=p=>posFull(p.pos||p.role);
 const EV_OPS=x=>x&&x.PA? x.OPS : null;
 const EV_L=(c,p)=>c.seasonLine(p)||{PA:0,OPS:0,HR:0,IP:0,ERA:0,G:0};
+
 const EVT_DATA=[
 
 // =============================== 스토브리그 ===============================
@@ -2508,13 +2609,6 @@ const EVT_DATA=[
    body:`한 구단이 우리 투수코치에게 수석코치 자리를 제안했어요. 에이스 ${c.ace.n}이(가) 가장 믿고 따르는 코치예요.`,
    opts:[{l:'연봉을 올려 붙잡는다', d:'돈 -2억 · 에이스 사기 +4', fx:[['money',-2],['mor',c.ace,4]], res:'코치가 남기로 했어요.'},
          {l:'좋은 기회라며 보내 준다', d:'에이스 사기 -6 · 이사회 신뢰 +1', fx:[['mor',c.ace,-6],['conf',1]], res:'코치가 고마워하며 떠났어요. 투수조가 아쉬워해요.'}]})},
-{id:'captain-vote', stage:'stove', rarity:'common', cool:2,
- pick:c=>({vet:c.find(p=>!p.f&&c.age(p)>=31&&c.ovr(p)>=68), young:c.find(p=>!p.f&&c.age(p)<=27&&c.ovr(p)>=70)}),
- when:c=>c.vet.n!==c.young.n,
- make:c=>({who:'선수단', icon:'🎖', title:'새 주장 선임',
-   body:`선수단 투표에서 베테랑 ${c.vet.n}과(와) 젊은 간판 ${c.young.n}이(가) 동점이에요. 감독이 정해야 해요.`,
-   opts:[{l:`${c.vet.n}에게 맡긴다`, d:`${c.vet.n} 사기 +8 · ${c.young.n} 사기 -2`, fx:[['mor',c.vet,8],['mor',c.young,-2]], res:'안정을 택했어요.'},
-         {l:`${c.young.n}에게 맡긴다`, d:`${c.young.n} 사기 +8 · ${c.vet.n} 사기 -3 · 팬 여론 +1`, fx:[['mor',c.young,8],['mor',c.vet,-3],['fans',1]], res:'새 시대를 알렸어요.'}]})},
 {id:'charity-event', stage:'stove', rarity:'common', cool:2,
  pick:c=>({star:c.find(p=>!p.f)}), when:c=>true,
  make:c=>({who:'홍보팀', icon:'🎁', title:'연말 자선 행사',
@@ -2555,6 +2649,18 @@ const EVT_DATA=[
          {l:'구단 시설에서 훈련하게 한다', d:'사기 -2 · 컨디션 +5', fx:[['mor',c.p,-2],['cond',c.p,5]], res:'국내에서 몸을 만들기로 했어요.'}]})},
 
 // =============================== 스프링캠프 ===============================
+// --- 주장의 건의: camp week 2, fixed (fm/05b-preseason2.js offFill). Needs a captain named in the stove league.
+{id:'camp-captain-voice', stage:'camp', rarity:'common', cool:0, chain:true,
+ pick:c=>{ const p=c.find(p=>p.n===c.flag('captain')); if(!p) return {p:null};
+   return {p, v:c.find(x=>x!==p&&c.age(x)>=31&&!c.isFarm(x)), y:c.find(x=>x!==p&&c.age(x)<=24&&!c.isFarm(x)&&c.pot(x)>c.ovr(x))}; },
+ when:c=>!!(c.v&&c.y),
+ make:c=>({who:'수석코치', icon:'🎖', title:`주장 ${c.p.n}의 건의`,
+   body:`주장 ${c.p.n}이(가) 캠프 2주차에 선수단 의견을 모아 왔어요.
+베테랑들은 훈련량이 많다고 하고(${c.v.n} ${c.age(c.v)}세), 젊은 선수들은 실전 연습을 더 원해요(${c.y.n} ${c.age(c.y)}세).
+주장은 감독의 답을 선수단에 그대로 전하겠다고 해요.`,
+   opts:[{l:'베테랑 훈련량을 줄인다', d:`주장 사기 +5 · ${c.v.n} 컨디션 +10 · ${c.y.n} 사기 -2`, fx:[['mor',c.p,5],['cond',c.v,10],['mor',c.y,-2]], res:`${c.p.n}: "베테랑들이 고마워합니다. 시즌 길게 보겠습니다."`},
+         {l:'젊은 선수 실전 연습을 늘린다', d:`주장 사기 +4 · ${c.y.n} 50%: 핵심 능력 +1 · ${c.v.n} 사기 -3`, fx:[['mor',c.p,4],['mor',c.v,-3],['chance',0.5,[['stat',c.y,EV_B(c.y)?'con':'ctl',1]],[]]], res:`${c.p.n}: "어린 선수들 눈빛이 달라졌어요."`},
+         {l:'지금 계획대로 간다', d:'주장 사기 -1', fx:[['mor',c.p,-1]], res:`${c.p.n}: "알겠습니다. 그대로 전하겠습니다."`}]})},
 // --- chain: 포지션 경쟁 → 시범경기에서 결론 ---
 {id:'camp-position-battle', stage:'camp', rarity:'common', cool:1,
  pick:c=>{ const a=c.find(p=>EV_B(p)&&!c.isFarm(p)&&p.pos!=='DH'&&!c.injured(p)); if(!a) return {a:null};
@@ -2580,8 +2686,8 @@ const EVT_DATA=[
  pick:c=>({p:c.find(p=>!c.isFarm(p)&&c.ovr(p)>=72&&c.age(p)>=30)}), when:c=>true,
  make:c=>({who:'트레이너', icon:'🩹', title:`${c.p.n}의 몸 상태`,
    body:`${c.p.n}(${c.age(c.p)}세)이(가) 허리에 뻐근함을 느껴요. 트레이너가 훈련량 조절을 권해요.`,
-   opts:[{l:'일주일 쉬게 한다', d:'컨디션 +10 · 개막 준비는 조금 늦어요', fx:[['cond',c.p,10]], res:'천천히 몸을 만들기로 했어요.'},
-         {l:'그대로 진행한다', d:'15%: 부상 7일 · 85%: 문제없음', fx:[['chance',0.15,[['inj',c.p,7]],[]]], res:'훈련을 이어 갔어요.'}]})},
+   opts:[{l:'그대로 진행한다', d:'15%: 부상 7일 · 85%: 문제없음', fx:[['chance',0.15,[['inj',c.p,7]],[]]], res:'훈련을 이어 갔어요.'},
+         {l:'일주일 쉬게 한다', d:'컨디션 +10 · 개막 준비는 조금 늦어요', fx:[['cond',c.p,10]], res:'천천히 몸을 만들기로 했어요.'}]})},
 {id:'camp-mentor', stage:'camp', rarity:'common', cool:2,
  pick:c=>{ const v=c.find(p=>c.age(p)>=32&&c.ovr(p)>=68); if(!v) return {v:null}; return {v, k:c.find(p=>c.age(p)<=23&&p.type===v.type&&c.pot(p)>c.ovr(p))}; },
  when:c=>true,
@@ -4012,6 +4118,7 @@ const GUIDE=[
   {sel:'#nextStep', t:'취임을 축하드립니다, 감독님. 오른쪽 위 버튼이 언제나 <b>다음 할 일</b>입니다. 모르겠으면 이것만 눌러도 시즌이 굴러갑니다.'},
   {sel:'#tabs button[onclick*="mail"]', t:'구단 소식과 결정할 일은 <b>받은편지함</b>에 모입니다. 급하지 않아요. 기한이 지나면 제가 기본값으로 처리합니다.'},
   {sel:'#tabs button[onclick*="players"]', t:'타순과 로테이션은 제가 <b>이미 짜 뒀습니다</b>. 바꾸고 싶을 때만 선수단 → 라인업 탭을 보세요.'},
+  {shots:true, t:'경기가 시작되면 <b>중계 화면 아래 버튼</b>으로 직접 지시합니다. 실제 화면을 미리 보여 드릴게요.'},
   {sel:'.hero-more .gold', dash:true, skip:()=>!canQuickStart(), t:'준비 과정이 번거로우면 <b>추천 준비로 개막전까지</b>를 누르세요. 캠프와 시범경기를 제가 맡고 바로 개막전으로 모시겠습니다.'},
   {relay:true, t:'경기가 시작됐습니다. 위쪽 버튼으로 <b>재생·정지·끝까지</b>를, 대타·투수 교체·작전은 그 옆 메뉴에서 지시하세요. 바쁘면 끝까지를 눌러도 됩니다.'}
 ];
@@ -4026,13 +4133,23 @@ function guideRender(){
   const relay=document.getElementById('relay'), cover=document.getElementById('prematch')||document.getElementById('result');
   if(s.relay? !relay||cover : relay||cover) return;
   if(s.dash&&currentTab!=='dash') return;
-  if(!s.relay){ const t=document.querySelector(s.sel); if(t) t.classList.add('guide-hl'); } else document.body.classList.add('guide-relay');
+  if(!s.relay){ const t=s.sel&&document.querySelector(s.sel); if(t) t.classList.add('guide-hl'); } else document.body.classList.add('guide-relay');
   const name=(staffOf(USER).head||{}).n||'수석코치', last=g.step>=GUIDE.length-1;
-  const tip=document.createElement('aside'); tip.id='coachTip'; tip.className='coach-tip'+(s.relay?' on-relay':''); tip.setAttribute('role','status');
-  tip.innerHTML=`<small>${esc(name)} 수석코치 · ${g.step+1}/${GUIDE.length}</small><p>${s.t}</p>
+  const tip=document.createElement('aside'); tip.id='coachTip'; tip.className='coach-tip'+(s.relay?' on-relay':'')+(s.shots?' with-shots':''); tip.setAttribute('role','status');
+  tip.innerHTML=`<small>${esc(name)} 수석코치 · ${g.step+1}/${GUIDE.length}</small><p>${s.t}</p>${s.shots?guideShots():''}
     <div><button type="button" class="btn btn-quiet btn-sm" onclick="FM.guideSkip()">건너뛰기</button><button type="button" class="btn primary btn-sm" onclick="FM.guideNext()">${last?'알겠어요':'다음'}</button></div>`;
   document.body.appendChild(tip);
 }
+// captured broadcast screens (design/guide/*.webp): the real controls, shown before the first game is reached
+const GUIDE_SHOTS=[
+  {l:'작전', f:'relay-tac.webp', c:'공격 때는 번트·도루·히트앤런, 수비 때는 고의4구·견제·시프트를 코치에게 지시해요.'},
+  {l:'투수 교체', f:'relay-sub.webp', c:'수비 중에 불펜 투수를 골라 바로 바꿔요. 투구 수가 쌓이면 투수코치가 먼저 알려 줘요.'},
+  {l:'야수 교체', f:'relay-pinch.webp', c:'공격 때는 대타와 대주자, 수비 때는 수비 강화 교체를 지시해요.'}];
+let guideShotI=0;
+function guideShots(){ const x=GUIDE_SHOTS[guideShotI]||GUIDE_SHOTS[0];
+  return `<div class="guide-shots"><div class="gs-tabs" role="tablist">${GUIDE_SHOTS.map((s,i)=>`<button type="button" role="tab" aria-selected="${i===guideShotI}" class="${i===guideShotI?'on':''}" onclick="FM.guideShot(${i})">${s.l}</button>`).join('')}</div>
+    <img src="design/guide/${x.f}" alt="중계 화면의 ${x.l} 메뉴" width="390" decoding="async"><p class="gs-cap">${x.c}</p></div>`; }
+function guideShot(i){ guideShotI=i; guideRender(); }
 function guideNext(){ const g=fm().guide; if(!g) return; g.step++; if(g.step>=GUIDE.length) g.done=true; if(window.Track) Track.action('guide_'+g.step); guideRender(); }
 function guideSkip(){ const g=fm().guide; if(!g) return; g.done=true; if(window.Track) Track.action('guide_skip'); guideRender(); }
 
@@ -4835,7 +4952,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ evtPromises, promiseCard, fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ leaderTag, leaders, leadPick, guideShot, evtPromises, promiseCard, fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeValue, packageValue, tradeVerdict, tradeLog, teamMode, aiTradeTick, clubTradeBudget, playerValue:p=>playerValue(p), tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   sprayTake, tradeHistoryCard, setTradeHist, tradeReact, tradeGrade, showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,

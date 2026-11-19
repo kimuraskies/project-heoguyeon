@@ -303,3 +303,22 @@ nav.tabs .tab-ph,nav.tabs .tab-more{display:none!important}
 .pr-bar i{display:block;height:100%;background:var(--good)}
 .pr-bar.late i{background:var(--warn)}
 .promise-list small{color:var(--ss-ink3);font-size:12px}
+
+/* 주장 · 투수조장 · 야수조장 */
+.lead-tag{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;margin-left:2px;border-radius:5px;background:var(--team);color:var(--on-team);font-size:11px;font-weight:800;vertical-align:1px}
+
+/* 리더 선임 카드 · 추천 표시 */
+.ev-opts.lead-opts{grid-template-columns:repeat(3,minmax(0,1fr))}
+.lead-opts .ev-opt{padding:10px}
+.lead-opts .ev-opt b{font-size:14px}
+.lead-rec{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:999px;background:var(--team);color:var(--on-team);font-size:11px;font-weight:800;vertical-align:1px}
+@media(max-width:600px){.lead-opts .ev-opt{padding:9px 8px}.lead-opts .ev-opt small{font-size:11.5px}}
+
+/* 수석코치 안내: 캡처한 중계 화면 */
+.coach-tip.with-shots{width:min(380px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto}
+.coach-tip .guide-shots{display:block;margin:0 0 10px}
+.coach-tip .gs-tabs{display:flex;justify-content:flex-start;gap:6px;margin-bottom:8px}
+.gs-tabs button{flex:1;min-height:36px;border-radius:999px;border:1px solid var(--md-outline-variant);background:transparent;color:var(--txt);font:inherit;font-size:13px;cursor:pointer}
+.gs-tabs button.on{background:var(--team);border-color:var(--team);color:var(--on-team);font-weight:700}
+.guide-shots img{display:block;width:100%;height:auto;max-height:42dvh;object-fit:contain;object-position:top;border-radius:10px;border:1px solid var(--md-outline-variant);background:#0b0f14}
+.coach-tip .gs-cap{margin:8px 0 0;font-size:13px;color:var(--dim)}
