@@ -258,7 +258,9 @@ function renderClub(){
 function fanCard(avgAtt){
   const f=fm(), v=fans(), col=v>=62?'var(--good)':v>=40?'var(--warn)':'var(--bad)';
   const st=standings(), me=st.find(x=>x.t===USER), pct=me&&me.gp? me.pct : null;
+  const park=parkOf(USER), sell=f.fin&&f.fin.homeGames? Math.round(f.fin.attTotal/f.fin.homeGames/park.cap*100) : null;
   return `<div class="card" style="margin-top:14px"><h3>📣 팬덤 <span class="tag">${fansLabel(v)}</span></h3>
+    <p class="muted" style="margin:0 0 8px">홈구장 ${esc(park.n)} · ${park.cap.toLocaleString()}석${sell!=null?` · 평균 좌석 점유율 ${sell}%`:''}</p>
     <div class="kpi">
       <div class="k"><div class="v" style="color:${col}">${Math.round(v)}</div><div class="l">팬 여론 (0~100)</div></div>
       <div class="k"><div class="v">${avgAtt? avgAtt.toLocaleString():'-'}</div><div class="l">평균 홈 관중</div></div>

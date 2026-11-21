@@ -191,12 +191,18 @@ function boardReview(){
     (s.met? '이사회는 현재 성적에 만족하고 있습니다.' : '이사회는 목표에 미치지 못하는 성적을 우려하고 있습니다.') +
     `\n\n이사회 신뢰도: ${b.conf} (${d>=0?'+':''}${d})`, []);
 }
+// home parks (2026): name and seats. Attendance and gate money scale with the park; 잠실 is shared by LG and 두산.
+const STADIUMS={KIA:{n:'광주-기아 챔피언스 필드',cap:20500},삼성:{n:'대구삼성라이온즈파크',cap:24000},LG:{n:'잠실야구장',cap:23750},두산:{n:'잠실야구장',cap:23750},
+  SSG:{n:'인천SSG랜더스필드',cap:23000},KT:{n:'수원KT위즈파크',cap:18700},롯데:{n:'사직야구장',cap:22669},NC:{n:'창원NC파크',cap:17891},
+  한화:{n:'대전한화생명볼파크',cap:17000},키움:{n:'고척스카이돔',cap:16000}};
+function parkOf(t){ return STADIUMS[t]||{n:'홈구장',cap:20500}; }
 function financeGame(home){
   const f=fm().fin, me=standings().find(x=>x.t===USER);
   const teamMor=avgMorale(USER);
   let rev=0.25; // media/sponsorship per game
   if(home){
-    const att=clampN(Math.round(10500 + me.pct*14000 + (teamMor-60)*90 + (fans()-50)*55 + Math.random()*1500),6000,20500);
+    const cap=parkOf(USER).cap, k=cap/20500;   // demand scales with the park; a full house is its seat count
+    const att=clampN(Math.round((10500 + me.pct*14000 + (teamMor-60)*90 + (fans()-50)*55 + Math.random()*1500)*k),Math.round(6000*k),cap);
     f.attTotal+=att; f.homeGames++; rev+=att*1.6/10000; // avg ticket 1.6만 원
   }
   const exp = payroll(USER)/144 + 1.0; // salaries + operations

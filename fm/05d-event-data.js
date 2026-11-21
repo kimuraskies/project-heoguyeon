@@ -141,7 +141,7 @@ const EVT_DATA=[
  make:c=>({who:c.p.n, icon:'🪖', title:`${c.p.n}의 군 복무 고민`,
    body:`${c.p.n}(${c.age(c.p)}세)이(가) 상무 지원 시기를 상의하러 왔어요. 올해 1군에서 자리를 잡고 싶어 해요.`,
    opts:[{l:'올해는 함께 뛰자고 한다', d:'사기 +6 · 60경기 동안 1군 유지 약속', fx:[['mor',c.p,6]], promise:{kind:'active', label:'1군 유지 약속', who:c.p, within:60}, res:`${c.p.n}이(가) 입대 준비 대신 시즌 준비에 집중하기로 했어요.`},
-         {l:'내년 상무 지원을 권한다', d:'사기 -2 · 이름표: 상무 예정', fx:[['mor',c.p,-2],['flag','military',c.p.n]], res:'본인도 계획을 세우기로 했어요.'}]})},
+         {l:'내년 상무 지원을 권한다', d:'사기 -2 · 다음 스토브리그에 합격 발표(70%) · 합격하면 두 시즌 이탈', fx:[['mor',c.p,-2],['flag','military',c.p.n]], res:'지원서를 내기로 했어요. 결과는 다음 스토브리그에 나와요.'}]})},
 {id:'coach-poach', stage:'stove', rarity:'uncommon', cool:3,
  pick:c=>({ace:c.find(p=>EV_P(p)&&c.inLineup(p))}), when:c=>true,
  make:c=>({who:'단장', icon:'🧢', title:'다른 구단이 우리 투수코치를 원해요',

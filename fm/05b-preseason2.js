@@ -19,6 +19,7 @@ function budgetRoom(){ const f=fm(); return eok(f.fin.budget*1.1-payroll(USER));
 function offState(){ const f=fm();
   if(!f.off||f.off.year!==state.year){ const first=f.firstYear===state.year;
     f.off={year:state.year, stage:'stove', week:0, weeks:(first?STOVE_FIRST:STOVE_FULL).map(w=>w.slice()), ticks:first?1:2, q:[], used:[], talked:[], mode:null, battles:null, mod:null};
+    if(typeof militaryTick==='function') militaryTick();   // 상무 results arrive as the stove league opens
     offFill(f.off); }
   return f.off; }
 function campState(){ const f=fm(); if(!f.camp||f.camp.year!==state.year) f.camp={year:state.year,focus:null};

@@ -41,4 +41,15 @@ module.exports = ({assert,test}) => {
     if(picks.length) assert.ok(h.state.fm.inbox.some(m=>/개막 때 고른/.test(m.subject)),'check-in message sent');
     assert.ok((h.state.fm.mineLog||[]).length>0,'milestone news for the manager’s players');
   });
+  test('상무: an accepted player leaves for two seasons and comes back to the 2군; parks differ', () => {
+    const h=new Runtime({observe:false}).start('KIA'); let served=0, failed=0;
+    for(let k=0;k<6;k++){ const p=h.K.ROSTERS.KIA.farm.filter(p=>!p.f)[k]; if(!p) break; h.state.fm.evt.flags.military=p.n; h.FM.militaryTick();
+      const m=h.state.fm.mil[p.n]; if(m.status==='failed'){ failed++; continue; }
+      assert.equal(m.status,'serving'); served++;
+      assert.ok(!h.K.ROSTERS.KIA.farm.some(x=>x.n===p.n)&&!h.K.ROSTERS.KIA.batters.some(x=>x.n===p.n)&&!h.K.ROSTERS.KIA.pitchers.some(x=>x.n===p.n),'away from the roster');
+      h.state.year+=2; h.FM.militaryTick(); h.state.year-=2;
+      assert.equal(m.status,'back'); assert.ok(h.K.ROSTERS.KIA.farm.some(x=>x.n===p.n),'back in the 2군'); }
+    assert.ok(served>0,'someone was accepted in six tries');
+    assert.notEqual(h.FM.parkOf('KIA').cap,h.FM.parkOf('키움').cap);
+  });
 };
