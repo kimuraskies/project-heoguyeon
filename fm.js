@@ -2925,12 +2925,6 @@ const EVT_DATA=[
    body:`올스타 팬 투표가 시작됐어요. ${c.p.n}이(가) 2위와 근소한 차이예요.`,
    opts:[{l:'구단 채널로 투표 독려 영상을 만든다', d:'돈 -0.3억 · 팬 여론 +2 · 사기 +4', fx:[['money',-0.3],['fans',2],['mor',c.p,4]], res:'영상 조회수가 쑥쑥 올라요.'},
          {l:'투표는 팬에게 맡긴다', d:'변화 없음', fx:[], res:'자연스럽게 흘러가요.'}]})},
-{id:'rain-rotation', stage:'season', rarity:'common', cool:1,
- pick:c=>({ace:c.find(p=>EV_P(p)&&c.inLineup(p)&&!c.injured(p))}), when:c=>c.games>=10,
- make:c=>({who:'투수코치', icon:'☔', title:'우천 순연 뒤 로테이션',
-   body:`비로 이틀 연속 경기가 취소됐어요. 에이스 ${c.ace.n}을(를) 당겨 쓸지 정해야 해요.`,
-   opts:[{l:'에이스를 당겨 쓴다', d:`${c.ace.n} 컨디션 -8 · 다음 시리즈 에이스 등판`, fx:[['cond',c.ace,-8]], res:'에이스가 하루 일찍 마운드에 올라요.'},
-         {l:'순서를 지킨다', d:`${c.ace.n} 컨디션 +6`, fx:[['cond',c.ace,6]], res:'로테이션 순서를 지켰어요.'}]})},
 {id:'slump-hitter', stage:'season', rarity:'common', cool:1,
  pick:c=>({p:c.find(p=>EV_B(p)&&c.inLineup(p)&&EV_L(c,p).PA>=70&&EV_L(c,p).OPS<0.600)}), when:c=>true,
  make:c=>{ const s=c.seasonLine(c.p); return {who:'타격코치', icon:'🧊', title:`${c.p.n}의 긴 슬럼프`,
@@ -3941,6 +3935,17 @@ function ovrSeen(team,p){ const o=K.ovr(p), r=scoutRange(o,scoutK(team,p),p.n+'o
 function scoutNote(team,p){ if(team===USER) return ''; const k=Math.round(scoutK(team,p)*100);
   return `<div class="hint" style="margin:6px 0 10px">스카우트 보고서 정확도 ${k}% · 맞대결과 전력분석팀, 스카우트 파견으로 범위가 좁아져요. 계약하면 정확한 값이 보여요.
     ${k<100?` <button type="button" class="btn btn-sm" ${scoutCanSend()?'':'disabled'} onclick="FM.scoutSend('${team}','${String(p.n).replace(/'/g,"\'")}')">🔭 스카우트 파견${scoutCanSend()?'':' (이번 주 완료)'}</button>`:''}</div>`; }
+
+// ----- 우천 취소 (A3): our game is rained out, the pitching coach asks about the rotation -----
+function rainoutCard(){ const r=state.rainout; if(!r||r.asked||state.phase!=='regular') return; r.asked=true;
+  const opp=r.home===USER? r.away : r.home, co=(staffOf(USER).pit||{}).n;
+  send(co?co+' 투수코치':'투수코치','☔',`${r.date} ${K.ROSTERS[opp].name}전 우천 취소`,
+    josa(`${r.date} ${K.ROSTERS[opp].name}전이 비로 취소돼 ${r.makeupDate}로 밀렸어요.
+예정 선발은 ${r.sp}이에요. 하루 쉬고 그대로 나갈지, 로테이션을 한 칸 당길지 정해 주세요.`),
+    [{label:'예정 선발 그대로 간다', fn:'rainKeep', arg:{}},{label:'로테이션을 한 칸 당긴다', fn:'rainPull', arg:{}}]); }
+ACTIONS.rainKeep=()=>{ const r=state.rainout, p=r&&findPlayer(USER,r.sp); if(p) p.cond=clampN(K.cond(p)+4,0,100); return josa(`${r?r.sp:'예정 선발'}이(가) 하루 더 쉬고 그대로 나갑니다.`); };
+ACTIONS.rainPull=()=>{ const n=window.App&&window.App.advanceRainoutRotation? window.App.advanceRainoutRotation() : false;
+  return n? josa(`로테이션을 한 칸 당겼습니다. 다음 경기 선발은 ${n}이에요.`) : '지금은 로테이션을 바꿀 수 없습니다.'; };
 // ---------- player records: game logs, season archive, career ----------
 function logGame(res){
   state.logs=state.logs||{};
@@ -5144,7 +5149,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ springTestCard, scoutSend, militaryTick, parkOf, leaderTag, leaders, leadPick, guideShot, coachPrep, prepSet, prepGo, canCoachPrep, springTestNote, evtPromises, promiseCard, fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ rainoutCard, springTestCard, scoutSend, militaryTick, parkOf, leaderTag, leaders, leadPick, guideShot, coachPrep, prepSet, prepGo, canCoachPrep, springTestNote, evtPromises, promiseCard, fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeValue, packageValue, tradeVerdict, tradeLog, teamMode, aiTradeTick, clubTradeBudget, playerValue:p=>playerValue(p), tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   sprayTake, tradeHistoryCard, setTradeHist, tradeReact, tradeGrade, showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,

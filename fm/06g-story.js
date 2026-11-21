@@ -130,3 +130,14 @@ function ovrSeen(team,p){ const o=K.ovr(p), r=scoutRange(o,scoutK(team,p),p.n+'o
 function scoutNote(team,p){ if(team===USER) return ''; const k=Math.round(scoutK(team,p)*100);
   return `<div class="hint" style="margin:6px 0 10px">스카우트 보고서 정확도 ${k}% · 맞대결과 전력분석팀, 스카우트 파견으로 범위가 좁아져요. 계약하면 정확한 값이 보여요.
     ${k<100?` <button type="button" class="btn btn-sm" ${scoutCanSend()?'':'disabled'} onclick="FM.scoutSend('${team}','${String(p.n).replace(/'/g,"\'")}')">🔭 스카우트 파견${scoutCanSend()?'':' (이번 주 완료)'}</button>`:''}</div>`; }
+
+// ----- 우천 취소 (A3): our game is rained out, the pitching coach asks about the rotation -----
+function rainoutCard(){ const r=state.rainout; if(!r||r.asked||state.phase!=='regular') return; r.asked=true;
+  const opp=r.home===USER? r.away : r.home, co=(staffOf(USER).pit||{}).n;
+  send(co?co+' 투수코치':'투수코치','☔',`${r.date} ${K.ROSTERS[opp].name}전 우천 취소`,
+    josa(`${r.date} ${K.ROSTERS[opp].name}전이 비로 취소돼 ${r.makeupDate}로 밀렸어요.
+예정 선발은 ${r.sp}이에요. 하루 쉬고 그대로 나갈지, 로테이션을 한 칸 당길지 정해 주세요.`),
+    [{label:'예정 선발 그대로 간다', fn:'rainKeep', arg:{}},{label:'로테이션을 한 칸 당긴다', fn:'rainPull', arg:{}}]); }
+ACTIONS.rainKeep=()=>{ const r=state.rainout, p=r&&findPlayer(USER,r.sp); if(p) p.cond=clampN(K.cond(p)+4,0,100); return josa(`${r?r.sp:'예정 선발'}이(가) 하루 더 쉬고 그대로 나갑니다.`); };
+ACTIONS.rainPull=()=>{ const n=window.App&&window.App.advanceRainoutRotation? window.App.advanceRainoutRotation() : false;
+  return n? josa(`로테이션을 한 칸 당겼습니다. 다음 경기 선발은 ${n}이에요.`) : '지금은 로테이션을 바꿀 수 없습니다.'; };

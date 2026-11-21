@@ -410,6 +410,7 @@ function checkRain(idx){
   if(g.home===USER||g.away===USER){
     state.rainout={home:g.home,away:g.away,date:FM.calDate(original).toLocaleDateString('sv-SE'),
       makeupDate:FM.calDate(day).toLocaleDateString('sv-SE'),sp:projectedSP(USER),advanced:false};
+    if(FM.rainoutCard) FM.rainoutCard();
   }
   return true;
 }
