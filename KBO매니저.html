@@ -1231,16 +1231,16 @@ function heroInfo(rank){
     return {eyebrow:`${state.year} SEASON / PREPARATION`, title:oh.title,
       sub:`스토브리그 ${oh.weeks}주 → 스프링캠프 4주 → 시범경기 ${FM.SPRING_GAMES}경기 → 개막`, m:null, tbd:"시범경기",
       starters:`<p>다음 경기 · 시범경기</p><strong>선발 미정 <span class="muted">vs</span> 선발 미정</strong><p>캠프를 마치면 시범경기 대진이 정해집니다.</p>`,
-      cta:`<button class="btn primary hero-cta" onclick="FM.offOpen()">${I('play')}${oh.cta}</button>`,
-      hint:oh.hint,
-      more:(FM.canQuickStart()?FM.quickBtn():'')+(oh.auto?`<button class="btn" onclick="FM.offAuto()">단장에게 맡기기</button>`:'')};
+      cta: FM.canCoachPrep()? `<button class="btn primary hero-cta" onclick="FM.coachPrep()">${I('play')}수석코치와 준비 → 시범 1차전</button>` : `<button class="btn primary hero-cta" onclick="FM.offOpen()">${I('play')}${oh.cta}</button>`,
+      hint: FM.canCoachPrep()? '세 가지만 정하면 나머지는 수석코치가 맡고 바로 시범 1차전으로 가요. 직접 하나하나 정하려면 아래 "직접 준비하기"를 누르세요.' : oh.hint,
+      more:(FM.canCoachPrep()?`<button class="btn" onclick="FM.offOpen()">직접 준비하기 · ${oh.title}</button>`:'')+(FM.canQuickStart()?FM.quickBtn():'')+(oh.auto&&!FM.canCoachPrep()?`<button class="btn" onclick="FM.offAuto()">단장에게 맡기기</button>`:'')};
   }
   if(ph==="spring"){
     const n=FM.springNext(), sp=state.spring;
     if(n) return {eyebrow:`EXHIBITION / GAME ${pad(n.i+1)}`, title:`시범경기 ${n.i+1}차전`,
       sub:`${sp.W}승 ${sp.L}패 ${sp.T}무 · 순위·시즌 기록 미반영 · 라인업과 작전을 시험하세요`, m:{home:n.home,away:n.away,label:'시범경기'},
       cta:`<button class="btn primary hero-cta" onclick="App.nextGame()">${I('play')}경기 준비</button>`,
-      hint:'시범경기는 순위에 들어가지 않아요. 직접 보지 않아도 되니, 바로 개막하려면 아래 버튼을 누르세요.',
+      hint:FM.springTestNote()||'시범경기는 순위에 들어가지 않아요. 직접 보지 않아도 되니, 바로 개막하려면 아래 버튼을 누르세요.',
       more:(FM.canQuickStart()?FM.quickBtn():'')+`<button class="btn" onclick="FM.springSimAll()">${I('fast-forward')}남은 시범경기 시뮬레이션</button>`};
     const g0=userGames[0];
     return {eyebrow:`${state.year} SEASON / OPENING DAY`, title:"개막이 다가왔다.",

@@ -322,3 +322,9 @@ nav.tabs .tab-ph,nav.tabs .tab-more{display:none!important}
 .gs-tabs button.on{background:var(--team);border-color:var(--team);color:var(--on-team);font-weight:700}
 .guide-shots img{display:block;width:100%;height:auto;max-height:42dvh;object-fit:contain;object-position:top;border-radius:10px;border:1px solid var(--md-outline-variant);background:#0b0f14}
 .coach-tip .gs-cap{margin:8px 0 0;font-size:13px;color:var(--dim)}
+
+/* 방금 내린 결정: 다음 카드 위 한 줄 (결과 화면 대신) */
+.ev-last{display:flex;flex-direction:column;gap:2px;margin:0 40px 12px 0;padding:8px 12px;border-radius:8px;background:var(--ss-1);border-left:3px solid var(--good)}
+.ev-last small{color:var(--ss-ink3);font-size:12px}
+.ev-last b{font-size:13.5px}
+.ev-last span{font-size:12.5px;color:var(--ss-ink2,var(--dim));overflow-wrap:anywhere}

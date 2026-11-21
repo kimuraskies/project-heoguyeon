@@ -33,4 +33,15 @@ module.exports = ({assert,test}) => {
     h.FM.quickStart(); assert.equal(h.state.phase,'regular'); assert.ok(h.FM.leaders().captain);
     assert.equal(h.state.spring.played,9);
   });
+  test('preseason: 수석코치와 준비 takes three calls and lands on exhibition game 1 with the test player in the lineup', () => {
+    const h = new Runtime({observe:false}).start('KIA');
+    assert.ok(h.FM.canCoachPrep());
+    h.FM.coachPrep(); h.FM.prepSet('dir','2'); h.FM.prepSet('camp','bat'); h.FM.prepGo();
+    const o=h.state.fm.off, sp=h.state.spring;
+    assert.equal(h.state.phase,'spring'); assert.equal(sp.played,0); assert.equal(o.mode,'rebuild'); assert.equal(h.state.fm.camp.focus,'bat');
+    assert.ok(h.FM.leaders().captain,'leaders named from the slate');
+    assert.ok(sp.test,'a test player was picked');
+    assert.ok(h.eval('buildCfg(USER).lineup').includes(sp.test),'the test player starts game 1');
+    assert.ok(h.state.fm.inbox.some(m=>m.subject==='수석코치 준비 보고'),'the head coach files a report');
+  });
 };

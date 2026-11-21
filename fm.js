@@ -602,8 +602,11 @@ function previewNote(){
   const lines=[];
   outB.forEach((n,i)=>{ const p=findPlayer(USER,n); lines.push(`${n} → ${inB[i]||'-'} (${p&&K.isInjured(p)?'부상':'휴식'})`); });
   if(base.spName!==plain.spName) lines.push(`선발 ${plain.spName} → ${base.spName} (${K.isInjured(findPlayer(USER,plain.spName))?'부상':'피로'})`);
-  if(!lines.length) return '';
-  return `<div class="card" style="background:var(--panel2);margin-top:10px;border-color:var(--warn)"><b>🩺 코칭스태프 조정</b><div class="hint">${lines.map(esc).join('<br>')}</div></div>`;
+  const sp=state.spring, test=state.pendingGame==='spring'&&sp&&sp.test&&sp.played===0? sp.test : null;
+  const testCard=test? `<div class="card" style="background:var(--panel2);margin-top:10px;border-color:var(--accent)"><b>🔎 오늘 시험: ${esc(test)}</b><div class="hint">감독님이 고른 선수예요. 선발로 나서요.</div></div>` : '';
+  if(test) for(let i=lines.length-1;i>=0;i--) if(lines[i].indexOf(`→ ${test} (`)>=0) lines.splice(i,1);
+  if(!lines.length) return testCard;
+  return testCard+`<div class="card" style="background:var(--panel2);margin-top:10px;border-color:var(--warn)"><b>🩺 코칭스태프 조정</b><div class="hint">${lines.map(esc).join('<br>')}</div></div>`;
 }
 
 // ---------- after every game (both teams) ----------
@@ -1857,6 +1860,45 @@ function leadersBody(e){ return e.data.roles.map((r,ri)=>`<h4 class="st-group">$
     <div class="ev-opts lead-opts">${r.c.map((n,k)=>{ const p=findPlayer(USER,n); if(!p) return '';
       return `<button type="button" class="ev-opt${r.pick===k?' sel':''}" aria-pressed="${r.pick===k}" onclick="FM.leadPick(${ri},${k})"><b>${esc(n)}${k===0?' <span class="lead-rec">추천</span>':''}</b><small>${p.age}세 · ${posFull(p.pos||p.role)}<br>OVR ${K.ovr(p)}</small></button>`; }).join('')}</div>`).join('')
     +`<div class="row" style="margin-top:12px"><button class="btn primary" onclick="FM.offChoose(0)">${e.data.roles.some(r=>r.pick)?'이대로 맡긴다':'추천안 승인'}</button></div>`; }
+// ----- 수석코치와 준비 (first season): the manager makes three calls, the head coach the rest, then exhibition game 1 -----
+let prepSel=null;
+function canCoachPrep(){ return state.phase==='stove'&&canQuickStart(); }
+// who to try in game 1: a challenger from a job battle, else young or bench batters
+function prepCands(){ const c=state.cfgs[USER], o=offState(); if(!o.battles) offBattles(); const out=[];
+  (o.battles||[]).forEach(b=>{ const p=findPlayer(USER,b.b); if(p&&p.type==='B'&&!K.isInjured(p)) out.push({n:p.n,why:b.label+' 도전'}); });
+  const score=p=>(p.pot||K.ovr(p))-K.ovr(p)+(p.age<=24?6:0)+K.ovr(p)*0.2;
+  K.ROSTERS[USER].batters.filter(p=>c.lineup.indexOf(p.n)<0&&!K.isInjured(p)&&!out.some(x=>x.n===p.n)).sort((a,b)=>score(b)-score(a))
+    .forEach(p=>{ if(out.length<3) out.push({n:p.n,why:`${p.age}세 · ${posFull(p.pos)} · OVR ${K.ovr(p)}`}); });
+  return out.slice(0,3); }
+function prepSet(k,v){ if(prepSel) prepSel[k]=v; coachPrep(); }
+function coachPrep(){ const o=offState(); if(!canCoachPrep()){ render(); return; } closeModal();
+  const L=makeEvent('leaders',o), roles=L? L.data.roles : [], cands=prepCands();
+  prepSel=prepSel||{dir:'1',camp:'bal',test:cands[0]?cands[0].n:null};
+  const chip=(k,v,label,sub)=>`<button type="button" class="ev-opt${prepSel[k]===v?' sel':''}" aria-pressed="${prepSel[k]===v}" onclick="FM.prepSet('${k}','${v}')"><b>${esc(label)}</b>${sub?`<small>${esc(sub)}</small>`:''}</button>`;
+  modal(`${X_BTN}<p class="eyebrow">${state.year} 시즌 준비 · 수석코치와 함께</p><h2>세 가지만 정해 주세요</h2>
+    <p class="ev-body">나머지 스토브리그·캠프 결정은 수석코치가 무리 없는 쪽으로 처리하고 바로 시범경기 1차전으로 가요. 처리한 내용은 받은편지함에 정리해 둘게요.</p>
+    ${roles.length?`<h4 class="st-group">리더 · 수석코치 추천안으로</h4><p class="ev-body">${roles.map(r=>`${r.role} <b>${esc(r.c[0])}</b>`).join(' · ')}</p>`:''}
+    <h4 class="st-group">1. 시즌 방향 (단장 미팅)</h4><div class="ev-opts lead-opts">${chip('dir','0','우승 도전','예산 +15% · 목표 상향')}${chip('dir','1','균형','예산·목표 그대로')}${chip('dir','2','리빌딩','예산 -10% · 유망주 성장')}</div>
+    <h4 class="st-group">2. 캠프 방향</h4><div class="ev-opts lead-opts">${Object.entries(CAMP).map(([k,x])=>chip('camp',k,x.label,x.d)).join('')}</div>
+    ${cands.length?`<h4 class="st-group">3. 시범 1차전에서 시험할 선수</h4><div class="ev-opts lead-opts">${cands.map(x=>chip('test',x.n,x.n,x.why)).join('')}</div>`:''}
+    <div class="row" style="margin-top:14px"><button class="btn primary" onclick="FM.prepGo()">준비 맡기고 시범 1차전으로</button></div>`); }
+function prepGo(){ const o=offState(), sel=prepSel||{dir:'1',camp:'bal'}, lines=[]; o.path='coach'; if(window.Track) Track.action('prep_path',{p:'coach'});
+  let n=0;
+  while(n++<80&&(o.stage==='stove'||o.stage==='camp'||o.stage==='dir')){
+    if(o.stage==='dir'){ setCampCore(sel.camp||'bal'); lines.push('캠프 방향: '+CAMP[sel.camp||'bal'].label); continue; }
+    const e=o.q[0]; if(!e){ offWeekEnd(o); continue; }
+    const i=e.id==='owner'? Math.min(e.opts.length-1,+sel.dir||0) : Math.min(e.opts.length-1, EV[e.id].safe==null?0:EV[e.id].safe);
+    const label=e.opts[i].l; offResolve(i); lines.push(`${e.title}: ${label}`); }
+  startSpring(); const sp=state.spring, t=sel.test&&findPlayer(USER,sel.test);
+  if(sp&&t&&!K.isInjured(t)) sp.test=t.n;
+  send('수석코치','📋','수석코치 준비 보고',josa('감독님이 정한 것 외에는 제가 무리 없는 쪽으로 처리했습니다.\n\n'+lines.map(x=>'• '+x).join('\n')+(sp&&sp.test?'\n\n시범경기 1차전에서 '+sp.test+'을(를) 선발로 시험합니다.':'')),[]);
+  prepSel=null; saveNow(); closeModal(); render(); if(window.App&&springNext()) window.App.nextGame(); }
+// the test player goes into game 1: his own position's slot, else the DH, else the last slot
+function springTestCfg(cfg,n){ const p=findPlayer(USER,n); if(!p||K.isInjured(p)||cfg.lineup.indexOf(n)>=0) return cfg;
+  const pos=cfg.positions||K.autoPositions(USER,cfg.lineup); let i=pos.findIndex(x=>x===p.pos||x===p.alt); if(i<0) i=pos.indexOf('DH'); if(i<0) i=cfg.lineup.length-1;
+  const lu=cfg.lineup.slice(); lu[i]=n; return Object.assign({},cfg,{lineup:lu}); }
+function springTestNote(){ const sp=state.spring; if(!sp||!sp.test||sp.played<1||!springNext()) return '';
+  return `시험한 ${sp.test}: ${springLine(sp.test).txt}. 남은 ${sp.games.length-sp.played}경기는 직접 보거나 수석코치에게 맡기세요.`; }
 // 빠른 시작 skips the stove league: the head coach's slate stands
 function leaderAuto(){ const o=fm().off&&fm().off.year===state.year? fm().off : null;
   if(o) o.q=o.q.filter(e=>e.id!=='leaders');
@@ -1893,22 +1935,23 @@ function offHero(){ const o=offState(), n=o.weeks.length;
   if(o.stage==='camp') return {weeks:n, title:`스프링캠프 ${campState().week+1}/4주차`, cta:'이번 주 결정하기', hint:o.q[0]?`이번 주: ${o.q[0].title}`:'', auto:true};
   return {weeks:n, title:'캠프를 마쳤습니다.', cta:'캠프 결산 보기', hint:'결산을 확인하고 시범경기로 넘어가세요.', auto:false}; }
 const X_BTN='<button type="button" class="closeX" onclick="App.closeModal()" aria-label="닫기">×</button>';
+// the decision just made, shown as one line on top of whatever comes next (no separate result screen)
+let offLast=null;
+function lastBanner(){ const x=offLast; offLast=null; if(!x) return '';
+  return `<div class="ev-last"><small>방금 결정 · ${esc(x.title)}</small><b>▶ ${esc(x.label)}</b>${x.res?`<span>${esc(String(x.res).split('\n')[0])}</span>`:''}</div>`; }
 function offOpen(){ const o=offState();
+  if(!o.path&&o.stage==='stove'){ o.path='direct'; if(window.Track) Track.action('prep_path',{p:'direct'}); }
   if(o.stage==='dir'){ campPicker(); return; }
   if(o.stage==='done'){ campSummary(); return; }
   const e=o.q[0]; if(!e){ render(); return; }
   const where=o.stage==='stove'?`스토브리그 ${o.week+1}/${o.weeks.length}주차`:`스프링캠프 ${campState().week+1}/4주차`;
   closeModal();
-  modal(`${X_BTN}<p class="eyebrow">${where}${o.q.length>1?` · 결정 ${o.q.length}건`:''}</p><h2>${esc(e.title)}</h2>
+  modal(`${X_BTN}${lastBanner()}<p class="eyebrow">${where}${o.q.length>1?` · 결정 ${o.q.length}건`:''}</p><h2>${esc(e.title)}</h2>
     <p class="ev-who">${e.icon} ${esc(e.who)}</p>${e.prev?`<div class="ev-prev"><small>지난 선택 · ${esc(e.prev.title||'')}</small><b>▶ ${esc(e.prev.choice||'')}</b></div>`:''}<p class="ev-body">${esc(e.body).replace(/\n/g,'<br>')}</p>
     ${e.id==='leaders'? leadersBody(e) : `<div class="ev-opts">${e.opts.map((x,i)=>`<button type="button" class="ev-opt" onclick="FM.offChoose(${i})"><b>${esc(x.l)}</b><small>${esc(x.d)}</small></button>`).join('')}</div>
     <div class="row" style="margin-top:10px"><button class="btn btn-quiet" onclick="FM.offAuto()">${o.stage==='camp'?'수석코치에게':'단장에게'} 맡기기</button></div>`}`); }
-function offShowResult(title,label,res){ const o=offState(); closeModal();
-  const next=o.stage==='dir'?'캠프 방향 정하기':o.stage==='done'?'캠프 결산 보기':'다음 결정';
-  modal(`${X_BTN}<h2>${esc(title)}</h2><p class="ev-who">▶ ${esc(label)}</p><p class="ev-body">${esc(res).replace(/\n/g,'<br>')}</p>
-    <div class="row" style="gap:8px;margin-top:12px"><button class="btn primary" onclick="FM.offOpen()">${next}</button><button class="btn" onclick="App.closeModal()">대시보드로</button></div>`); }
 function offChoose(i){ const o=offState(), e=o.q[0]; if(!e) return; const label=(e.opts[i]||e.opts[0]).l, title=e.title;
-  const res=offResolve(i); saveNow(); render(); offShowResult(title,label,res); if(window.Track) Track.action('off_choice',{id:e.id,i}); }
+  const res=offResolve(i); saveNow(); render(); offLast={title,label,res}; offOpen(); if(window.Track) Track.action('off_choice',{id:e.id,i}); }
 // the general manager (or the head coach in camp) takes the safe choice. all = run to the end of camp.
 function offAuto(all,rnd){ const o=offState(); let n=0, last=null;
   while(n++<60){
@@ -1919,14 +1962,14 @@ function offAuto(all,rnd){ const o=offState(); let n=0, last=null;
     else break;
     if(!all) break; }
   saveNow(); if(all) return;
-  render(); if(last) offShowResult(last.title,'단장에게 맡김: '+last.label,last.res); else offOpen(); }
+  render(); if(last) offLast={title:last.title,label:'맡김: '+last.label,res:last.res}; offOpen(); }
 
 // ----- camp -----
 function setCampCore(k){ const c=campState(), o=offState(); c.focus=k; if(o.stage==='dir'){ o.stage='camp'; o.used=[]; offFill(o); } }
 function setCamp(k){ const o=offState(), wasDir=o.stage==='dir'; setCampCore(k); if(window.Track) Track.action('camp'); saveNow();
   if(wasDir&&typeof document!=='undefined'&&document.querySelector&&document.querySelector('.modal')){ render(); offOpen(); } else render(); }
 function campPicker(){ const c=campState(); closeModal();
-  modal(`${X_BTN}<p class="eyebrow">스프링캠프</p><h2>${state.year} 캠프 훈련 방향</h2>
+  modal(`${X_BTN}${lastBanner()}<p class="eyebrow">스프링캠프</p><h2>${state.year} 캠프 훈련 방향</h2>
     <p class="ev-body">4주 동안 팀이 집중할 방향을 고르세요. 젊은 선수일수록 훈련 효과가 큽니다. 캠프 중에는 매주 결정할 일이 하나씩 생깁니다.</p>
     <div class="ev-opts">${Object.entries(CAMP).map(([k,x])=>`<button type="button" class="ev-opt${c.focus===k?' sel':''}" onclick="FM.setCamp('${k}')"><b>${x.label}</b><small>${x.d}</small></button>`).join('')}</div>`); }
 function campRunWeek(){
@@ -1960,7 +2003,7 @@ const ATTR_L={con:'컨택',pow:'파워',eye:'선구안',spd:'주력',fld:'수비
 function campStars(){ const c=campState(); return Object.entries(c.gain).map(([n,g])=>({n,tot:Object.values(g).reduce((a,b)=>a+b,0),txt:Object.entries(g).map(([k,v])=>`${ATTR_L[k]||k} +${v}`).join(' ')}))
     .filter(x=>x.tot>0).sort((a,b)=>b.tot-a.tot).slice(0,3); }
 function campSummary(){ const c=campState(), stars=campStars(); closeModal();
-  modal(`${X_BTN}<p class="eyebrow">스프링캠프 결산</p><h2>${CAMP[c.focus||'bal'].label} 캠프를 마쳤습니다</h2>
+  modal(`${X_BTN}${lastBanner()}<p class="eyebrow">스프링캠프 결산</p><h2>${CAMP[c.focus||'bal'].label} 캠프를 마쳤습니다</h2>
     <h4 class="st-group">가장 달라진 선수</h4>${stars.length? `<div class="aw-list">${stars.map(x=>`<div><b>${esc(x.n)}</b><span>${x.txt}</span></div>`).join('')}</div>` : '<p class="muted">눈에 띄게 성장한 선수는 없었습니다.</p>'}
     ${c.notes.length?`<h4 class="st-group">캠프에서 있었던 일</h4><ul class="ev-notes">${c.notes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
     <div class="row" style="margin-top:14px"><button class="btn primary" onclick="FM.startSpring()">시범경기로</button></div>`); }
@@ -1980,7 +2023,7 @@ function offBattles(){ const o=offState(), c=state.cfgs[USER], r=K.ROSTERS[USER]
   o.battles=out.map(x=>Object.assign(x,{pick:null,plan:'even'})); }
 // who plays today, by the plan the manager stated at the camp interview: 'b' the challenger plays two games in three
 // (and two of the three 5th-starter turns), 'a' the incumbent does, 'even' they take turns.
-function springBattleCfg(cfg){ const o=fm().off, sp=state.spring; if(!o||!o.battles||!sp) return cfg; const i=sp.played, j=i%3, ok=n=>{ const p=findPlayer(USER,n); return p&&!K.isInjured(p); };
+function springBattleCfg(cfg){ const o=fm().off, sp=state.spring; if(sp&&sp.test&&sp.played===0) cfg=springTestCfg(cfg,sp.test); if(!o||!o.battles||!sp) return cfg; const i=sp.played, j=i%3, ok=n=>{ const p=findPlayer(USER,n); return p&&!K.isInjured(p); };
   let out=cfg;
   o.battles.forEach(b=>{ if(!ok(b.a)||!ok(b.b)) return; const plan=b.plan||'even';
     const turn=Math.floor(i/3), useB=b.k==='SP5'? (plan==='b'? turn!==2 : plan==='a'? turn===2 : turn%2===0) : plan==='b'? j!==1 : plan==='a'? j===1 : i%2===1;
@@ -4953,7 +4996,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ leaderTag, leaders, leadPick, guideShot, evtPromises, promiseCard, fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ leaderTag, leaders, leadPick, guideShot, coachPrep, prepSet, prepGo, canCoachPrep, springTestNote, evtPromises, promiseCard, fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeValue, packageValue, tradeVerdict, tradeLog, teamMode, aiTradeTick, clubTradeBudget, playerValue:p=>playerValue(p), tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   sprayTake, tradeHistoryCard, setTradeHist, tradeReact, tradeGrade, showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,
