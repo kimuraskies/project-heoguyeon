@@ -1,11 +1,11 @@
 // ---------- 리그 달력: 트레이드 마감 · 올스타 휴식기 · 신인 드래프트 ----------
-// The schedule has no dates, so game days are laid on a calendar: opening day 3/28, six game
-// days a week, and a four-day All-Star break from 7/10. That puts the 7/31 trade deadline
-// around game 104 and the season's end in mid-September.
+// Earlier careers keep their original six-game calendar until the next season.
 const SEASON_START=[3,28], ALLSTAR=[7,10], ALLSTAR_DAYS=4, DEADLINE=[7,31], DRAFT_ROUNDS=4, DRAFT_POOL=60;
-function baseDate(day){ return new Date(state.year, SEASON_START[0]-1, SEASON_START[1]+Math.floor(day*7/6)); }
-function allStarDate(){ return new Date(state.year, ALLSTAR[0]-1, ALLSTAR[1]); }
-function calDate(day){ const d=baseDate(day); if(d>=allStarDate()) d.setDate(d.getDate()+ALLSTAR_DAYS); return d; }
+function baseDate(day){
+  if(state.schedV===SCHED_V){const d=openingDate(state.year); d.setDate(d.getDate()+day); return d;}
+  return new Date(state.year, SEASON_START[0]-1, SEASON_START[1]+Math.floor(day*7/6)); }
+function allStarDate(){ return state.schedV===SCHED_V?allStarStart(state.year):new Date(state.year, ALLSTAR[0]-1, ALLSTAR[1]); }
+function calDate(day){ const d=baseDate(day); if(state.schedV!==SCHED_V&&d>=allStarDate()) d.setDate(d.getDate()+ALLSTAR_DAYS); return d; }
 function dateLabel(d){ return `${d.getMonth()+1}월 ${d.getDate()}일`; }
 function nextUserGame(){ return state.schedule.find(g=>!g.played&&(g.home===USER||g.away===USER)); }
 function today(){ const g=nextUserGame(), last=state.schedule[state.schedule.length-1]; return calDate(g? g.day : last? last.day : 0); }

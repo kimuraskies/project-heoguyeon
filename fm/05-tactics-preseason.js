@@ -246,7 +246,7 @@ function startSpring(){
   closeModal(); render(); saveNow();
 }
 function springNext(){ const sp=state.spring; if(!sp) return null; const i=sp.games.findIndex(g=>!g.played); if(i<0) return null; const g=sp.games[i]; return {home:g.home, away:g.away, label:`시범경기 ${i+1}차전`, i}; }
-function springPlayNext(){ if(!springNext()){ render(); return; } state.pendingGame='spring'; openPreview(); }
+function springPlayNext(){ if(state.liveMatch)return Match.resume(); if(!springNext()){ render(); return; } state.pendingGame='spring'; openPreview(); }
 function springRecord(res){
   const sp=state.spring, n=springNext(); if(!n) return;
   const g=sp.games[n.i]; g.played=true; g.hr=res.homeRuns; g.ar=res.awayRuns; sp.played++;
@@ -263,9 +263,10 @@ function springRecord(res){
   if(!springNext()) send('수석코치','📋',`시범경기 종료 (${sp.W}승 ${sp.L}패 ${sp.T}무)`, '시범경기 일정을 모두 마쳤습니다. 대시보드에서 정규시즌 개막을 선언하세요.', []);
 }
 function springSimAll(){
+  if(state.liveMatch)return Match.resume(true);
   if(window.Track) Track.action('spring_sim');
   state.pendingGame=null; state.matchTac=null;
-  let n; while((n=springNext())){ springRecord(K.simGame(buildCfg(n.home), buildCfg(n.away), {maxInnings:9})); }
+  let n; while((n=springNext())){ springRecord(K.simGame(buildCfg(n.home), buildCfg(n.away), {maxInnings:K.GAME_RULES.spring})); }
   closeModal(); render();
 }
 // a first-season shortcut: balanced camp, exhibition games simulated, straight to the opening-day preview

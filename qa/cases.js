@@ -4,7 +4,7 @@ const {copy,json,attrs,Runtime}=require('./runtime');
 module.exports=function({make,safe,audit,report,saveRoundTrip,finishRegular,finishPS,out}){
   const results=report.cases=[];
   function test(name,fn){safe(name,()=>{const h=make('case-'+name).start();const observed=fn(h);results.push({name,...h.context(),observed});console.log('CASE '+name+': '+json(observed));});}
-  const play=(h,n)=>{for(let i=0;i<n;i++)h.action('play one day',()=>h.App.userGames(1));};
+  const play=(h,n)=>{for(let i=0;i<n;i++)h.advanceOne();};
   const active=(h,n)=>h.K.ROSTERS[h.user].batters.concat(h.K.ROSTERS[h.user].pitchers).some(p=>p.n===n);
   const witness=(h,name,data)=>fs.writeFileSync(path.join(out,'evidence',name+'.json'),json({context:h.context(),actions:h.actions,data,snapshot:h.saveObject()}));
   test('spam-and-ten-games',h=>{
@@ -117,6 +117,20 @@ module.exports=function({make,safe,audit,report,saveRoundTrip,finishRegular,fini
     for(const mode of ['bat','pit','farm'])h.action('squad '+mode,()=>h.App.squadView(mode));const p=h.K.ROSTERS[h.user].farm[0];h.action('farm player profile',()=>h.App.player(h.user,p.n));
     const stored=new Map(h.storage),fresh=make('autosave-boot',h.seed,{storage:stored});assert.equal(fresh.context().userGames,12);assert.equal(fresh.user,h.user);
     audit.pass('all tabs, farm profile, autosave boot');return {tabs:tabs.length,restoredGames:fresh.context().userGames};
+  });
+  test('live-checkpoint-reload',h=>{
+    h.FM.offAuto(true,true); h.FM.setCamp('bal'); h.FM.startSpring();
+    let fresh=h.reloadLive();
+    assert.equal(fresh.state.spring.played,1);
+    fresh.FM.springSimAll(); fresh.FM.openSeason();
+    fresh=fresh.reloadLive(true);
+    assert.equal(fresh.context().userGames,1);
+    finishRegular(fresh);
+    // Exercise a watched playoff regardless of the club's regular-season rank.
+    fresh.fixture('user club in wildcard series',()=>fresh.eval("psOpenSeries(USER,K.TEAM_IDS.find(t=>t!==USER))"));
+    const result=fresh.reloadLive(true);
+    assert.equal(result.state.postseason.gc[result.user],1);
+    return {spring:1,regular:1,postseason:1};
   });
   test('repeatability',h=>{
     h.spring();play(h,3);const other=make('repeatability-second',h.seed).start();other.spring();play(other,3);

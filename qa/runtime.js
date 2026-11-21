@@ -123,6 +123,41 @@ class Runtime {
     this.action('finish live match',()=>this.ctx.Match.toEnd());
     this.action('commit live match result',()=>this.ctx.Match.finalize());
   }
+  advanceOne(){
+    const before=this.context().userGames;
+    do {this.action('advance one user game',()=>this.App.userGames(1));}
+    while(this.state.phase==='regular'&&this.state.rainout&&this.context().userGames===before);
+  }
+  reloadLive(resultsOnly=false){
+    const assert=require('node:assert/strict');
+    this.action('open game preview',()=>this.state.phase==='postseason'?this.App.psNext():this.App.nextGame());
+    this.action('start broadcast',()=>this.App.startMatch());
+    const match=this.ctx.Match;
+    for(let i=0;i<100&&match.game.half==='top';i++)match.stepPA();
+    assert.equal(match.game.half,'bottom');
+    const saved=copy(this.state.liveMatch);
+    match.stepOne(); // leave the broadcast part way through the next half
+    const fresh=new Runtime({seed:this.seed+1,storage:this.storage,observe:false});
+    assert.deepEqual(copy(fresh.state.liveMatch),saved);
+    assert.match(fresh.document.getElementById('view').innerHTML,/이어하기/);
+    fresh.ctx.Match.resume(resultsOnly);
+    if(!resultsOnly){
+      assert.deepEqual(copy(fresh.ctx.Match.game.serialize()),saved.engine);
+      assert.deepEqual(copy(fresh.ctx.Match.feed),saved.feed);
+      assert.deepEqual(copy(fresh.ctx.Match.wpLog),saved.wpLog);
+      fresh.ctx.Match.toEnd();
+      const finished=copy(fresh.state.finishedGame);
+      // Close on the final out before the result screen, then replay the same delivery.
+      const finalReload=new Runtime({storage:fresh.storage,observe:false});
+      const before=json(finalReload.saveObject());
+      finalReload.ctx.recordFinished(finished);
+      assert.equal(json(finalReload.saveObject()),before);
+      return finalReload;
+    }
+    assert.equal(fresh.state.liveMatch,null);
+    assert.ok(fresh.state.recordedGames[saved.id]);
+    return fresh;
+  }
   renew(){for(const m of this.state.fm.inbox.slice()) {const i=m.actions.findIndex(a=>a.fn==='renew');if(!m.done&&i>=0)this.action('renew '+m.actions[i].arg.n,()=>this.FM.act(m.id,i));}}
   nextSeason(){this.renew(); if(this.state.fm.fired) {
       if(!this.state.fm.lastChance)this.action('request last chance',()=>this.FM.lastChance());
