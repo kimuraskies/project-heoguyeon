@@ -3880,7 +3880,7 @@ function militaryLeave(p){ const r=K.ROSTERS[USER], farm=farmOf(USER);
     if(p.type==='B'&&arr.length<=MIN_1B||p.type!=='B'&&arr.length<=MIN_1P||p.type!=='B'&&p.role==='SP'&&arr.filter(x=>x.role==='SP').length<=5) return false;
     arr.splice(arr.indexOf(p),1); }
   const keys=p.type==='B'? ['con','pow','eye','fld'] : ['stu','ctl','mov','sta']; bumpWithin(p,keys[Math.floor(Math.random()*keys.length)],2);
-  fm().away[p.n]={p, back:state.year+2}; if(state.cfgs[USER]) repairCfg(USER); return true; }
+  depart(p,'상무 입대'); fm().away[p.n]={p, back:state.year+2}; if(state.cfgs[USER]) repairCfg(USER); return true; }
 
 // ----- 감독 신뢰 (B1): each player remembers how this manager treated him -----
 // p.trust 0..100 (50 = neutral), p.tlog = last five reasons. Used in renewals, FA retention and benching complaints.
