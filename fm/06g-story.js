@@ -125,7 +125,8 @@ function scoutSend(team,n){ if(!scoutCanSend()){ notify('이번 주 스카우트
 function scoutRange(v,k,seed,lo,hi){ const w=Math.round((1-k)*(hi-lo)*0.3); if(w<=0) return null; const off=hash(seed)%(w+1); return [Math.max(lo,v-off),Math.min(hi,v-off+w)]; }
 function attrRowK(label,v,k,seed){ const a=attr20(v), r=scoutRange(a,k,seed+label,1,20); if(!r) return attrRow(label,v);
   return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:var(--panel2);border-radius:6px;margin-bottom:5px"><span>${label}</span><b style="color:var(--dim);font-size:15px">${r[0]}~${r[1]}</b></div>`; }
-function ovrSeen(team,p){ const o=K.ovr(p), r=scoutRange(o,scoutK(team,p),p.n+'ovr',30,99); return r? `${r[0]}~${r[1]}` : String(o); }
+// OVR range at most ~6 wide
+function ovrSeen(team,p){ const o=K.ovr(p), r=scoutRange(o,scoutK(team,p),p.n+'ovr',50,70); return r? `${r[0]}~${r[1]}` : String(o); }
 function scoutNote(team,p){ if(team===USER) return ''; const k=Math.round(scoutK(team,p)*100);
   return `<div class="hint" style="margin:6px 0 10px">스카우트 보고서 정확도 ${k}% · 맞대결과 전력분석팀, 스카우트 파견으로 범위가 좁아져요. 계약하면 정확한 값이 보여요.
     ${k<100?` <button type="button" class="btn btn-sm" ${scoutCanSend()?'':'disabled'} onclick="FM.scoutSend('${team}','${String(p.n).replace(/'/g,"\'")}')">🔭 스카우트 파견${scoutCanSend()?'':' (이번 주 완료)'}</button>`:''}</div>`; }

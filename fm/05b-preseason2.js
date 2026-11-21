@@ -87,6 +87,10 @@ function prepGo(){ const o=offState(), sel=prepSel||{dir:'1',camp:'bal'}, lines=
 function springTestCfg(cfg,n){ const p=findPlayer(USER,n); if(!p||K.isInjured(p)||cfg.lineup.indexOf(n)>=0) return cfg;
   const pos=cfg.positions||K.autoPositions(USER,cfg.lineup); let i=pos.findIndex(x=>x===p.pos||x===p.alt); if(i<0) i=pos.indexOf('DH'); if(i<0) i=cfg.lineup.length-1;
   const lu=cfg.lineup.slice(); lu[i]=n; return Object.assign({},cfg,{lineup:lu}); }
+// top of the game-1 preview: who the manager chose to try, and where he bats
+function springTestCard(){ const sp=state.spring; if(state.pendingGame!=='spring'||!sp||!sp.test||sp.played!==0) return '';
+  const p=findPlayer(USER,sp.test); if(!p) return ''; const lu=buildCfg(USER).lineup, i=lu.indexOf(p.n);
+  return `<div class="card" style="margin:10px 0;border-color:var(--team-ink,var(--accent))"><b>🔎 오늘 시험: ${esc(p.n)}</b><div class="hint">감독님이 고른 선수예요. ${i>=0?`${i+1}번 타자로 선발 출전해요.`:'오늘 선발 명단에 들어가요.'} (${p.age}세 · ${posFull(p.pos)} · OVR ${K.ovr(p)})</div></div>`; }
 function springTestNote(){ const sp=state.spring; if(!sp||!sp.test||sp.played<1||!springNext()) return '';
   return `시험한 ${sp.test}: ${springLine(sp.test).txt}. 남은 ${sp.games.length-sp.played}경기는 직접 보거나 수석코치에게 맡기세요.`; }
 // 빠른 시작 skips the stove league: the head coach's slate stands

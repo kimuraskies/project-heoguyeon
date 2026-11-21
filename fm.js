@@ -609,7 +609,7 @@ function previewNote(){
   outB.forEach((n,i)=>{ const p=findPlayer(USER,n); lines.push(`${n} → ${inB[i]||'-'} (${p&&K.isInjured(p)?'부상':'휴식'})`); });
   if(base.spName!==plain.spName) lines.push(`선발 ${plain.spName} → ${base.spName} (${K.isInjured(findPlayer(USER,plain.spName))?'부상':'피로'})`);
   const sp=state.spring, test=state.pendingGame==='spring'&&sp&&sp.test&&sp.played===0? sp.test : null;
-  const testCard=test? `<div class="card" style="background:var(--panel2);margin-top:10px;border-color:var(--accent)"><b>🔎 오늘 시험: ${esc(test)}</b><div class="hint">감독님이 고른 선수예요. 선발로 나서요.</div></div>` : '';
+  const testCard='';   // shown at the top of the preview instead (springTestCard)
   if(test) for(let i=lines.length-1;i>=0;i--) if(lines[i].indexOf(`→ ${test} (`)>=0) lines.splice(i,1);
   if(!lines.length) return testCard;
   return testCard+`<div class="card" style="background:var(--panel2);margin-top:10px;border-color:var(--warn)"><b>🩺 코칭스태프 조정</b><div class="hint">${lines.map(esc).join('<br>')}</div></div>`;
@@ -1905,6 +1905,10 @@ function prepGo(){ const o=offState(), sel=prepSel||{dir:'1',camp:'bal'}, lines=
 function springTestCfg(cfg,n){ const p=findPlayer(USER,n); if(!p||K.isInjured(p)||cfg.lineup.indexOf(n)>=0) return cfg;
   const pos=cfg.positions||K.autoPositions(USER,cfg.lineup); let i=pos.findIndex(x=>x===p.pos||x===p.alt); if(i<0) i=pos.indexOf('DH'); if(i<0) i=cfg.lineup.length-1;
   const lu=cfg.lineup.slice(); lu[i]=n; return Object.assign({},cfg,{lineup:lu}); }
+// top of the game-1 preview: who the manager chose to try, and where he bats
+function springTestCard(){ const sp=state.spring; if(state.pendingGame!=='spring'||!sp||!sp.test||sp.played!==0) return '';
+  const p=findPlayer(USER,sp.test); if(!p) return ''; const lu=buildCfg(USER).lineup, i=lu.indexOf(p.n);
+  return `<div class="card" style="margin:10px 0;border-color:var(--team-ink,var(--accent))"><b>🔎 오늘 시험: ${esc(p.n)}</b><div class="hint">감독님이 고른 선수예요. ${i>=0?`${i+1}번 타자로 선발 출전해요.`:'오늘 선발 명단에 들어가요.'} (${p.age}세 · ${posFull(p.pos)} · OVR ${K.ovr(p)})</div></div>`; }
 function springTestNote(){ const sp=state.spring; if(!sp||!sp.test||sp.played<1||!springNext()) return '';
   return `시험한 ${sp.test}: ${springLine(sp.test).txt}. 남은 ${sp.games.length-sp.played}경기는 직접 보거나 수석코치에게 맡기세요.`; }
 // 빠른 시작 skips the stove league: the head coach's slate stands
@@ -3931,7 +3935,8 @@ function scoutSend(team,n){ if(!scoutCanSend()){ notify('이번 주 스카우트
 function scoutRange(v,k,seed,lo,hi){ const w=Math.round((1-k)*(hi-lo)*0.3); if(w<=0) return null; const off=hash(seed)%(w+1); return [Math.max(lo,v-off),Math.min(hi,v-off+w)]; }
 function attrRowK(label,v,k,seed){ const a=attr20(v), r=scoutRange(a,k,seed+label,1,20); if(!r) return attrRow(label,v);
   return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:var(--panel2);border-radius:6px;margin-bottom:5px"><span>${label}</span><b style="color:var(--dim);font-size:15px">${r[0]}~${r[1]}</b></div>`; }
-function ovrSeen(team,p){ const o=K.ovr(p), r=scoutRange(o,scoutK(team,p),p.n+'ovr',30,99); return r? `${r[0]}~${r[1]}` : String(o); }
+// OVR range at most ~6 wide
+function ovrSeen(team,p){ const o=K.ovr(p), r=scoutRange(o,scoutK(team,p),p.n+'ovr',50,70); return r? `${r[0]}~${r[1]}` : String(o); }
 function scoutNote(team,p){ if(team===USER) return ''; const k=Math.round(scoutK(team,p)*100);
   return `<div class="hint" style="margin:6px 0 10px">스카우트 보고서 정확도 ${k}% · 맞대결과 전력분석팀, 스카우트 파견으로 범위가 좁아져요. 계약하면 정확한 값이 보여요.
     ${k<100?` <button type="button" class="btn btn-sm" ${scoutCanSend()?'':'disabled'} onclick="FM.scoutSend('${team}','${String(p.n).replace(/'/g,"\'")}')">🔭 스카우트 파견${scoutCanSend()?'':' (이번 주 완료)'}</button>`:''}</div>`; }
@@ -5138,7 +5143,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ scoutSend, militaryTick, parkOf, leaderTag, leaders, leadPick, guideShot, coachPrep, prepSet, prepGo, canCoachPrep, springTestNote, evtPromises, promiseCard, fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ springTestCard, scoutSend, militaryTick, parkOf, leaderTag, leaders, leadPick, guideShot, coachPrep, prepSet, prepGo, canCoachPrep, springTestNote, evtPromises, promiseCard, fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeValue, packageValue, tradeVerdict, tradeLog, teamMode, aiTradeTick, clubTradeBudget, playerValue:p=>playerValue(p), tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   sprayTake, tradeHistoryCard, setTradeHist, tradeReact, tradeGrade, showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,

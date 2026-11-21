@@ -78,7 +78,7 @@ function previewNote(){
   outB.forEach((n,i)=>{ const p=findPlayer(USER,n); lines.push(`${n} → ${inB[i]||'-'} (${p&&K.isInjured(p)?'부상':'휴식'})`); });
   if(base.spName!==plain.spName) lines.push(`선발 ${plain.spName} → ${base.spName} (${K.isInjured(findPlayer(USER,plain.spName))?'부상':'피로'})`);
   const sp=state.spring, test=state.pendingGame==='spring'&&sp&&sp.test&&sp.played===0? sp.test : null;
-  const testCard=test? `<div class="card" style="background:var(--panel2);margin-top:10px;border-color:var(--accent)"><b>🔎 오늘 시험: ${esc(test)}</b><div class="hint">감독님이 고른 선수예요. 선발로 나서요.</div></div>` : '';
+  const testCard='';   // shown at the top of the preview instead (springTestCard)
   if(test) for(let i=lines.length-1;i>=0;i--) if(lines[i].indexOf(`→ ${test} (`)>=0) lines.splice(i,1);
   if(!lines.length) return testCard;
   return testCard+`<div class="card" style="background:var(--panel2);margin-top:10px;border-color:var(--warn)"><b>🩺 코칭스태프 조정</b><div class="hint">${lines.map(esc).join('<br>')}</div></div>`;
