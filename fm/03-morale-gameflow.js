@@ -137,16 +137,16 @@ function checkPromises(res, ug){
   f.promises=f.promises.filter(pr=>{
     if(ug<pr.until) return true;
     const p=findPlayer(USER,pr.n); if(!p) return false;
-    if((pr.played||0)>=pr.need){ addMor(p,5); send(pr.n,'🗣','약속을 지켜주셔서 감사합니다',`${pr.n}이(가) 약속대로 기회를 받았습니다. 선수단도 감독이 말을 지킨다는 걸 봤습니다.`,[]); }
+    if((pr.played||0)>=pr.need){ addMor(p,5); addTrust(p,12,'출전 약속을 지킴'); send(pr.n,'🗣','약속을 지켜주셔서 감사합니다',`${pr.n}이(가) 약속대로 기회를 받았습니다. 선수단도 감독이 말을 지킨다는 걸 봤습니다.`,[]); }
     else { p.mor=clampN(p.mor-25,5,99); allPlayers(USER).forEach(x=>{ if(x!==p) x.mor=clampN(x.mor-3,5,99); });
-      send(pr.n,'💢','약속이 지켜지지 않았습니다',`${pr.n}이(가) 약속한 출전 기회를 받지 못해 크게 실망했습니다. (${pr.played||0}/${pr.need}경기 출전)\n\n선수단 전체의 신뢰가 흔들렸습니다.`,[]); }
+      addTrust(p,-15,'출전 약속을 어김'); send(pr.n,'💢','약속이 지켜지지 않았습니다',`${pr.n}이(가) 약속한 출전 기회를 받지 못해 크게 실망했습니다. (${pr.played||0}/${pr.need}경기 출전)\n\n선수단 전체의 신뢰가 흔들렸습니다.`,[]); }
     return false;
   });
 }
 function checkUnhappy(ug){
   const f=fm();
   allPlayers(USER).forEach(p=>{
-    if(K.mor(p)>=32 || K.isInjured(p)) return;
+    if(K.mor(p)>=(trustOf(p)>=70?24:trustOf(p)<=30?40:32) || K.isInjured(p)) return;   // trusted players complain later, wary ones sooner
     if(ug-(f.lastTalk[p.n]||-99)<15) return;
     if(f.inbox.some(m=>!m.done&&m.actions.some(a=>a.arg&&a.arg.n===p.n))) return;
     f.lastTalk[p.n]=ug;

@@ -88,7 +88,7 @@ function faRank(t){ const r=K.TEAM_IDS.slice().sort((a,b)=>teamStrength(b)-teamS
 function faScore(x,t,b){ if(!b) return 0;
   let s=(b.aav*b.yrs+(x.kind==='fa'?0:0))/(x.ask*x.yrs);
   s+= b.yrs>x.yrs? 0.03*(b.yrs-x.yrs) : -0.06*(x.yrs-b.yrs);
-  if(t===x.from) s+=0.06;
+  if(t===x.from) s+=0.06+(t===USER? (trustOf(x.p)-50)*0.002 : 0);   // our own FA: trust in the manager keeps him (±0.1)
   if(faRank(t)<=3) s+=0.04;
   if(b.promise) s+=0.06;
   return s; }
@@ -173,7 +173,7 @@ function faCard(){ const f=fm(), list=(f.fa||[]).map((x,i)=>({x,i})).sort((a,b)=
   const rows=list.map(({x,i})=>{ const p=x.p, st=faStatus(x);
     const mine= st.mine? `<span class="chip ${st.lead?'good':'warn'}">${st.lead?'우리 제안 선두':'경쟁 제안 우위'}</span>` : '';
     return `<tr><td class="name"><a href="javascript:void(0)" onclick="FM.faOffer(${i})">${esc(p.n)}</a>${x.grade?` <span class="pill pos">${x.grade}</span>`:p.f?` <span class="pill pos">${fxLabel(p)}</span>`:''}</td><td><span class="pill pos">${p.pos||p.role}</span></td><td>${p.age}</td>
-      <td><span class="ovr ${ovrClass(K.ovr(p))}">${K.ovr(p)}</span></td><td>${x.from||'-'}</td><td>${x.yrs}년 ${eok(x.ask*x.yrs)}억</td><td>${st.n}곳 ${mine}</td>
+      <td><span class="ovr ${ovrClass(K.ovr(p))}">${ovrSeen(x.from===USER?USER:'FA',p)}</span></td><td>${x.from||'-'}</td><td>${x.yrs}년 ${eok(x.ask*x.yrs)}억</td><td>${st.n}곳 ${mine}</td>
       <td>${x.blockY!=null&&x.blockY>=state.year? `<span class="muted" title="웨이버 공시 후 클레임이 없던 선수는 그해 계약할 수 없습니다">${x.blockY+1}년부터</span>` : `<button class="btn btn-sm" onclick="FM.faOffer(${i})">${st.mine?'제안 수정':'제안'}</button>`}</td></tr>`; }).join('');
   return `<div class="card" style="margin-top:14px">${head}${gauge}
     <div class="sq-table" style="display:block"><table><thead><tr><th class="name">선수</th><th>POS</th><th>나이</th><th>OVR</th><th>원소속</th><th>요구</th><th>관심 구단</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>

@@ -129,12 +129,12 @@ function onSeasonEnd(){
       if(p.f&&Math.random()<0.25){ toFA.push([t,p]); return; }
       p.yrs=2; p.sal=renewSalary(p); return; }
     p.expiring=true;
-    const ask=Math.round(renewSalary(p)*(K.mor(p)<40?1.2:K.mor(p)>75?0.95:1.03)*10)/10;
+    const tv=trustOf(p), ask=Math.round(renewSalary(p)*(K.mor(p)<40?1.2:K.mor(p)>75?0.95:1.03)*(tv>=70?0.95:tv<=30?1.12:1)*10)/10;   // trust: a discount, or a premium
     const acts=[{label:`1년 ${ask}억 재계약`, fn:'renew', arg:{n:p.n, years:1, sal:ask}}];
     if(p.age<=33) acts.push({label:`3년 ${Math.round(ask*1.1*10)/10}억 재계약`, fn:'renew', arg:{n:p.n, years:3, sal:Math.round(ask*1.1*10)/10}});
     acts.push({label:'재계약하지 않는다', fn:'release', arg:{n:p.n}});
     send(`${p.n} 에이전트`,'📝',`${p.n} 계약 만료 — 재계약 협상`,
-      `${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})의 계약이 만료됩니다.${storyNote(p.n)?' ('+storyNote(p.n)+')':''}\n현재 연봉 ${p.sal}억 원 · 요구 연봉 ${ask}억 원 · 사기 ${moraleLabel(K.mor(p))}\n\n` +
+      `${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})의 계약이 만료됩니다.${storyNote(p.n)?' ('+storyNote(p.n)+')':''}\n감독과의 관계: ${trustLabel(tv)}${tv>=70?' · 조금 낮춰 불렀습니다':tv<=30?' · 웃돈을 요구합니다':''}\n현재 연봉 ${p.sal}억 원 · 요구 연봉 ${ask}억 원 · 사기 ${moraleLabel(K.mor(p))}\n\n` +
       `다음 시즌 시작 전까지 결정하지 않으면 요구 조건(1년 ${ask}억)으로 재계약합니다. 재계약하지 않으면 보류선수 명단에서 빠져 자유계약 선수가 됩니다.`, acts);
   }));
   faDeclare(faCands);

@@ -40,6 +40,8 @@ module.exports = ({assert,test}) => {
     const picks=(h.state.fm.opening||{}).picks||[]; for(const x of picks) assert.ok(x.done,'opening pick '+x.win+' got its check-in');
     if(picks.length) assert.ok(h.state.fm.inbox.some(m=>/개막 때 고른/.test(m.subject)),'check-in message sent');
     assert.ok((h.state.fm.mineLog||[]).length>0,'milestone news for the manager’s players');
+    for(const x of picks){ const p=h.state.fm&&[...h.K.ROSTERS.KIA.batters,...h.K.ROSTERS.KIA.pitchers,...h.K.ROSTERS.KIA.farm].find(q=>q.n===x.win); if(p) assert.ok((p.tlog||[]).some(t=>t[1]==='개막 주전으로 선택'),'trust remembers the opening pick'); }
+    assert.ok(h.state.fm.inbox.some(m=>/40경기 중간 평가/.test(m.subject))&&h.state.fm.inbox.some(m=>/80경기 중간 평가/.test(m.subject)),'board check-ins at 40 and 80 games');
   });
   test('상무: an accepted player leaves for two seasons and comes back to the 2군; parks differ', () => {
     const h=new Runtime({observe:false}).start('KIA'); let served=0, failed=0;
@@ -51,5 +53,10 @@ module.exports = ({assert,test}) => {
       assert.equal(m.status,'back'); assert.ok(h.K.ROSTERS.KIA.farm.some(x=>x.n===p.n),'back in the 2군'); }
     assert.ok(served>0,'someone was accepted in six tries');
     assert.notEqual(h.FM.parkOf('KIA').cap,h.FM.parkOf('키움').cap);
+  });
+  test('scouting: other clubs show ranges, one scout trip a week narrows them', () => {
+    const h=new Runtime({observe:false}).start('KIA'), p=h.K.ROSTERS.LG.batters[0];
+    h.FM.scoutSend('LG',p.n); assert.equal(h.state.fm.scout[p.n],1);
+    h.FM.scoutSend('LG',p.n); assert.equal(h.state.fm.scout[p.n],1,'only one trip per week');
   });
 };

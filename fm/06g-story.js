@@ -18,9 +18,9 @@ const storyTrade=executeClubTrade; executeClubTrade=function(a,b,aGive,bGive,kin
 // opening-day job battle settled (fm/05b-preseason2.js battleApply)
 function storyOpening(b,win,lose,auto){ const f=fm(); if(!f.opening||f.opening.y!==state.year) f.opening={y:state.year,picks:[]};
   f.opening.picks.push({k:b.k,label:b.label,win:win.n,lose:lose.n,wl:springLine(win.n).txt,ll:springLine(lose.n).txt,auto:!!auto,done:false});
-  if(!auto) storyMark(win.n,'battle'); }
+  if(!auto){ storyMark(win.n,'battle'); addTrust(win,8,'개막 주전으로 선택'); addTrust(lose,-6,'개막 주전 경쟁에서 밀림'); } }
 // after each of our games: opening check-ins and milestones
-function storyTick(){ if(state.phase!=='regular'&&state.phase!=='postseason') return; const f=fm(), ug=userGamesPlayed();
+function storyTick(){ if(state.phase!=='regular'&&state.phase!=='postseason') return; const f=fm(), ug=userGamesPlayed(); trustSweep(); boardCheckTick();
   if(f.opening&&f.opening.y===state.year) f.opening.picks.forEach((x,i)=>{ if(x.done) return; const L=seasonLineOf(x.win);
     const ready=x.k==='SP5'? L.p&&(L.p.GS||0)>=3 : L.b&&(L.b.G||0)>=15; if(!ready) return; x.done=true;
     const now=x.k==='SP5'? `선발 ${L.p.GS}경기 ${ipStr(L.p.OUT)}이닝 ERA ${fmtEra(L.p.ER,L.p.OUT)}` : `${L.b.G}경기 ${L.b.AB}타수 ${L.b.H}안타 ${L.b.HR}홈런 · 타율 ${fmtAvg(L.b.H/Math.max(1,L.b.AB))}`;
@@ -76,3 +76,56 @@ function militaryLeave(p){ const r=K.ROSTERS[USER], farm=farmOf(USER);
     arr.splice(arr.indexOf(p),1); }
   const keys=p.type==='B'? ['con','pow','eye','fld'] : ['stu','ctl','mov','sta']; bumpWithin(p,keys[Math.floor(Math.random()*keys.length)],2);
   fm().away[p.n]={p, back:state.year+2}; if(state.cfgs[USER]) repairCfg(USER); return true; }
+
+// ----- 감독 신뢰 (B1): each player remembers how this manager treated him -----
+// p.trust 0..100 (50 = neutral), p.tlog = last five reasons. Used in renewals, FA retention and benching complaints.
+function trustOf(p){ return p&&p.trust!=null? p.trust : 50; }
+function addTrust(p,d,why){ if(!p||!d) return; p.trust=clampN(Math.round(trustOf(p)+d),0,100);
+  p.tlog=(p.tlog||[]); p.tlog.push([state.year,why,d]); if(p.tlog.length>5) p.tlog.shift(); }
+function trustLabel(v){ return v>=75?'깊은 신뢰':v>=60?'좋음':v>=40?'보통':v>=25?'서운함':'불신'; }
+function trustCard(p){ if(!p||!state.fm) return ''; const v=trustOf(p), L=(p.tlog||[]).slice().reverse();
+  return `<div class="card" style="margin-top:12px"><h3>🤝 감독과의 관계 <span class="tag">${trustLabel(v)} · ${v}</span></h3>
+    <div class="progress" style="margin:4px 0 8px"><i style="width:${v}%;background:${v>=60?'var(--good)':v>=40?'var(--warn)':'var(--bad)'}"></i></div>
+    ${L.length? `<ul class="ev-notes">${L.map(([y,w,d])=>`<li>${y} · ${esc(w)} <span class="muted">(${d>0?'+':''}${d})</span></li>`).join('')}</ul>` : '<p class="muted">아직 특별한 일이 없었어요.</p>'}</div>`; }
+// promise verdicts from the event engine land in flags as promise:<id>|<name>
+function trustSweep(){ const e=typeof evtState==='function'? evtState() : null, f=fm(); if(!e) return; f.trustSeen=f.trustSeen||{};
+  for(const k in e.flags){ if(k.indexOf('promise:')!==0||f.trustSeen[k]===e.flags[k]) continue; f.trustSeen[k]=e.flags[k];
+    const p=findPlayer(USER,k.split('|').pop()); if(p) addTrust(p,e.flags[k]?12:-15,e.flags[k]?'약속을 지킴':'약속을 어김'); }
+  allPlayers(USER).forEach(p=>{ if(p.listed&&!p.listedT){ p.listedT=1; addTrust(p,-10,'트레이드 리스트 등록'); } if(!p.listed&&p.listedT) p.listedT=0; }); }
+const trustDemote=demote; demote=function(n){ const p=findPlayer(USER,n), was=p&&!isFarm(USER,p); const out=trustDemote(n); if(was&&isFarm(USER,p)) addTrust(p,-6,'2군 말소'); return out; };
+const trustPromote=promote; promote=function(n){ const p=farmOf(USER).find(x=>x.n===n); const out=trustPromote(n); if(p&&!isFarm(USER,p)) addTrust(p,5,'1군 콜업'); return out; };
+
+// ----- 이사회 중간 평가 (B3): after 40 and 80 games the board checks the way the club is run, not just the rank -----
+function boardCheckTick(){ const f=fm(), o=f.off&&f.off.year===state.year? f.off : null, ug=userGamesPlayed(); if(state.phase!=='regular'||!o||!o.mode) return;
+  f.bchk=f.bchk||{}; const k=ug>=80?'80':ug>=40?'40':null; if(!k||f.bchk[state.year+':'+k]) return; f.bchk[state.year+':'+k]=1;
+  const s=state.season[USER], rank=standings().findIndex(x=>x.t===USER)+1, b=f.board, goal=b.expect&&b.expect.rank||5;
+  let ok, why;
+  if(o.mode==='rebuild'){ let young=0, all=0; allPlayers(USER).forEach(p=>{ const x=s.bat[p.n], q=s.pit[p.n]; const w=(x&&x.PA||0)+(q&&q.OUT||0); all+=w; if(p.age<=25) young+=w; });
+    const pct=all? Math.round(young/all*100) : 0; ok=pct>=25; why=`리빌딩을 약속했습니다. 25세 이하 선수의 출전 비중 ${pct}% (기준 25%).`; }
+  else if(o.mode==='win'){ ok=rank<=goal; why=`우승 도전을 선언했습니다. 현재 ${rank}위 (목표 ${goal}위 이내).`; }
+  else { ok=f.fin.balance>=0&&fans()>=45; why=`균형 운영을 약속했습니다. 잔고 ${f.fin.balance.toFixed(1)}억 · 팬 여론 ${Math.round(fans())}.`; }
+  b.conf=clampN(b.conf+(ok?3:-4),0,100);
+  send('이사회','🏛',`${k}경기 중간 평가: ${ok?'계획대로':'우려'}`, `${why}\n\n${ok?'이사회는 운영 방향에 만족합니다. (신뢰 +3)':'이사회는 약속과 다른 운영을 우려합니다. (신뢰 -4)'}`,
+    [{label:'운영 방향을 설명한다', fn:'boardExplain', arg:{ok}},{label:'계획을 균형 운영으로 바꾼다', fn:'boardShift', arg:{}},{label:'예산 증액을 요청한다', fn:'boardBudget', arg:{}}]); }
+ACTIONS.boardExplain=(m,a)=>{ const b=fm().board; if(a.ok){ b.conf=clampN(b.conf+1,0,100); return '이사회가 감독의 설명에 고개를 끄덕였습니다. (신뢰 +1)'; } return '이사회는 결과로 보여 달라고 했습니다.'; };
+ACTIONS.boardShift=()=>{ const o=fm().off; if(o) o.mode='keep'; const b=fm().board; b.conf=clampN(b.conf-1,0,100); return '올 시즌 운영 방향을 균형으로 바꿨습니다. 다음 평가부터 이 기준을 씁니다. (신뢰 -1)'; };
+ACTIONS.boardBudget=()=>{ const f=fm(), b=f.board; if(b.conf>=60){ f.fin.budget=eok(f.fin.budget*1.05); return `이사회가 예산을 늘렸습니다. 예산 ${eok(f.fin.budget)}억.`; } b.conf=clampN(b.conf-3,0,100); return '이사회가 요청을 거절했습니다. 지금은 신뢰가 부족합니다. (신뢰 -3)'; };
+
+// ----- 스카우팅 (B2): other clubs' players are seen through a report with a margin of error -----
+// knowledge 0..1: own players 1; others start at 0.4, rise with games against their club, the analyst, and scout visits.
+function scoutState(){ const f=fm(); f.scout=f.scout||{}; return f.scout; }
+function scoutK(team,p){ if(!p) return 1; if(team===USER) return 1; const f=fm(), vs=(state.schedule||[]).filter(g=>g.played&&((g.home===USER&&g.away===team)||(g.away===USER&&g.home===team))).length;
+  const ana=typeof coachQOf==='function'? (coachQOf('ana')-10)*0.02 : 0; return clampN(0.4+Math.min(0.3,vs*0.02)+ana+(scoutState()[p.n]||0)*0.25,0,1); }
+function scoutSlot(){ const o=fm().off; return state.phase==='stove'&&o? 's'+state.year+':'+o.week : state.phase+state.year+':'+Math.floor(userGamesPlayed()/6); }
+function scoutCanSend(){ return fm().scoutSlot!==scoutSlot(); }
+function scoutSend(team,n){ if(!scoutCanSend()){ notify('이번 주 스카우트는 이미 나갔어요. 다음 주(6경기 뒤)에 다시 보낼 수 있어요.'); return; }
+  const s=scoutState(); s[n]=(s[n]||0)+1; fm().scoutSlot=scoutSlot(); if(window.Track) Track.action('scout_send');
+  notify(josa(`스카우트가 ${n}을(를) 보고 왔어요. 보고서가 더 정확해졌어요.`)); if(team) showProfile(team,n); else if(typeof draftState==='function'&&draftState()) showDraft(); else render(); }
+// a range that always holds the true value; the same player shows the same range until the report improves
+function scoutRange(v,k,seed,lo,hi){ const w=Math.round((1-k)*(hi-lo)*0.3); if(w<=0) return null; const off=hash(seed)%(w+1); return [Math.max(lo,v-off),Math.min(hi,v-off+w)]; }
+function attrRowK(label,v,k,seed){ const a=attr20(v), r=scoutRange(a,k,seed+label,1,20); if(!r) return attrRow(label,v);
+  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:var(--panel2);border-radius:6px;margin-bottom:5px"><span>${label}</span><b style="color:var(--dim);font-size:15px">${r[0]}~${r[1]}</b></div>`; }
+function ovrSeen(team,p){ const o=K.ovr(p), r=scoutRange(o,scoutK(team,p),p.n+'ovr',30,99); return r? `${r[0]}~${r[1]}` : String(o); }
+function scoutNote(team,p){ if(team===USER) return ''; const k=Math.round(scoutK(team,p)*100);
+  return `<div class="hint" style="margin:6px 0 10px">스카우트 보고서 정확도 ${k}% · 맞대결과 전력분석팀, 스카우트 파견으로 범위가 좁아져요. 계약하면 정확한 값이 보여요.
+    ${k<100?` <button type="button" class="btn btn-sm" ${scoutCanSend()?'':'disabled'} onclick="FM.scoutSend('${team}','${String(p.n).replace(/'/g,"\'")}')">🔭 스카우트 파견${scoutCanSend()?'':' (이번 주 완료)'}</button>`:''}</div>`; }

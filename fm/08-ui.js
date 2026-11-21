@@ -356,11 +356,12 @@ function showProfile(team,name){
   const s = isB ? state.season[team].bat[name] : state.season[team].pit[name];
   const rt=ratingsOf(team,name);
   const avgRt = rt&&rt.cnt? (rt.sum/rt.cnt).toFixed(2) : '-';
+  const kS=scoutK(team,p), aRow=(l,v)=>attrRowK(l,v,kS,p.n);   // other clubs' players: a scouting range
   const attrs = isB
-    ? `<div class="grid cols2" style="gap:14px"><div><div class="muted" style="font-weight:700;margin-bottom:6px">타격</div>${attrRow('컨택',p.con)}${attrRow('파워',p.pow)}${attrRow('선구안',p.eye)}</div>
-       <div><div class="muted" style="font-weight:700;margin-bottom:6px">주루 · 수비</div>${attrRow('주력',p.spd)}${attrRow('수비',p.fld)}${attrRow('송구',p.arm)}</div></div>`
-    : `<div class="grid cols2" style="gap:14px"><div><div class="muted" style="font-weight:700;margin-bottom:6px">구질</div>${attrRow('구위',p.stu)}${attrRow('무브먼트',p.mov)}</div>
-       <div><div class="muted" style="font-weight:700;margin-bottom:6px">제구 · 체력</div>${attrRow('제구',p.ctl)}${attrRow('체력',p.sta)}</div></div>`;
+    ? `<div class="grid cols2" style="gap:14px"><div><div class="muted" style="font-weight:700;margin-bottom:6px">타격</div>${aRow('컨택',p.con)}${aRow('파워',p.pow)}${aRow('선구안',p.eye)}</div>
+       <div><div class="muted" style="font-weight:700;margin-bottom:6px">주루 · 수비</div>${aRow('주력',p.spd)}${aRow('수비',p.fld)}${aRow('송구',p.arm)}</div></div>`
+    : `<div class="grid cols2" style="gap:14px"><div><div class="muted" style="font-weight:700;margin-bottom:6px">구질</div>${aRow('구위',p.stu)}${aRow('무브먼트',p.mov)}</div>
+       <div><div class="muted" style="font-weight:700;margin-bottom:6px">제구 · 체력</div>${aRow('제구',p.ctl)}${aRow('체력',p.sta)}</div></div>`;
   const rad = isB ? radar([p.con,p.pow,p.eye,p.spd,p.fld,p.arm].map(attr20),['컨택','파워','선구','주력','수비','송구'],ratColor(o))
                   : radar([p.stu,p.mov,p.ctl,p.sta].map(attr20),['구위','무브','제구','체력'],ratColor(o));
   const statLine = isB
@@ -385,7 +386,7 @@ function showProfile(team,name){
   profilePage(team, name, `
     <div class="row" style="align-items:center;gap:16px;flex-wrap:wrap">
       <div style="width:64px;height:64px;border-radius:50%;background:conic-gradient(${ratColor(o)} ${o}%, var(--panel2) 0);display:flex;align-items:center;justify-content:center">
-        <div style="width:52px;height:52px;border-radius:50%;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:${ratColor(o)}">${o}</div></div>
+        <div style="width:52px;height:52px;border-radius:50%;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:${mine?22:15}px;font-weight:800;color:${ratColor(o)}">${mine?o:ovrSeen(team,p)}</div></div>
       <div style="flex:1;min-width:200px"><h2 style="margin:0">${esc(name)}${p.rookie?' <span class="pill pos">신인</span>':''}</h2>
         <div class="muted">${teamDot(team)} ${K.ROSTERS[team].name}${farm?' <span class="chip">2군</span>':''} · ${p.age}세 · ${posFull(p.pos||p.role)}</div>${p.dr?`<div class="muted" style="font-size:12px;margin-top:2px">${p.dy} 신인 드래프트 ${p.dr.r}라운드 · ${esc(p.dr.school)}${p.dr.team!==team?` · ${esc(p.dr.team)} 지명`:''}</div>`:''}
         <div class="muted" style="font-size:12px;margin-top:2px">성격: <b style="color:var(--txt)">${pers(p).k}</b> — ${pers(p).d}</div></div>
@@ -401,7 +402,7 @@ function showProfile(team,name){
     <div class="tabsm" style="margin-bottom:12px">${[['overview','개요'],['season',state.year+' 시즌'],['analysis','분석'],['career','통산 기록'],['log','최근 경기']].map(([k,l])=>`<button class="${profTab===k?'active':''}" onclick="FM.profileTab('${k}')">${l}</button>`).join('')}</div>
     ${profTab==='season'? seasonPanel(team,p) : profTab==='analysis'? analysisPanel(team,p) : profTab==='career'? careerPanel(team,p) : profTab==='log'? logPanel(team,p) : `
     <div class="grid" style="grid-template-columns:1fr auto;gap:14px;align-items:start" id="profgrid">
-      <div>${attrs}<div class="hint">능력치 1~20 (FM 스케일) · 16+ 최상급, 11~15 준수, 6~10 평범, 5 이하 약점</div></div>
+      <div>${mine?'':scoutNote(team,p)}${attrs}<div class="hint">능력치 1~20 (FM 스케일) · 16+ 최상급, 11~15 준수, 6~10 평범, 5 이하 약점</div></div>${mine?trustCard(p):''}
       <div style="text-align:center">${rad}</div></div>
     <style>@media(max-width:640px){#profgrid{grid-template-columns:1fr!important}}</style>
     <div class="muted" style="font-weight:700;margin:12px 0 6px">${p.type==='P'?'보직 숙련도':'포지션 적합도'}</div>${p.type==='P'? posStars(p) : `<div class="row" style="gap:4px">${posStars(p)}</div>`}

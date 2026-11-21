@@ -315,7 +315,7 @@ const EV={
       return {who:'수석코치',icon:'🎖',title:`${state.year} 시즌 리더 선임`,body:`${L.captain?'새 시즌을 앞두고 리더를 다시 정해요.':'감독님이 선수단을 이끌 사람을 처음 정하는 자리예요.'} 나이와 실력을 보고 추천안을 짰어요. 이름을 누르면 바꿀 수 있어요.\n주장은 라커룸을, 투수조장과 야수조장은 각 조의 훈련과 컨디션 이야기를 코치진에 전해요.`,
         opts:[{l:'추천안 승인',d:'리더 사기 +6 · 추천에서 바꾸면 빠진 추천 후보 사기 -2'}],data:{roles}}; },
     pick(i,d,o){ const f=evtState().flags, out=[];
-      d.roles.forEach(r=>{ const n=r.c[r.pick]||r.c[0], p=findPlayer(USER,n); if(!p) return; f[r.key]=n; addMor(p,6);
+      d.roles.forEach(r=>{ const n=r.c[r.pick]||r.c[0], p=findPlayer(USER,n); if(!p) return; f[r.key]=n; addMor(p,6); addTrust(p,6,r.role+' 선임');
         if(r.pick){ const rec=findPlayer(USER,r.c[0]); if(rec) addMor(rec,-2); }
         out.push(`${r.role}: ${n} · ${(LEAD_ROLES.find(x=>x.key===r.key)||{}).say}`); });
       if(o) o.leadY=state.year; memo('leaders',null,'리더 선임: '+d.roles.map(r=>r.role+' '+(r.c[r.pick]||r.c[0])).join(', '));
