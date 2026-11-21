@@ -32,7 +32,7 @@ function saveRoundTrip(h,label){h.action('manual save '+label,()=>h.App.save());
   const after=h.saveObject();if(json(before)!==json(after))h.violation('SAVE_ROUNDTRIP',{label,beforeHash:require('node:crypto').createHash('sha256').update(json(before)).digest('hex'),afterHash:require('node:crypto').createHash('sha256').update(json(after)).digest('hex')});else audit.pass(h.label+' save '+label,{bytes:h.storage.get('kbo_manager_save').length*2});}
 function finishRegular(h,daily=false,live=false){
   if(live)h.liveNext();
-  if(daily){let guard=0;while(h.state.phase==='regular'&&guard++<146){h.action('advance one user game',()=>h.App.userGames(1));if(h.state.season[h.user].W+h.state.season[h.user].L+h.state.season[h.user].T===48)saveRoundTrip(h,'day48');}}
+  if(daily){let guard=0;while(h.state.phase==='regular'&&guard++<146){h.advanceOne();if(h.state.season[h.user].W+h.state.season[h.user].L+h.state.season[h.user].T===48)saveRoundTrip(h,'day48');}}
   else h.action('simulate remaining regular season',()=>{h.App.simRest();h.FM.answer();});
   if(h.state.phase!=='postseason')throw new Error('Regular season failed to complete');
 }

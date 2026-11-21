@@ -1741,7 +1741,7 @@ function startSpring(){
   closeModal(); render(); saveNow();
 }
 function springNext(){ const sp=state.spring; if(!sp) return null; const i=sp.games.findIndex(g=>!g.played); if(i<0) return null; const g=sp.games[i]; return {home:g.home, away:g.away, label:`시범경기 ${i+1}차전`, i}; }
-function springPlayNext(){ if(!springNext()){ render(); return; } state.pendingGame='spring'; openPreview(); }
+function springPlayNext(){ if(state.liveMatch)return Match.resume(); if(!springNext()){ render(); return; } state.pendingGame='spring'; openPreview(); }
 function springRecord(res){
   const sp=state.spring, n=springNext(); if(!n) return;
   const g=sp.games[n.i]; g.played=true; g.hr=res.homeRuns; g.ar=res.awayRuns; sp.played++;
@@ -1758,9 +1758,10 @@ function springRecord(res){
   if(!springNext()) send('수석코치','📋',`시범경기 종료 (${sp.W}승 ${sp.L}패 ${sp.T}무)`, '시범경기 일정을 모두 마쳤습니다. 대시보드에서 정규시즌 개막을 선언하세요.', []);
 }
 function springSimAll(){
+  if(state.liveMatch)return Match.resume(true);
   if(window.Track) Track.action('spring_sim');
   state.pendingGame=null; state.matchTac=null;
-  let n; while((n=springNext())){ springRecord(K.simGame(buildCfg(n.home), buildCfg(n.away), {maxInnings:9})); }
+  let n; while((n=springNext())){ springRecord(K.simGame(buildCfg(n.home), buildCfg(n.away), {maxInnings:K.GAME_RULES.spring})); }
   closeModal(); render();
 }
 // a first-season shortcut: balanced camp, exhibition games simulated, straight to the opening-day preview
@@ -4484,13 +4485,13 @@ function draftee(t,[rd,n,kind,school]){
 // name -> rating points, + = 2026 better than 2024-25. Feeds potentialOf() in fm/00-core.js.
 const TREND_2026={"허경민":2,"안현민":-1,"김민혁":-2,"오윤석":-1,"권동진":2,"장준원":1,"장성우":1,"김민석":4,"구자욱":2,"디아즈":-2,"최형우":-1,"김성윤":-2,"류지혁":2,"김영웅":-4,"나성범":2,"박재현":2,"김선빈":-2,"한준수":2,"김호령":-1,"하주석":-1,"오스틴":3,"박해민":1,"문성주":-1,"천성호":1,"구본혁":-1,"문정빈":1,"송찬의":3,"문보경":-2,"신민재":-4,"오지환":-1,"홍창기":-4,"박동원":-2,"이주헌":-1,"조수행":2,"박준순":3,"박찬호":-1,"안재석":-1,"정수빈":-1,"양의지":-3,"손아섭":-1,"양석환":-2,"박성한":2,"최정":2,"에레디아":-3,"고명준":1,"조형우":2,"김성욱":1,"최지훈":-1,"전의산":2,"김재환":-2,"한유섬":-2,"레이예스":2,"한동희":1,"황성빈":-1,"고승민":1,"장두성":1,"전민재":1,"손성빈":2,"한태양":-1,"윤동희":-3,"유강남":-1,"전준우":-4,"손호영":-2,"천재환":2,"김휘집":2,"최정원":-2,"김형준":2,"권희동":-3,"서호철":-1,"최인호":1,"문현빈":1,"페라자":2,"강백호":1,"노시환":1,"허인서":1,"이원석":1,"심우준":2,"황영묵":-1,"최재훈":-2,"데이비슨":-1,"추재현":1,"김건희":2,"김웅빈":1,"임병욱":1,"최주환":-2,"양현종":-2,"소형준":-1,"손동현":-1,"주권":-1,"오원석":2,"배찬승":-1,"이승민":3,"김재윤":3,"후라도":-1,"원태인":3,"최원태":1,"임기영":1,"양창섭":-1,"올러":-2,"네일":-1,"황동하":-3,"정해영":-1,"웰스":-1,"톨허스트":-1,"임찬규":-1,"송승기":-1,"곽빈":3,"벤자민":4,"김택연":-1,"이영하":2,"최민석":2,"이용찬":-1,"잭로그":-2,"박치국":1,"이병헌":-1,"최승용":-1,"조병현":-1,"김민":1,"노경은":-3,"최민준":-1,"전영준":-1,"이로운":1,"김건우":-2,"김진욱":3,"나균안":1,"김원중":-1,"이민석":1,"라일리":-1,"구창모":-1,"신민혁":-1,"배재환":1,"전사민":-1,"김진호":-2,"송명기":-1,"조동욱":1,"황준서":-1,"정우주":-1,"알칸타라":1,"전준표":1,"조영건":1,"박정훈":1};
 // ---------- 리그 달력: 트레이드 마감 · 올스타 휴식기 · 신인 드래프트 ----------
-// The schedule has no dates, so game days are laid on a calendar: opening day 3/28, six game
-// days a week, and a four-day All-Star break from 7/10. That puts the 7/31 trade deadline
-// around game 104 and the season's end in mid-September.
+// Earlier careers keep their original six-game calendar until the next season.
 const SEASON_START=[3,28], ALLSTAR=[7,10], ALLSTAR_DAYS=4, DEADLINE=[7,31], DRAFT_ROUNDS=4, DRAFT_POOL=60;
-function baseDate(day){ return new Date(state.year, SEASON_START[0]-1, SEASON_START[1]+Math.floor(day*7/6)); }
-function allStarDate(){ return new Date(state.year, ALLSTAR[0]-1, ALLSTAR[1]); }
-function calDate(day){ const d=baseDate(day); if(d>=allStarDate()) d.setDate(d.getDate()+ALLSTAR_DAYS); return d; }
+function baseDate(day){
+  if(state.schedV===SCHED_V){const d=openingDate(state.year); d.setDate(d.getDate()+day); return d;}
+  return new Date(state.year, SEASON_START[0]-1, SEASON_START[1]+Math.floor(day*7/6)); }
+function allStarDate(){ return state.schedV===SCHED_V?allStarStart(state.year):new Date(state.year, ALLSTAR[0]-1, ALLSTAR[1]); }
+function calDate(day){ const d=baseDate(day); if(state.schedV!==SCHED_V&&d>=allStarDate()) d.setDate(d.getDate()+ALLSTAR_DAYS); return d; }
 function dateLabel(d){ return `${d.getMonth()+1}월 ${d.getDate()}일`; }
 function nextUserGame(){ return state.schedule.find(g=>!g.played&&(g.home===USER||g.away===USER)); }
 function today(){ const g=nextUserGame(), last=state.schedule[state.schedule.length-1]; return calDate(g? g.day : last? last.day : 0); }

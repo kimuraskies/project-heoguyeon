@@ -358,27 +358,66 @@ function roundRobin(teams){
   }
   return rounds;
 }
-// KBO-style series: each pair meets 16 times as four 3-game series and two 2-game series,
-// home field alternating series by series (8 home games each). 144 days, five games a day.
-const SCHED_V=2;
-function buildSchedule(){
-  const rounds = roundRobin(K.TEAM_IDS); // 9 rounds x 5 pairs
-  const sched=[]; let day=0;
-  const series=[3,3,3,3,2,2];
-  series.forEach((len,c)=>{
-    rounds.forEach((pairs,r)=>{
-      for(let g=0;g<len;g++){
-        pairs.forEach(p=>{
-          const flip=(c+r)%2===0; // alternates home and away from one series to the next
-          const home = flip? p[0]:p[1];
-          const away = flip? p[1]:p[0];
-          sched.push({day:day, home, away, played:false, hr:0, ar:0, ser:g+1, serLen:len});
-        });
-        day++;
+// day is a civil-day offset from the last Saturday in March (schedule v3).
+const SCHED_V=3;
+function openingDate(year){
+  const d=new Date(year,2,31);
+  d.setDate(31-(d.getDay()+1)%7);
+  return d;
+}
+function allStarStart(year){
+  const d=new Date(year,6,10);
+  d.setDate(10+(5-d.getDay()+7)%7); // Friday through Monday
+  return d;
+}
+function buildSchedule(year=2026){
+  const rounds=roundRobin(K.TEAM_IDS), schedule=[];
+  const opening=openingDate(year), pause=Math.round((allStarStart(year)-opening)/864e5);
+  let day=0;
+  function series(c,r,len){
+    // A two-game series starting on Sunday would spill into Monday.
+    if(day%7===1&&len>1)day+=2;
+    if(day%7===2)day++; // Monday
+    if(day===pause)day+=4;
+    for(let i=0;i<len;i++,day++){
+      for(const pair of rounds[r]){
+        const [home,away]=(c+r)%2?pair:[pair[1],pair[0]];
+        schedule.push({day,home,away,played:false,hr:0,ar:0,ser:i+1,serLen:len});
       }
-    });
-  });
-  return sched;
+    }
+  }
+  series(0,0,2);
+  for(let c=1;c<=4;c++)for(let r=0;r<rounds.length;r++)series(c,r,3);
+  for(let r=1;r<rounds.length;r++)series(0,r,2);
+  for(let r=0;r<rounds.length;r++)series(5,r,2);
+  return schedule;
+}
+
+// Move the fixture itself. No placeholder can be counted as a played game.
+function checkRain(idx){
+  const g=state.schedule[idx];
+  if(state.schedV!==SCHED_V||g.played||g.weatherChecked)return false;
+  g.weatherChecked=true;
+  if(Math.random()>=0.012)return false;
+  const original=g.day, last=state.schedule[state.schedule.length-1];
+  if(state.reserveDay==null)state.reserveDay=last.day+1;
+  let day=state.reserveDay;
+  while(state.schedule.some(s=>s.day===day&&[s.home,s.away].some(t=>t===g.home||t===g.away)))day++;
+  state.schedule.splice(idx,1);
+  g.originalDay=original; g.day=day;
+  const after=state.schedule.findIndex(s=>s.day>day);
+  state.schedule.splice(after<0?state.schedule.length:after,0,g);
+  if(g.home===USER||g.away===USER){
+    state.rainout={home:g.home,away:g.away,date:FM.calDate(original).toLocaleDateString('sv-SE'),
+      makeupDate:FM.calDate(day).toLocaleDateString('sv-SE'),sp:projectedSP(USER),advanced:false};
+  }
+  return true;
+}
+function advanceRainoutRotation(){
+  const rain=state.rainout, rot=state.cfgs[USER].rotation;
+  if(!rain||rain.advanced||rot.length<2||state.phase!=='regular')return false;
+  rot.push(rot.shift());
+  rain.advanced=true; autosave(); return projectedSP(USER);
 }
 
 function initState(){
@@ -387,7 +426,7 @@ function initState(){
     year: 2026,
     cfgs: {},
     season: {},
-    schedule: buildSchedule(), schedV: 2,
+    schedule: buildSchedule(), schedV: SCHED_V,
     gameIdx: 0,
     phase: "stove", // stove (스토브리그·전지훈련) | spring (시범경기) | regular | postseason | offseason
     history: [],
@@ -433,6 +472,7 @@ function playGame(idx, detail){
   const g=state.schedule[idx];
   if(g.played) return null;
   const hc=buildCfg(g.home), ac=buildCfg(g.away);
+  if(g.home===USER||g.away===USER)state.rainout=null;
   const res=K.simGame(hc,ac,{});
   g.played=true; g.hr=res.homeRuns; g.ar=res.awayRuns;
   accumulate(res);
@@ -444,16 +484,22 @@ function playGame(idx, detail){
 // ---------- sim controls ----------
 // New flow: auto-sim other teams' games up to our next game, then show PREVIEW (entry submission).
 function startNextUserGame(){
+  if(state.liveMatch)return Match.resume();
   if(state.phase==="spring"){ FM.springPlayNext(); return; }
   if(state.phase!=="regular"){ render(); return; }
   while(state.gameIdx<state.schedule.length){
     const g=state.schedule[state.gameIdx];
+    if(checkRain(state.gameIdx)){
+      if(g.home===USER||g.away===USER){render(); return;}
+      continue;
+    }
     if(g.home===USER||g.away===USER){ state.pendingGame=state.gameIdx; openPreview(); return; }
     playGame(state.gameIdx,false); state.gameIdx++;
   }
   endRegularSeason(); render();
 }
 function advanceUserGames(n){
+  if(state.liveMatch)return Match.resume(true);
   state.pendingGame=null; state.matchTac=null; closeModal();
   for(let i=0;i<n;i++){
     if(state.gameIdx>=state.schedule.length||state.phase!=="regular") break;
@@ -461,6 +507,10 @@ function advanceUserGames(n){
     while(state.gameIdx<state.schedule.length){
       const g=state.schedule[state.gameIdx];
       const isUser=(g.home===USER||g.away===USER);
+      if(checkRain(state.gameIdx)){
+        if(isUser){render(); return;}
+        continue;
+      }
       playGame(state.gameIdx,false);
       state.gameIdx++;
       if(isUser){done=true;break;}
@@ -471,8 +521,9 @@ function advanceUserGames(n){
   render();
 }
 function simRestOfSeason(){
+  if(state.liveMatch)return Match.resume(true);
   state.pendingGame=null; closeModal();
-  while(state.gameIdx<state.schedule.length){ playGame(state.gameIdx,false); state.gameIdx++; }
+  while(state.gameIdx<state.schedule.length){ if(checkRain(state.gameIdx))continue; playGame(state.gameIdx,false); state.gameIdx++; }
   endRegularSeason(); render();
 }
 
@@ -545,20 +596,67 @@ function openPreview(){
 }
 
 // ---------- live relay ----------
+function liveGameId(idx){
+  let slot;
+  if(idx==='spring')slot='spring/'+state.spring.played;
+  else if(idx==='ps')slot='ps/'+state.postseason.stage+'/'+state.postseason.cur.games.length;
+  else {const g=state.schedule[idx]; slot='regular/'+(g.originalDay??g.day)+'/'+g.home;}
+  return state.year+'/'+slot;
+}
+function liveCard(){
+  if(!state.liveMatch)return '';
+  const g=state.liveMatch.engine.game;
+  return `<section class="return-card"><div><b>${g.inning}회${g.half==='top'?'초':'말'} ${g.score[g.a]}:${g.score[g.h]}</b><p>${FM.esc(g.a)} 원정 · ${FM.esc(g.h)} 홈</p></div>
+    <button class="btn primary" onclick="Match.resume()">이어하기</button><button class="btn" onclick="Match.resume(true)">결과만 보기</button></section>`;
+}
 const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[], _mult:1, _ended:false, panel:null, ab:null, feed:null,
   start(){
+    if(state.liveMatch)return this.resume();
     const g=pendingMatch(); if(!g) return;
     this.idx=state.pendingGame; this.ps=g.ps; this.spring=!!g.spring;
-    this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away), {maxInnings:g.ps?15:g.spring?9:12}); this.game.live={[USER]:true};
-    this.wpLog=[]; this._ended=false; this.paused=false; this.panel=null; this.logOpen=window.innerWidth>=1000; this.commentaryOpen=false; this.feed=[]; this.ab=null; this.comm=[{t:'플레이볼!',k:'call'}];
-    closeModal(); closePreview();
-    let o=document.getElementById('relay'); if(o)o.remove();
-    o=el('<div id="relay" class="matchpage"></div>');
-    document.body.appendChild(o);
-    this.renderLive();
-    if(window.Track){ Track.screen('relay'); Track.match('start',{type:this.spring?'spring':this.ps?'ps':'regular'}); }
-    FM.guideRender();
+    this.game=new K.InteractiveGame(buildCfg(g.home), buildCfg(g.away), {pitchByPitch:true,maxInnings:K.GAME_RULES[g.ps?'postseason':g.spring?'spring':'regular']}); this.game.live={[USER]:true};
+    this.id=liveGameId(this.idx);
+    if(!this.ps&&!this.spring)state.rainout=null;
+    this.wpLog=[]; this.feed=[]; this.comm=[{t:'플레이볼!',k:'call'}];
+    this.checkpoint();
+    this.open(false);
+    if(window.Track)Track.match('start',{type:this.spring?'spring':this.ps?'ps':'regular'});
     this._tick();
+  },
+  checkpoint(){
+    state.liveMatch={id:this.id,idx:this.idx,engine:this.game.serialize(),
+      feed:this.feed.slice(0,20),wpLog:this.wpLog.slice(),comm:this.comm.slice()};
+    autosave();
+  },
+  resume(resultsOnly=false){
+    const s=state.liveMatch;
+    if(!s||this.game)return;
+    this.id=s.id; this.idx=state.pendingGame=s.idx;
+    this.ps=s.idx==='ps'; this.spring=s.idx==='spring';
+    this.game=K.InteractiveGame.restore(s.engine);
+    this.game.live={[USER]:true};
+    this.feed=s.feed.slice(); this.wpLog=s.wpLog.slice(); this.comm=s.comm.slice();
+    this.open(true);
+    if(resultsOnly){this.toEnd(); this.finalize();}
+  },
+  open(paused){
+    clearTimeout(this.timer); this._ended=false; this.paused=paused; this.panel=null;
+    this.logOpen=window.innerWidth>=1000; this.commentaryOpen=false; this.queued=[]; this.ab=null; this._mult=1;
+    closeModal(); closePreview();
+    let o=$('relay'); if(o)o.remove();
+    document.body.appendChild(el('<div id="relay" class="matchpage"></div>'));
+    this.renderLive();
+    if(window.Track)Track.screen('relay');
+    FM.guideRender();
+  },
+  afterPlay(ev){
+    if(this.game.over){this.end(); return;}
+    if(ev&&ev.half!==this.game.half){this._flush(); this.checkpoint();}
+  },
+  batterView(p,wp0){
+    return {pitches:p.pitches,shown:p.startShown,charged:p.charged,pre:false,susp:false,committed:false,
+      pitName:p.pitName,batName:p.batName,off:p.off,def:p.def,slot:p.slot,oc:p.oc,ev:null,wp0,
+      steal:p.kind==='steal',variant:p.variant,runner:p.runner,kind:p.kind||'pa'};
   },
   _tick(){ if(this.paused) return; this._do(); if(!this._ended) this.timer=setTimeout(()=>this._tick(), this.speed*(this._mult||1)); },
   _say(line){ this.comm.unshift(line); this.comm.length=Math.min(this.comm.length,4); this._mult=line.wait||1; },
@@ -574,7 +672,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
       if(p.po) this.feed.unshift({sysmsg:'피치아웃! 포수가 일어서서 바깥쪽으로 뺀 공을 받습니다'});
       if(g.dropped&&g.dropped[USER]){ this.feed.unshift({sysmsg:`${K.SIGNS[g.dropped[USER]].l} 사인 취소 · 주자 상황이 바뀌었습니다`}); g.dropped[USER]=null; }
       const wpNow=winProb(g); this.wpLog.push(Math.round((g.h===USER?wpNow:1-wpNow)*100)/100);
-      this.ab={pitches:p.pitches,shown:0,pre:false,susp:false,committed:false,pitName:p.pitName,batName:p.batName,off:p.off,def:p.def,slot:p.slot,oc:p.oc,ev:null,wp0:winProb(g),steal:p.kind==='steal',variant:p.variant,runner:p.runner,kind:p.kind||'pa'};
+      this.ab=this.batterView(p,wpNow);
       this._say(Comm.intro(g,this.ab)); this.renderLive(); return; }
     if(ab.shown < ab.pitches.length){
       if(!ab.pre){ ab.pre=true; this._say(Comm.prePitch(g,ab)); this.renderLive(); return; }
@@ -583,7 +681,7 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
       if(ab.pitches[ab.pitches.length-1].res==='IP' && !ab.susp){ ab.susp=true; this._say(Comm.suspense(g,ab)); this.renderLive(); return; }
       const ev=g.commitAB(); ab.committed=true; ab.ev=ev;
       if(ev){ const line=Comm.result(g,ab,ev); ev.call=line.t; this.feed.unshift(ev); this._say(line); }
-      this.renderLive(); return; }
+      this.afterPlay(ev); this.renderLive(); return; }
     this.ab=null; this._mult=0.5; this._flush(); this.renderLive();
   },
   play(){ if(this._ended)return; this.paused=false; this.renderLive(); this._tick(); },
@@ -592,9 +690,9 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
   // plays the rest of this at-bat (or the next one, if this one is finished) and stops on its result
   stepPA(){ this.paused=true; clearTimeout(this.timer); let g=0; while(!this._ended&&g++<5&&(!this.ab||this.ab.committed)) this._do(); while(!this._ended&&g++<80&&this.ab&&!this.ab.committed) this._do(); if(this.game.over&&!this._ended) this.end(); else this.renderLive(); },
   toEnd(){ this.paused=true; clearTimeout(this.timer); this.game.live=null; // the rest is simulated: the coach makes the changes
-    if(this.ab && !this.ab.committed){ const ev=this.game.commitAB(); if(ev)this.feed.unshift(ev); }
+    if(this.ab && !this.ab.committed){ const ev=this.game.commitAB(); if(ev){this.feed.unshift(ev); this.afterPlay(ev);} }
     this.ab=null; this._flush();
-    let n=0; while(!this.game.over && n<3000){ const ev=this.game.step(); if(ev){ this.feed.unshift(ev); const w=winProb(this.game); this.wpLog.push(Math.round((this.game.h===USER?w:1-w)*100)/100); } n++; }
+    let n=0; while(!this.game.over && n<3000){ const ev=this.game.step(); if(ev){ this.feed.unshift(ev); const w=winProb(this.game); this.wpLog.push(Math.round((this.game.h===USER?w:1-w)*100)/100); this.afterPlay(ev); } n++; }
     this.renderLive(); this.end();
   },
   setSpeed(v){ this.speed=parseInt(v,10); },
@@ -615,12 +713,15 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
   // the manager leaves the broadcast, applySave records it on the next load
   end(){ if(this._ended)return; this._ended=true; this.paused=true; clearTimeout(this.timer);
     const finalRes=this.game.result(); finalRes.wp=this.wpLog||null;
-    state.finishedGame={idx:this.idx, ps:!!this.ps, spring:!!this.spring, res:finalRes};
+    state.liveMatch=null;
+    state.finishedGame={id:this.id,idx:this.idx, ps:!!this.ps, spring:!!this.spring, res:finalRes};
     autosave();
     if(window.Track) Track.match('end',{type:this.spring?'spring':this.ps?'ps':'regular'});
     this.renderLive(); },
   finalize(){
-    const fin=state.finishedGame||{idx:this.idx, ps:!!this.ps, spring:!!this.spring, res:this.game.result()};
+    if(!this.game||!this.game.over)return;
+    this.end();
+    const fin=state.finishedGame; if(!fin)return;
     const o=document.getElementById('relay'); if(o)o.remove();
     this.game=null; this.ab=null;
     recordFinished(fin);
@@ -629,11 +730,22 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
     showMatchResult(fin.res, fin.spring?'spring':fin.ps?'ps':'regular');
   },
   closeResult(){ const o=document.getElementById('result'); if(o) o.remove(); if(window.Track) Track.screen(currentTab); FM.guideRender(); },
-  order(c){ if(!this.game.orderCmd(USER,c)){ FM.notify('지금 주자 상황에서는 낼 수 없는 사인입니다.'); return; } this.panel=null;
-    // before the first pitch the sign is for this batter: drop the prepared at-bat and call it again
-    const ab=this.ab, now=ab&&!ab.committed&&ab.shown===0;
-    if(now){ this.game.cancelPending(); this.ab=null; }
-    this.feed.unshift({sysmsg:K.SIGNS[c].l+' 사인 ('+(now?'이번 타석':'다음 타석')+')'}); this.renderLive(); },
+  canSign(){
+    const ab=this.ab;
+    if(!ab||ab.committed)return !this.game.over;
+    return ab.shown<ab.pitches.length&&(ab.shown===0||this.game.bases.some(Boolean));
+  },
+  order(c){
+    if(!this.canSign())return;
+    const ab=this.ab;
+    if(ab&&!ab.committed){
+      const p=this.game.reviseSign(USER,c,ab.shown);
+      if(!p)return;
+      this.ab=this.batterView(p,ab.wp0);
+    }else if(!this.game.orderCmd(USER,c))return;
+    this.panel=null;
+    this.feed.unshift({sysmsg:K.SIGNS[c].l+' 사인 · 이번 타석'}); this.renderLive();
+  },
   doRun(base,name){ this._change(()=>{ if(this.game.pinchRun(USER,base,name)) return true; FM.notify('교체할 수 없는 선수입니다.'); return false; }, `대주자 → ${name}`, `대주자 → ${name}`); },
   doDef(slot,name){ this._change(()=>{ if(this.game.defSub(USER,slot,name)) return true; FM.notify('교체할 수 없는 선수입니다.'); return false; }, `수비 교체 → ${name}`, `수비 교체 → ${name}`); },
   setTac(k,v){ if(v==='true')v=true; if(v==='false')v=false; this.game.setTac(USER,k,v); this.feed.unshift({sysmsg:`작전 변경: ${FM.tacLabel(k,v)}`}); this.renderLive(); },
@@ -643,6 +755,15 @@ const Match={ game:null, idx:null, timer:null, speed:1300, paused:true, comm:[],
 // write a finished game into the season. Called once, from the end of the broadcast or from the next load.
 function recordFinished(fin){
   const res=fin.res;
+  const ids=state.recordedGames||(state.recordedGames={});
+  const id=fin.id||liveGameId(fin.idx);
+  const phase=fin.spring?'spring':fin.ps?'postseason':'regular';
+  if(ids[id]||state.phase!==phase||id!==liveGameId(fin.idx)||(!fin.spring&&!fin.ps&&state.schedule[fin.idx].played)){
+    if(state.finishedGame===fin)state.finishedGame=null;
+    return;
+  }
+  ids[id]=true;
+  state.liveMatch=null;
   state.finishedGame=null; state.pendingGame=null; state.matchTac=null;
   if(fin.spring){ FM.springRecord(res); return; }
   if(fin.ps){ psRecord(res); return; }
@@ -668,9 +789,9 @@ function showMatchResult(res,kind){
 function jno(name){ let s=0; for(let i=0;i<name.length;i++)s=(s*31+name.charCodeAt(i))%97; return s+1; }
 function handB(name){ return K.handsOf(name).b; }
 function handP(name){ return K.handsOf(name).t; }
-function countOf(pitches){ let b=0,s=0; pitches.forEach(p=>{ if(p.res==='B')b++; else if(p.res==='F'){ if(s<2)s++; } else if(p.res==='S'||p.res==='SW')s++; }); return {b:Math.min(b,4),s:Math.min(s,3)}; }
+function countOf(pitches){ let b=0,s=0; pitches.forEach(p=>{ if(!p.code)return; if(p.res==='B')b++; else if(p.res==='F'){ if(s<2)s++; } else if(p.res==='S'||p.res==='SW')s++; }); return {b:Math.min(b,4),s:Math.min(s,3)}; }
 const PITCHCOLOR={B:'#6b7785',S:'#e0556a',SW:'#f0a020',F:'#7fd0ff',IP:'#36c275',HBP:'#c060e0',IBB:'#9aa8b8'};
-const PITCHLABEL={B:'볼',S:'스트라이크',SW:'헛스윙',F:'파울',IP:'타격',HBP:'사구',IBB:'고의4구'};
+const PITCHLABEL={RUN:'투구 전 스타트',B:'볼',S:'스트라이크',SW:'헛스윙',F:'파울',IP:'타격',HBP:'사구',IBB:'고의4구'};
 function baseMini(bases){
   const f=i=>bases[i]?'var(--accent2)':'rgba(255,255,255,.28)';
   return `<svg width="32" height="32" viewBox="0 0 32 32" style="vertical-align:middle">
@@ -764,6 +885,7 @@ const Comm={
     const p=ab.pitches[ab.shown-1], c=countOf(ab.pitches.slice(0,ab.shown)), loc=this.where(p,ab);
     const sp=p.type==='직구'&&p.velo>=150?`${p.velo}km 강속구`:`${p.velo}km ${p.type}`, cnt=` (${c.b}-${Math.min(c.s,2)})`;
     // strikeouts get the big treatment only when something rides on them
+    if(p.res==='RUN')return {t:'투수가 공을 던지기 전에 주자가 출발합니다!',k:'tense'};
     if(ab.steal) return {t:ab.variant==='pick'?'주자 몸을 날려 귀루합니다…':`${sp}… 포수, ${ab.variant==='shome'?'홈 플레이트를 지킵니다':ab.variant==='steal3'||ab.variant==='dsteal'?'3루로 송구':'2루로 송구'}!`,k:'tense',wait:1.3};
     if(p.res==='IBB') return {t:`${ab.batName}, 1루로 걸어 나갑니다.`,k:'quiet'};
     if(ab.kind==='bunt'&&p.res==='IP') return {t:'번트! 공을 굴립니다…',k:'tense',wait:0.8};
@@ -856,7 +978,7 @@ function relayHTML(game,feed,M){
   const userBatting = offId===USER, userPitching = defId===USER;
 
   let ptot=game.ptot[defId], pstr=game.pstr[defId], pball=game.pball[defId];
-  if(ab && !committed){ shown.forEach(p=>{ ptot++; if(p.res==='B'||p.res==='HBP')pball++; else pstr++; }); }
+  if(ab && !committed){ shown.slice(ab.charged).forEach(p=>{ if(!p.code)return; ptot++; if(p.res==='B'||p.res==='HBP')pball++; else pstr++; }); }
 
   const inningTxt = `${game.inning}회${game.half==='top'?'초':'말'}`;
   const outDots = `<span style="color:#e0556a">${'●'.repeat(game.outs)}</span><span style="color:var(--dim)">${'○'.repeat(Math.max(0,2-game.outs))}</span>`;
@@ -930,9 +1052,9 @@ function relayHTML(game,feed,M){
     }
     if(M.panel==='tac'){
       const T=game.tac[USER], sel=(k,opts)=>`<label class="muted" style="font-size:12px">${FM.tacName(k)} <select onchange="Match.setTac('${k}',this.value)">${opts.map(o=>`<option value="${o}" ${String(T[k])===String(o)?'selected':''}>${FM.tacLabel(k,o)}</option>`).join('')}</select></label>`;
-      const side=userBatting?'o':'d', cur=game.cmd[USER], signBtn=(s,g)=>`<button class="btn${cur===s?' primary':''}" ${game.signOK(USER,s)?'':'disabled'} onclick="Match.order('${s}')">${g.l}</button>`;
-      const groups=userBatting?[['타격코치',['bunt','safety','buster','ssq','sq']],['주루코치',['hitrun','runhit','steal','delay','steal3','dsteal','shome']]]:[['배터리코치',['ibb','pickoff','pitchout']],['수비코치',['buntd']],['투수코치',['multi']]];
-      interv += `<div class="card" style="margin-top:8px;background:var(--panel2)"><div class="muted" style="margin-bottom:6px">${userBatting?'공격 작전':'수비 작전'} <span style="opacity:.7">· 일시정지 중 지시하면 다음 타석부터 적용</span></div>
+      const side=game.offId()===USER?'o':'d', cur=game.cmd[USER], signBtn=(s,g)=>`<button class="btn${cur===s?' primary':''}" ${M.canSign()&&side===g.side&&game.signOK(USER,s)?'':'disabled'} onclick="Match.order('${s}')">${g.l}</button>`;
+      const groups=side==='o'?[['타격코치',['bunt','safety','buster','ssq','sq']],['주루코치',['hitrun','runhit','steal','delay','steal3','dsteal','shome']]]:[['배터리코치',['ibb','pickoff','pitchout']],['수비코치',['buntd']],['투수코치',['multi']]];
+      interv += `<div class="card" style="margin-top:8px;background:var(--panel2)"><div class="muted" style="margin-bottom:6px">${side==='o'?'공격 작전':'수비 작전'} <span style="opacity:.7">· 첫 공 전이나 주자가 있을 때 투구 사이에 사인을 바꿀 수 있어요.</span></div>
         ${groups.map(([c,l])=>`<div class="sign-group"><span>${c}</span><div>${l.map(s=>signBtn(s,K.SIGNS[s])).join('')}</div></div>`).join('')}
         <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:8px">${userBatting
           ? sel('atk',['normal','aggr','patient'])+sel('dir',['normal','pull','oppo'])+sel('run',['normal','aggr','hold'])+sel('adv',['normal','aggr','hold'])+sel('teamBat',[false,true])
@@ -1031,7 +1153,7 @@ function psSeriesOver(c){ return c.wHi>=c.need || c.wLo>=c.need || (c.maxGames>0
 function psNext(){
   const ps=state.postseason; if(!ps||!ps.cur) return null;
   const c=ps.cur, n=c.games.length;
-  const hiHome = c.hiHomeAll || n<2 || n>=4;
+  const hiHome = c.hiHomeAll || K.GAME_RULES.seriesHome[Math.min(n,6)];
   return {home:hiHome?c.hi:c.lo, away:hiHome?c.lo:c.hi, label:`${c.name} ${n+1}차전`};
 }
 function psCfg(team){ return buildCfg(team); }
@@ -1053,19 +1175,21 @@ function psRecord(res){
 }
 // play the next postseason game: the user's games go through the preview and live relay
 function psPlayNext(){
+  if(state.liveMatch)return Match.resume();
   if(state.phase!=="postseason"||!state.postseason.cur) return;
   const n=psNext();
   if(n.home===USER||n.away===USER){ state.pendingGame='ps'; openPreview(); return; }
-  psRecord(K.simGame(psCfg(n.home), psCfg(n.away), {maxInnings:15}));
+  psRecord(K.simGame(psCfg(n.home), psCfg(n.away), {maxInnings:K.GAME_RULES.postseason}));
   render();
 }
 // simulate games until the user's next one (or to the end when the user is out)
 function psAuto(toEnd){
+  if(state.liveMatch)return Match.resume(true);
   let guard=0;
   while(state.phase==="postseason" && state.postseason.cur && guard++<40){
     const n=psNext();
     if(!toEnd && (n.home===USER||n.away===USER)) break;
-    psRecord(K.simGame(psCfg(n.home), psCfg(n.away), {maxInnings:15}));
+    psRecord(K.simGame(psCfg(n.home), psCfg(n.away), {maxInnings:K.GAME_RULES.postseason}));
   }
   closeModal(); render();
 }
@@ -1117,7 +1241,8 @@ function nextSeason(){
   ageRosters();
   FM.offseasonMoves(); // departures, retirements, rookies before lineups are rebuilt
   state.year++;
-  state.schedule=buildSchedule(); state.schedV=SCHED_V;
+  state.schedule=buildSchedule(state.year); state.schedV=SCHED_V;
+  state.reserveDay=null; state.rainout=null; state.recordedGames={};
   state.gameIdx=0;
   state.phase="stove";
   state.spring=null;
@@ -1294,7 +1419,7 @@ function renderDash(){
     const steps=['스토브리그','스프링캠프','시범경기','개막'], at=state.phase==='stove'?0:state.phase==='spring'?2:3;
     starters=`<p>개막까지</p><ol class="road">${steps.map((s,i)=>`<li class="${i<at?'done':i===at?'now':''}"><i></i>${s}</li>`).join('')}</ol>`;
   } else matchup='';
-  const hero=`${FM.returnCard()}<section class="hero" aria-labelledby="heroTitle">
+  const hero=`${state.liveMatch?liveCard():FM.returnCard()}<section class="hero" aria-labelledby="heroTitle">
     <div class="hero-top"><p class="eyebrow">${h.eyebrow}</p></div>
     <h1 class="hero-title" id="heroTitle">${FM.esc(h.title)}</h1>${h.tbd?'':`<p class="hero-sub">${h.sub}</p>`}
     ${matchup?`<div class="matchup">${matchup}</div>`:'<div style="height:18px"></div>'}
@@ -1533,7 +1658,7 @@ function renderSched(){
       result=`<span class="${t?'muted':(w?'win':'lose')}"><b>${t?'무':(w?'승':'패')}</b> ${us}:${them}</span>`; }
     const isNext = !g.played && (state.schedule.findIndex(s=>!s.played&&(s.home===USER||s.away===USER))===x.idx);
     return `<tr style="${isNext?'background:color-mix(in srgb, var(--accent) 14%, transparent)':''}"><td>${Math.floor(userGames.indexOf(x))+1}</td>
-      <td>${homeAway}</td><td class="name">${teamDot(opp)} ${K.ROSTERS[opp].name}</td><td>${result}</td>${isNext?'<td>▶ 다음</td>':'<td></td>'}</tr>`;
+      <td>${FM.dateLabel(FM.calDate(g.day))} (${"일월화수목금토"[FM.calDate(g.day).getDay()]})${g.originalDay!=null?' · 재편성':''}</td><td>${homeAway}</td><td class="name">${teamDot(opp)} ${K.ROSTERS[opp].name}</td><td>${result}</td>${isNext?'<td>▶ 다음</td>':'<td></td>'}</tr>`;
   }).join("");
   const ctrl = state.phase==="regular"?`<div class="row" style="margin-bottom:12px">
     <button class="btn primary" onclick="App.nextGame()">▶ 다음 경기</button>
@@ -1542,7 +1667,7 @@ function renderSched(){
     <button class="btn" onclick="App.simRest()">시즌 끝까지</button></div>`:'';
   return `<div class="card"><h3>${K.ROSTERS[USER].name} 일정 <span class="tag">144경기</span></h3>${ctrl}
     <div style="max-height:620px;overflow:auto">
-    <table><thead><tr><th>#</th><th>구분</th><th class="name">상대</th><th>결과</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    <table><thead><tr><th>#</th><th>날짜</th><th>구분</th><th class="name">상대</th><th>결과</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 
 function renderStand(){
@@ -1769,12 +1894,12 @@ function saveData(){ return JSON.stringify({ v:SAVE_VERSION, savedAt:Date.now(),
 function applySave(data){
   // restore rosters in place
   for(const t in data.rosters){ K.ROSTERS[t].batters=data.rosters[t].batters; K.ROSTERS[t].pitchers=data.rosters[t].pitchers; K.ROSTERS[t].color=data.rosters[t].color; K.ROSTERS[t].farm=data.rosters[t].farm||[]; }
-  state=data.state; teamGameCount=data.teamGameCount; state.pendingGame=null;
+  clearTimeout(Match.timer); Match.game=null; Match.ab=null; Match.queued=[]; Match.paused=true;
+  state=data.state; teamGameCount=data.teamGameCount; state.pendingGame=state.liveMatch?.idx??null;
   USER=(state.user&&state.user.team)||"KIA"; // saves from before team selection were KIA careers
   FM.applyTheme(USER);
   if(state.finishedGame) recordFinished(state.finishedGame); // the page closed right after the final out
-  // a save from before series play gets the new schedule if its regular season hasn't started yet
-  if(state.schedV!==SCHED_V && !state.schedule.some(g=>g.played)){ state.schedule=buildSchedule(); state.schedV=SCHED_V; state.gameIdx=0; }
+
 }
 function autosave(){
   if(!state) return;
@@ -1892,6 +2017,7 @@ const App={
   squadView:(v)=>{squadView=v;render();},
   squadSort:(k)=>{ squadSort = squadSort.k===k? {k, d:-squadSort.d} : {k, d:SQ_ASC[k]?1:-1}; render(); },
   leaderCat:(c)=>{leaderCat=c;render();},
+  advanceRainoutRotation,
   nextGame:()=>startNextUserGame(),
   allTasks:()=>{ showAllTasks=!showAllTasks; render(); },
   startMatch:()=>Match.start(),
