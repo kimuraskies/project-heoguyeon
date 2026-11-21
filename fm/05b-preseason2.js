@@ -39,9 +39,9 @@ function offFill(o){ o.q=[]; const add=e=>{ if(e) o.q.push(e); };
 function fixedEvt(id,stage){ if(typeof evtTemplates!=='function') return null; const t=evtTemplates().find(x=>x.id===id), card=t&&evtBuild(t,stage,null); return card? evtMark(card) : null; }
 // ----- 리더 선임: 주장·투수조장·야수조장, one card in stove week 2, every season -----
 // The head coach's slate comes first (age and ability); the manager approves it or taps another name.
-const LEAD_ROLES=[{key:'captain',role:'주장',ok:p=>p.age>=28,say:'팀이 한 방향으로 가게 하겠습니다.'},
-  {key:'pitchCap',role:'투수조장',ok:p=>p.type!=='B'&&p.age>=26,say:'투수들 컨디션은 제가 챙기겠습니다.'},
-  {key:'fieldCap',role:'야수조장',ok:p=>p.type==='B'&&p.age>=26,say:'야수들 훈련은 제가 앞장서겠습니다.'}];
+const LEAD_ROLES=[{key:'captain',role:'주장',ok:p=>p.age>=28,say:'라커룸을 대표하고 선수단 미팅을 이끌어요.'},
+  {key:'pitchCap',role:'투수조장',ok:p=>p.type!=='B'&&p.age>=26,say:'투수조 훈련과 컨디션 이야기를 코치진에 전해요.'},
+  {key:'fieldCap',role:'야수조장',ok:p=>p.type==='B'&&p.age>=26,say:'야수조 훈련 분위기를 잡고 코치진과 소통해요.'}];
 function leadCands(ok,skip){ return allPlayers(USER).filter(p=>!p.f&&!isFarm(USER,p)&&ok(p)&&skip.indexOf(p.n)<0)
   .sort((a,b)=>(K.ovr(b)+b.age*0.6)-(K.ovr(a)+a.age*0.6)).slice(0,3).map(p=>p.n); }
 function leadPick(ri,k){ const e=offState().q[0]; if(!e||e.id!=='leaders'||!e.data.roles[ri]) return; e.data.roles[ri].pick=k; offOpen(); }
@@ -276,7 +276,7 @@ const EV={
     pick(i,d,o){ const f=evtState().flags, out=[];
       d.roles.forEach(r=>{ const n=r.c[r.pick]||r.c[0], p=findPlayer(USER,n); if(!p) return; f[r.key]=n; addMor(p,6);
         if(r.pick){ const rec=findPlayer(USER,r.c[0]); if(rec) addMor(rec,-2); }
-        out.push(`${r.role} ${n}: "${(LEAD_ROLES.find(x=>x.key===r.key)||{}).say}"`); });
+        out.push(`${r.role}: ${n} · ${(LEAD_ROLES.find(x=>x.key===r.key)||{}).say}`); });
       if(o) o.leadY=state.year; memo('leaders',null,'리더 선임: '+d.roles.map(r=>r.role+' '+(r.c[r.pick]||r.c[0])).join(', '));
       return out.join('\n'); }},
   // 보강 과제: the club's thinnest spot, and what the GM can do about it this week
@@ -367,7 +367,7 @@ const EV={
       return {who:p.n,icon:'🧓',title:`베테랑 ${p.n}의 고민`,body:`${p.n}(${p.age}세)이(가) 찾아왔습니다.\n"감독님, 올해가 마지막일지도 모르겠습니다. 팀에서 제가 뭘 하면 좋겠습니까?"`,
         opts:[{l:'주전으로 믿는다고 말한다',d:`${p.n} 사기 크게 상승`},{l:'후배들의 멘토 역할을 부탁한다',d:'25세 이하 성장 +2% · 본인 출전 욕심은 줄어든다'},{l:'본인 판단에 맡긴다',d:'변화 없음'}],data:{n:p.n}}; },
     pick(i,d,o){ const p=findPlayer(USER,d.n); if(!p) return '';
-      if(i===0){ addMor(p,10); return `${d.n}: "마지막까지 뛰겠습니다."`; }
+      if(i===0){ addMor(p,10); return `${d.n}이(가) 마지막 시즌을 준비하겠다며 훈련장으로 향했습니다.`; }
       if(i===1){ o.mentor=d.n; addMor(p,3); memo('mentor',d.n,`${d.n}에게 멘토 역할을 맡김`); return `${d.n}이(가) 캠프 내내 젊은 선수들 곁을 지킵니다.`; }
       return `${d.n}은(는) 고개를 끄덕이고 돌아갔습니다.`; }},
   star:{safe:1, make(){ const p=allPlayers(USER).filter(p=>!p.f).sort(byOvr)[0]; if(!p) return null;

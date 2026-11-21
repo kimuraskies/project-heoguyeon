@@ -133,9 +133,9 @@ function checkPromises(res, ug){
   f.promises=f.promises.filter(pr=>{
     if(ug<pr.until) return true;
     const p=findPlayer(USER,pr.n); if(!p) return false;
-    if((pr.played||0)>=pr.need){ addMor(p,5); send(pr.n,'🗣','약속을 지켜주셔서 감사합니다',`${pr.n}: "기회를 주셔서 감사합니다. 보답하겠습니다."`,[]); }
+    if((pr.played||0)>=pr.need){ addMor(p,5); send(pr.n,'🗣','약속을 지켜주셔서 감사합니다',`${pr.n}이(가) 약속대로 기회를 받았습니다. 선수단도 감독이 말을 지킨다는 걸 봤습니다.`,[]); }
     else { p.mor=clampN(p.mor-25,5,99); allPlayers(USER).forEach(x=>{ if(x!==p) x.mor=clampN(x.mor-3,5,99); });
-      send(pr.n,'💢','약속이 지켜지지 않았습니다',`${pr.n}: "출전 기회를 약속하셨잖아요. 실망입니다." (${pr.played||0}/${pr.need}경기 출전)\n\n선수단 전체의 신뢰가 흔들렸습니다.`,[]); }
+      send(pr.n,'💢','약속이 지켜지지 않았습니다',`${pr.n}이(가) 약속한 출전 기회를 받지 못해 크게 실망했습니다. (${pr.played||0}/${pr.need}경기 출전)\n\n선수단 전체의 신뢰가 흔들렸습니다.`,[]); }
     return false;
   });
 }
@@ -148,7 +148,7 @@ function checkUnhappy(ug){
     f.lastTalk[p.n]=ug;
     if(p.type==='B' && (p.bench||0)>=6){
       send(p.n,'🗣',`${p.n}이(가) 출전 시간에 불만을 표합니다`,
-        `${p.n}: "감독님, 최근 ${p.bench}경기 연속 벤치에 있었습니다. 저도 뛸 수 있습니다. 기회를 주십시오."\n\n성격: ${pers(p).k} — ${pers(p).d}`,
+        `${p.n}이(가) 면담을 요청했습니다. 최근 ${p.bench}경기 연속 벤치에 있었고, 출전 기회를 원합니다.\n\n성격: ${pers(p).k} — ${pers(p).d}`,
         [{label:'주전 기회를 약속한다', fn:'promisePlay', arg:{n:p.n}},
          {label:'경쟁에서 이겨야 한다', fn:'compete', arg:{n:p.n}},
          {label:'트레이드 요청을 받아들인다', fn:'listMe', arg:{n:p.n}}]);

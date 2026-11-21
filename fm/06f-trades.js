@@ -54,14 +54,15 @@ function tradeReact(){
         addFans({A:2,B:1,C:0,D:-2,F:-4}[fa.g]+((e.a===USER?e.aGive:e.bGive).some(trBeloved)?-2:0));
         if(f.board) f.board.conf=clampN(f.board.conf+{A:2,B:1,C:0,D:-1,F:-3}[fa.g],0,100); } }
     else if(!e.rx.re && e.rx.ug!=null && ug-e.rx.ug>=TR_REVISIT && e.y===state.year){ e.rx.re=true;
-      const war=list=>list.reduce((a,s)=>{ const t=K.TEAM_IDS.find(x=>findPlayer(x,s.n)); return a+(t? trWarSince(t,s.n) : 0); },0);
+      const war=list=>list.reduce((a,s)=>{ const t=K.TEAM_IDS.find(x=>findPlayer(x,s.n)); return a+(t? trWarSince(t,s.n)-(s.war0||0) : 0); },0);   // since the trade only
       const wA=war(e.bGive), wB=war(e.aGive), A=K.ROSTERS[e.a].name, B=K.ROSTERS[e.b].name;
       const lead=Math.abs(wA-wB)<0.3? '아직은 무승부' : wA>wB? `지금까지는 ${A}의 승리` : `지금까지는 ${B}의 승리`;
       feedPush({year:state.year, kind:'press', ug, title:`[다시 보는 트레이드] ${A}·${B}, ${lead}`,
-        body:josa(`${TR_REVISIT}경기가 지났다. ${A}이(가) 받은 ${trNames(e.bGive)}은(는) WAR ${wA.toFixed(1)}, ${B}이(가) 받은 ${trNames(e.aGive)}은(는) WAR ${wB.toFixed(1)}을(를) 기록 중이다.`)}); }
+        body:josa(`이적 후 ${TR_REVISIT}경기가 지났다. ${A}이(가) 받은 ${trNames(e.bGive)}은(는) 이적 후 WAR ${wA.toFixed(1)}, ${B}이(가) 받은 ${trNames(e.aGive)}은(는) 이적 후 WAR ${wB.toFixed(1)}을(를) 기록 중이다.`)}); }
   });
 }
 // season WAR so far for a player (the trade log holds names; season stats are per club, so sum both)
+function trWarOf(p){ if(!p||!state.season) return 0; const env=leagueEnv(); let w=0; K.TEAM_IDS.forEach(x=>{ const s=state.season[x]; if(!s) return; const b=s.bat[p.n], q=s.pit[p.n]; if(b&&b.PA) w+=batWAR(x,p,b,env); if(q&&q.OUT) w+=pitWAR(q,env); }); return w; }
 function trWarSince(t,n){ const env=leagueEnv(), p=findPlayer(t,n); if(!p) return 0; let w=0;
   K.TEAM_IDS.forEach(x=>{ const s=state.season[x]; const b=s.bat[n], q=s.pit[n]; if(b&&b.PA) w+=batWAR(x,p,b,env); if(q&&q.OUT) w+=pitWAR(q,env); }); return w; }
 

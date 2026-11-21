@@ -22,7 +22,7 @@ function test(name, fn) {
 test.skip = (name, reason) => { skipped++; console.log('SKIP ' + name + ': ' + reason); };
 const random = Math.random;
 try {
-  for (const file of ['box', 'lineup', 'tactics', 'career', 'farm', 'familiarity', 'signs', 'manual-pitch', 'preseason-flow', 'regress', 'statcast', 'potential', 'trades', 'events', 'fm-build', 'roster-rules', 'fm-exports', 'qa-snapshot']) {
+  for (const file of ['box', 'lineup', 'tactics', 'career', 'farm', 'familiarity', 'signs', 'manual-pitch', 'preseason-flow', 'immersion', 'regress', 'statcast', 'potential', 'trades', 'events', 'fm-build', 'roster-rules', 'fm-exports', 'qa-snapshot']) {
     require('./tests/' + file)({ K, assert, test, seed });
   }
 } finally { Math.random = random; }

@@ -88,7 +88,7 @@ function tradeDay(){
   const played=state.schedule.filter(g=>g.played&&(g.home===USER||g.away===USER));
   return played.length?played[played.length-1].day:0;
 }
-function tradeSnapshot(p){ return {n:p.n,type:p.type,...(p.type==='B'?{pos:p.pos}:{role:p.role}),age:p.age,ovr:K.ovr(p),pot:p.pot||K.ovr(p),sal:p.sal||0,yrs:p.yrs==null?1:p.yrs}; }
+function tradeSnapshot(p){ return {n:p.n,type:p.type,...(p.type==='B'?{pos:p.pos}:{role:p.role}),age:p.age,ovr:K.ovr(p),pot:p.pot||K.ovr(p),sal:p.sal||0,yrs:p.yrs==null?1:p.yrs,war0:Math.round(trWarOf(p)*100)/100}; }   // war0: season WAR before the move, so the revisit counts only what came after
 function executeClubTrade(a,b,aGive,bGive,kind){
   const log=tradeLog(), ca=tradeContext(a), cb=tradeContext(b);
   const entry={id:log.reduce((n,x)=>Math.max(n,Number(x.id)||0),0)+1,y:state.year,day:tradeDay(),phase:state.phase,a,b,

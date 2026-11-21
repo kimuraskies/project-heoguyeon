@@ -58,4 +58,4 @@ function wpChart(wp){ if(!wp||wp.length<4) return ''; const W=560,H=110,x=i=>6+i
   return `<figure class="result-wp"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="승리 확률 흐름, 마지막 ${Math.round(wp[wp.length-1]*100)}%"><line x1="0" x2="${W}" y1="${y(0.5)}" y2="${y(0.5)}" stroke="var(--dim)" stroke-dasharray="3 4"/><polyline points="${pts}" fill="none" stroke="var(--team-ink)" stroke-width="2" stroke-linejoin="round"/></svg><figcaption class="hint">우리 팀 승리 확률 흐름 (점선 50%)</figcaption></figure>`; }
 function coachWord(res,kind){ const c=staffOf(USER).head; coachInit(c); const us=res.home===USER?res.homeRuns:res.awayRuns, th=res.home===USER?res.awayRuns:res.homeRuns;
   const w=us>th, tb={'육성형':w?'어린 선수들이 잘 버텼습니다.':'오늘의 경험이 자산이 될 겁니다.','성적형':w?'이런 경기를 계속 잡아야 합니다.':'다음 경기는 반드시 잡아야 합니다.','데이터형':w?'준비한 대로 숫자가 나왔습니다.':'내용을 분석해 다음 경기에 반영하겠습니다.','올드스쿨':w?'선수들 투지가 좋았습니다.':'기본부터 다시 하겠습니다.'};
-  return `<p class="hint">${esc(c.n)} 수석코치: "${tb[c.style]}"</p>`; }
+  return `<p class="hint">수석코치 경기 정리 · ${tb[c.style]}</p>`; }   // no quoted lines for (possibly real) coaches

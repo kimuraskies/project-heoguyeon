@@ -719,6 +719,9 @@ function pitchList(pitches){ return PitchView.pitchList(pitches,PITCHCOLOR,PITCH
 
 // ----- play-by-play commentary (FM-style text lines) -----
 // each line: {t:text, k:'quiet'|'call'|'tense'|'big', wait: how long the next beat waits, as a multiple of the speed}
+// batted-ball angle → field zone (negative = left field), and who fields it there
+function bbZone(bb){ if(!bb||!isFinite(bb.ang)) return null; const a=bb.ang; return a<-27?'L':a<-9?'LC':a<=9?'C':a<=27?'RC':'R'; }
+const OFZ={L:'좌익수',LC:'좌익수',C:'중견수',RC:'우익수',R:'우익수'}, INZ={L:'3루수',LC:'유격수',C:'투수',RC:'2루수',R:'1루수'};
 const Comm={
   pick(a){ return a[Math.floor(Math.random()*a.length)]; },
   outsTxt(n){ return n===0?'무사':n+'사'; },
@@ -797,12 +800,13 @@ const Comm={
   result(g,ab,ev){
     const P=a=>this.pick(a), off=ev.off, def=ev.def, before=ev.score[off]-ev.runs, other=ev.score[def], fl=ab.flavor;
     let t='', k='call', wait=1.5;
+    const zn=bbZone(ev.bb);   // where the ball actually went (core.js battedBall angle)
     switch(ev.oc){
       case 'K': t='삼진 아웃.'; wait=1.1; break;
       case 'BB': t=ev.runs?'밀어내기 볼넷! 한 점이 들어옵니다.':'볼넷으로 걸어 나갑니다.'; break;
       case 'HBP': t=ev.runs?'밀어내기 사구! 한 점이 들어옵니다.':'몸에 맞는 공으로 1루에 나갑니다.'; break;
       case 'GIDP': { const d=P([['유격수','6-4-3'],['2루수','4-6-3'],['3루수','5-4-3']]); t=`${d[0]} 땅볼… ${d[1]} 병살타! 두 개를 잡아냅니다.`; k='big'; break; }
-      case 'SF': t=`${P(['좌익수','중견수','우익수'])} 희생플라이! 3루 주자 홈인.`; break;
+      case 'SF': t=`${OFZ[zn]||P(['좌익수','중견수','우익수'])} 희생플라이! 3루 주자 홈인.`; break;
       case 'IBB': t=`고의4구. ${ev.runs?'밀어내기로 한 점이 들어옵니다.':'주자가 하나 늘어납니다.'}`; break;
       case 'SAC': t=P(['1루에서 타자 아웃, 주자는 한 베이스씩 진루. 희생번트 성공!','침착하게 1루 송구, 아웃. 희생번트 성공입니다.']); break;
       case 'FC': t=P(['선행 주자를 잡아냅니다! 번트 실패.','빠른 송구, 선행 주자 포스 아웃! 번트 작전 실패.']); k='tense'; break;
@@ -814,7 +818,7 @@ const Comm={
       case 'CS': if(ev.variant&&ev.variant!=='steal'&&ev.variant!=='delay'){ t='아웃! '+ev.desc+'.'; k='big'; break; } t=P([`아웃! 포수의 정확한 송구, ${ev.runner} 도루 실패!`,`태그 아웃! ${ev.runner}, 2루에서 잡힙니다.`]); k='big'; break;
       case 'E': t=`${P(['유격수','2루수','3루수','1루수'])} 실책! 공을 놓칩니다, 타자 주자 살아 나갑니다.`; k='tense'; break;
       case 'OUT': {
-        const of=P(['좌익수','중견수','우익수']), inf=P(['유격수','2루수','3루수','1루수','투수']);
+        const of=OFZ[zn]||P(['좌익수','중견수','우익수']), inf=INZ[zn]||P(['유격수','2루수','3루수','1루수','투수']);
         if(fl==='deep'){ t=`${of}, 뒤로… 뒤로… 담장 앞에서 잡아냅니다! 아웃.`; k='tense'; }
         else if(fl==='fly') t=P([`${of} 플라이 아웃.`,`${of}, 앞으로 달려 나와 잡습니다. 아웃.`,`${of}가 자리를 잡고… 잡았습니다. 아웃.`]);
         else if(fl==='weak') t=P([`${inf} 앞 땅볼, 1루에서 아웃.`,`내야 플라이, ${inf}가 잡습니다.`]);
@@ -822,10 +826,10 @@ const Comm={
         else t=P([`${inf} 땅볼, 1루에서 아웃.`,`${of} 플라이 아웃.`,`${inf} 땅볼, 깔끔하게 처리합니다.`]);
         if(ev.adv) t+= ev.hr? ' 스타트를 끊은 1루 주자는 2루까지.' : ' 그 사이 2루 주자는 3루까지.';
         break; }
-      case '1B': t=fl==='weak'?P(['빗맞았지만 코스가 좋습니다! 안타!','내야 안타! 1루에서 살았습니다!']):P(['중전 안타!','3유간을 빠지는 좌전 안타!','1-2루간을 꿰뚫는 우전 안타!','투수 옆을 스치는 중전 안타!']); break;
-      case '2B': t=P(['좌중간을 가르는 2루타!','우익선상 2루타!','좌익선상을 타고 흐르는 2루타!','우중간 펜스까지 굴러가는 2루타!']); k='tense'; break;
-      case '3B': t=P(['우중간 깊숙한 3루타!','펜스 맞고 튀는 사이 3루까지! 3루타!']); k='tense'; break;
-      case 'HR': t=`넘어갔습니다!!! ${P(['좌측','가운데','우측'])} 담장을 넘기는 ${ev.batter}의 ${['','솔로 홈런','투런 홈런','쓰리런 홈런','만루 홈런'][ev.runs]||'홈런'}!`; k='big'; wait=2.4; break;
+      case '1B': t=fl==='weak'?P(['빗맞았지만 코스가 좋습니다! 안타!','내야 안타! 1루에서 살았습니다!']):zn? {L:'3루수 옆을 빠지는 좌전 안타!',LC:'3유간을 빠지는 좌전 안타!',C:P(['중전 안타!','투수 옆을 스치는 중전 안타!']),RC:'1-2루간을 꿰뚫는 우전 안타!',R:'1루수 옆을 빠지는 우전 안타!'}[zn] : P(['중전 안타!','3유간을 빠지는 좌전 안타!','1-2루간을 꿰뚫는 우전 안타!','투수 옆을 스치는 중전 안타!']); break;
+      case '2B': t=zn? {L:'좌익선상을 타고 흐르는 2루타!',LC:'좌중간을 가르는 2루타!',C:'중견수 키를 넘기는 2루타!',RC:'우중간 펜스까지 굴러가는 2루타!',R:'우익선상 2루타!'}[zn] : P(['좌중간을 가르는 2루타!','우익선상 2루타!','좌익선상을 타고 흐르는 2루타!','우중간 펜스까지 굴러가는 2루타!']); k='tense'; break;
+      case '3B': t=zn? {L:'좌익선상 깊숙한 3루타!',LC:'좌중간 깊숙한 3루타!',C:'중견수 뒤로 빠지는 3루타!',RC:'우중간 깊숙한 3루타!',R:'우익선상 깊숙한 3루타!'}[zn] : P(['우중간 깊숙한 3루타!','펜스 맞고 튀는 사이 3루까지! 3루타!']); k='tense'; break;
+      case 'HR': t=`넘어갔습니다!!! ${zn? {L:'좌측',LC:'좌중간',C:'가운데',RC:'우중간',R:'우측'}[zn] : P(['좌측','가운데','우측'])} 담장을 넘기는 ${ev.batter}의 ${['','솔로 홈런','투런 홈런','쓰리런 홈런','만루 홈런'][ev.runs]||'홈런'}!`; k='big'; wait=2.4; break;
     }
     if(ev.runs&&ev.oc!=='HR'){ t+=` ${ev.runs}점 득점!`; wait=Math.max(wait,1.9); if(k==='call')k='tense'; }
     if(ev.runs){

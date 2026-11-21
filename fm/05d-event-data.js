@@ -18,7 +18,7 @@ const EVT_DATA=[
  make:c=>({who:c.vet.n, icon:'🧓', title:`${c.vet.n}의 면담 요청`,
    body:`${c.vet.n}(${c.age(c.vet)}세, ${EV_POS(c.vet)}, OVR ${c.ovr(c.vet)})이(가) 감독실을 찾았어요. 지난 시즌 벤치에 앉은 날이 많았어요.\n"감독님, 저 아직 뛸 수 있습니다. 기회만 주십시오."`,
    opts:[{l:'출전을 약속한다', d:'사기 +8 · 개막 후 40경기 안에 20경기 선발 출전이 필요해요', fx:[['mor',c.vet,8]],
-          promise:{kind:'starts', label:'선발 출전 약속', who:c.vet, n:20, within:40}, then:{id:'vet-playtime-check', afterGames:41}, res:`${c.vet.n}: "실망시키지 않겠습니다."`},
+          promise:{kind:'starts', label:'선발 출전 약속', who:c.vet, n:20, within:40}, then:{id:'vet-playtime-check', afterGames:41}, res:`${c.vet.n}이(가) 고개를 끄덕이고 훈련장으로 돌아갔어요.`},
          {l:'실력으로 보여 달라고 한다', d:'사기 -4 · 약속 없음', fx:[['mor',c.vet,-4]], res:`${c.vet.n}은(는) 말없이 고개를 끄덕였어요.`},
          {l:'후배들을 이끌어 달라고 부탁한다', d:'사기 +2 · 멘토 역할(이름표)', fx:[['mor',c.vet,2],['flag','mentor',c.vet.n]], res:`${c.vet.n}이(가) 젊은 선수들과 훈련 일정을 짜기 시작했어요.`}]})},
 {id:'vet-playtime-check', stage:'season', rarity:'common', chain:true,
@@ -28,7 +28,7 @@ const EVT_DATA=[
    return kept? {who:c.vet.n, icon:'🤝', title:`${c.vet.n}, 약속을 지켜 준 감독에게`,
      body:`약속한 40경기가 지났어요. ${c.vet.n}은(는) 20경기 넘게 선발로 나섰어요.\n"믿어 주셔서 감사합니다. 남은 시즌도 제 몫 하겠습니다."`,
      opts:[{l:'고맙다고 말한다', d:'사기 +6 · 팬 여론 +1', fx:[['mor',c.vet,6],['fans',1]], res:'라커룸 분위기가 한결 밝아졌어요.'},
-           {l:'이제 출전은 실력대로라고 말한다', d:'사기 +2', fx:[['mor',c.vet,2]], res:`${c.vet.n}: "그게 맞죠."`}]}
+           {l:'이제 출전은 실력대로라고 말한다', d:'사기 +2', fx:[['mor',c.vet,2]], res:`${c.vet.n}이(가) 담담하게 받아들였어요.`}]}
    : {who:c.vet.n, icon:'😠', title:`${c.vet.n}, 약속은 어디 갔습니까`,
      body:`40경기가 지났지만 ${c.vet.n}의 선발 출전은 20경기에 못 미쳤어요.\n"감독님이 하신 말씀, 저는 그대로 믿었습니다."`,
      opts:[{l:'사과하고 다시 약속한다', d:'사기 +3 · 30경기 안에 15경기 선발', fx:[['mor',c.vet,3]], promise:{kind:'starts', label:'선발 출전 약속', who:c.vet, n:15, within:30}, res:`${c.vet.n}은(는) 한 번 더 믿어 보기로 했어요.`},
@@ -59,7 +59,7 @@ const EVT_DATA=[
    return kept? {who:c.kid.n, icon:'🚀', title:`${c.kid.n}의 1군 적응기`,
      body:`약속대로 ${c.kid.n}이(가) 1군에서 뛰고 있어요. 1군 선배들에게 많이 배운다고 해요.`,
      opts:[{l:'타격·투구 코치에게 맡긴다', d:'60%: 핵심 능력 +1', fx:[['chance',0.6,[['stat',c.kid,EV_B(c.kid)?'con':'ctl',1]],[]]], res:'코치들이 따로 시간을 내기로 했어요.'},
-           {l:'칭찬만 해 준다', d:'사기 +5', fx:[['mor',c.kid,5]], res:`${c.kid.n}: "더 잘하겠습니다!"`}]}
+           {l:'칭찬만 해 준다', d:'사기 +5', fx:[['mor',c.kid,5]], res:`${c.kid.n}이(가) 밝은 얼굴로 돌아갔어요.`}]}
    : {who:'2군 감독', icon:'😞', title:`${c.kid.n}이(가) 실망했어요`,
      body:`30경기가 지났지만 ${c.kid.n}은(는) 1군에 오래 머물지 못했어요. 2군 감독이 걱정해요. "애가 의욕을 잃었습니다."`,
      opts:[{l:'다음 콜업을 다시 약속한다', d:'사기 +4 · 30경기 안에 10경기', fx:[['mor',c.kid,4]], promise:{kind:'callup', label:'1군 콜업 약속', who:c.kid, n:10, within:30}, res:'한 번 더 기회가 생겼어요.'},
@@ -140,7 +140,7 @@ const EVT_DATA=[
  when:c=>true,
  make:c=>({who:c.p.n, icon:'🪖', title:`${c.p.n}의 군 복무 고민`,
    body:`${c.p.n}(${c.age(c.p)}세)이(가) 상무 지원 시기를 상의하러 왔어요. 올해 1군에서 자리를 잡고 싶어 해요.`,
-   opts:[{l:'올해는 함께 뛰자고 한다', d:'사기 +6 · 60경기 동안 1군 유지 약속', fx:[['mor',c.p,6]], promise:{kind:'active', label:'1군 유지 약속', who:c.p, within:60}, res:`${c.p.n}: "올해 꼭 보여 드리겠습니다."`},
+   opts:[{l:'올해는 함께 뛰자고 한다', d:'사기 +6 · 60경기 동안 1군 유지 약속', fx:[['mor',c.p,6]], promise:{kind:'active', label:'1군 유지 약속', who:c.p, within:60}, res:`${c.p.n}이(가) 입대 준비 대신 시즌 준비에 집중하기로 했어요.`},
          {l:'내년 상무 지원을 권한다', d:'사기 -2 · 이름표: 상무 예정', fx:[['mor',c.p,-2],['flag','military',c.p.n]], res:'본인도 계획을 세우기로 했어요.'}]})},
 {id:'coach-poach', stage:'stove', rarity:'uncommon', cool:3,
  pick:c=>({ace:c.find(p=>EV_P(p)&&c.inLineup(p))}), when:c=>true,
@@ -197,9 +197,9 @@ const EVT_DATA=[
    body:`주장 ${c.p.n}이(가) 캠프 2주차에 선수단 의견을 모아 왔어요.
 베테랑들은 훈련량이 많다고 하고(${c.v.n} ${c.age(c.v)}세), 젊은 선수들은 실전 연습을 더 원해요(${c.y.n} ${c.age(c.y)}세).
 주장은 감독의 답을 선수단에 그대로 전하겠다고 해요.`,
-   opts:[{l:'베테랑 훈련량을 줄인다', d:`주장 사기 +5 · ${c.v.n} 컨디션 +10 · ${c.y.n} 사기 -2`, fx:[['mor',c.p,5],['cond',c.v,10],['mor',c.y,-2]], res:`${c.p.n}: "베테랑들이 고마워합니다. 시즌 길게 보겠습니다."`},
-         {l:'젊은 선수 실전 연습을 늘린다', d:`주장 사기 +4 · ${c.y.n} 50%: 핵심 능력 +1 · ${c.v.n} 사기 -3`, fx:[['mor',c.p,4],['mor',c.v,-3],['chance',0.5,[['stat',c.y,EV_B(c.y)?'con':'ctl',1]],[]]], res:`${c.p.n}: "어린 선수들 눈빛이 달라졌어요."`},
-         {l:'지금 계획대로 간다', d:'주장 사기 -1', fx:[['mor',c.p,-1]], res:`${c.p.n}: "알겠습니다. 그대로 전하겠습니다."`}]})},
+   opts:[{l:'베테랑 훈련량을 줄인다', d:`주장 사기 +5 · ${c.v.n} 컨디션 +10 · ${c.y.n} 사기 -2`, fx:[['mor',c.p,5],['cond',c.v,10],['mor',c.y,-2]], res:`주장 ${c.p.n}이(가) 결정을 전하자 베테랑들이 반겼어요.`},
+         {l:'젊은 선수 실전 연습을 늘린다', d:`주장 사기 +4 · ${c.y.n} 50%: 핵심 능력 +1 · ${c.v.n} 사기 -3`, fx:[['mor',c.p,4],['mor',c.v,-3],['chance',0.5,[['stat',c.y,EV_B(c.y)?'con':'ctl',1]],[]]], res:`주장 ${c.p.n}이(가) 젊은 선수들의 실전 연습을 직접 챙기기 시작했어요.`},
+         {l:'지금 계획대로 간다', d:'주장 사기 -1', fx:[['mor',c.p,-1]], res:`주장 ${c.p.n}이(가) 기존 계획을 선수단에 그대로 전했어요.`}]})},
 // --- chain: 포지션 경쟁 → 시범경기에서 결론 ---
 {id:'camp-position-battle', stage:'camp', rarity:'common', cool:1,
  pick:c=>{ const a=c.find(p=>EV_B(p)&&!c.isFarm(p)&&p.pos!=='DH'&&!c.injured(p)); if(!a) return {a:null};
@@ -346,7 +346,7 @@ const EVT_DATA=[
  make:c=>{ const s=c.springLine(c.p); return {who:'투수코치', icon:'📉', title:`${c.p.n}의 구속이 안 올라와요`,
    body:`${c.p.n}이(가) 시범경기 ${s.IP}이닝 ERA ${s.ERA}로 흔들려요. 구속도 평소보다 3km/h 낮아요.`,
    opts:[{l:'개막 등판을 한 턴 미룬다', d:'컨디션 +12', fx:[['cond',c.p,12]], res:'조금 더 시간을 주기로 했어요.'},
-         {l:'예정대로 간다', d:'사기 +4', fx:[['mor',c.p,4]], res:`${c.p.n}: "개막전엔 올라옵니다."`}]}; }},
+         {l:'예정대로 간다', d:'사기 +4', fx:[['mor',c.p,4]], res:`${c.p.n}이(가) 개막에 맞춰 몸을 끌어올리기로 했어요.`}]}; }},
 {id:'spring-rookie-hot', stage:'spring', rarity:'uncommon', cool:1,
  pick:c=>({p:c.find(p=>p.rookie&&EV_B(p)&&c.springLine(p)&&c.springLine(p).PA>=8&&c.springLine(p).OPS>=0.800)}), when:c=>true,
  make:c=>({who:'스포츠 기자', icon:'🗞', title:`신인 ${c.p.n}, 개막 선발 출전할까`,
@@ -419,7 +419,7 @@ const EVT_DATA=[
  make:c=>{ const s=c.seasonLine(c.p); return {who:'타격코치', icon:'🧊', title:`${c.p.n}의 긴 슬럼프`,
    body:`${c.p.n}의 시즌 OPS가 ${s.OPS.toFixed(3)}까지 떨어졌어요. 타격코치가 해법을 물어요.`,
    opts:[{l:'2군에서 재조정한다', d:'컨디션 +12 · 사기 -4 · 엔트리는 선수단 탭에서', fx:[['cond',c.p,12],['mor',c.p,-4]], res:'2군 경기로 감을 찾기로 했어요.'},
-         {l:'계속 믿고 내보낸다', d:'사기 +6', fx:[['mor',c.p,6]], res:`${c.p.n}: "꼭 보답하겠습니다."`},
+         {l:'계속 믿고 내보낸다', d:'사기 +6', fx:[['mor',c.p,6]], res:`${c.p.n}이(가) 감독의 믿음에 힘을 얻은 표정이에요.`},
          {l:'특타를 시킨다', d:'50%: 컨택 +1 · 컨디션 -6', fx:[['chance',0.5,[['stat',c.p,'con',1]],[]],['cond',c.p,-6]], res:'경기 전 배팅케이지에 불이 꺼지지 않아요.'}]}; }},
 {id:'closer-blown', stage:'season', rarity:'common', cool:1,
  pick:c=>({p:c.find(p=>EV_P(p)&&p.role==='CL'&&EV_L(c,p).G>=12&&EV_L(c,p).ERA>=5)}), when:c=>true,
@@ -467,6 +467,6 @@ const EVT_DATA=[
  pick:c=>({p:c.find(p=>p.f&&!c.isFarm(p)&&((EV_B(p)&&EV_L(c,p).PA>=60&&EV_L(c,p).OPS<0.650)||(EV_P(p)&&EV_L(c,p).IP>=25&&EV_L(c,p).ERA>=5.5)))}), when:c=>c.games>=25,
  make:c=>({who:'통역', icon:'🌏', title:`${c.p.n}, 적응에 애먹어요`,
    body:`외국인 선수 ${c.p.n}이(가) 기대에 못 미쳐요. 본인도 많이 답답해한대요.`,
-   opts:[{l:'면담하고 믿음을 준다', d:'사기 +8', fx:[['mor',c.p,8]], res:`${c.p.n}: "한국 야구를 더 공부하겠습니다."`},
+   opts:[{l:'면담하고 믿음을 준다', d:'사기 +8', fx:[['mor',c.p,8]], res:`${c.p.n}이(가) 전력분석팀과 따로 영상 미팅을 잡았어요.`},
          {l:'교체 후보를 알아본다', d:'사기 -6 · 외국인 후보는 스카우트 탭에서', fx:[['mor',c.p,-6]], res:'스카우트 팀이 후보를 추리기 시작했어요.'}]})}
 ];
