@@ -113,6 +113,7 @@ function afterGame(res){
     coachReport(ug);
     coachDesk(ug);
     offCallbacks();
+    storyTick();
     evtAfterGame(res);
     maybeMedia(ug);
     maybePress(ug);

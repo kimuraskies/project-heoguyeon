@@ -28,4 +28,17 @@ module.exports = ({assert,test}) => {
     const rev=(h.state.fm.feed||[]).filter(x=>/다시 보는 트레이드/.test(x.title));
     for(const x of rev) assert.ok(x.body.includes('이적 후'),'revisit counts only after the trade');
   });
+  test('story: opening picks get a check-in, the manager’s own players are marked and make news', () => {
+    const h=new Runtime({observe:false}).start('KIA'); h.FM.offAuto(true); h.FM.setCamp('bal'); h.FM.offAuto(true); h.FM.startSpring(); h.FM.springSimAll();
+    const o=h.state.fm.off; if(h.FM.offHasBattles()){ o.battles.forEach((b,i)=>h.FM.offPick(i,'b')); h.FM.offConfirm(); } else h.FM.openSeason();
+    const used=new Set(h.state.cfgs.KIA.lineup.concat((o.battles||[]).flatMap(b=>[b.a,b.b])));
+    const bench=h.K.ROSTERS.KIA.batters.find(p=>!used.has(p.n)); if(bench) h.FM.demote(bench.n); let farm=null;
+    for(const p of h.K.ROSTERS.KIA.farm.filter(p=>!p.f&&!h.K.isInjured(p)).slice(0,8)){ h.FM.promote(p.n); if(!h.K.ROSTERS.KIA.farm.includes(p)){ farm=p; break; } }
+    for(let k=0;k<20&&h.state.phase==='regular';k++){ h.App.simRest(); h.FM.answer(); }
+    const mine=h.state.fm.mine||{}; assert.ok(Object.keys(mine).length>0,'some players are marked as the manager’s');
+    if(farm) assert.equal((mine[farm.n]||{}).why,'callup');
+    const picks=(h.state.fm.opening||{}).picks||[]; for(const x of picks) assert.ok(x.done,'opening pick '+x.win+' got its check-in');
+    if(picks.length) assert.ok(h.state.fm.inbox.some(m=>/개막 때 고른/.test(m.subject)),'check-in message sent');
+    assert.ok((h.state.fm.mineLog||[]).length>0,'milestone news for the manager’s players');
+  });
 };

@@ -246,7 +246,7 @@ function battleApply(auto){ const o=fm().off; if(!o||o.year!==state.year||!o.bat
     addMor(win,5); addMor(lose,-6);
     if(!auto&&b.pick!==better&&(sa||sb)){ addMor(lose,-5);
       feedPush({title:`${b.label} 경쟁, 시범경기 성적과 다른 선택`, body:josa(`${lose.n}은(는) 시범경기에서 더 좋은 성적을 냈지만 개막 ${b.label} 자리는 ${win.n}에게 돌아갔습니다.\n현장에서는 감독의 선택을 두고 말이 나옵니다.`), year:state.year, kind:'press', ug:0}); }
-    memo('battle',win.n,`개막 ${b.label}: ${win.n} 선택 (${lose.n} 탈락)`); }); }
+    memo('battle',win.n,`개막 ${b.label}: ${win.n} 선택 (${lose.n} 탈락)`); storyOpening(b,win,lose,auto); }); }
 function offConfirm(auto){ battleApply(!!auto); closeModal(); openSeason(); }
 
 // ----- results that come back during the season -----
@@ -339,7 +339,7 @@ const EV={
         if(Math.random()>0.8){ const t=offAiSign(x); return `${d.fa}은(는) 고민 끝에 ${t?K.ROSTERS[t].name:'다른 구단'}을(를) 택했습니다. ${d.need} 고민은 이어집니다.`; }
         memo('fa',d.fa,`보강 과제(${d.need}): FA ${d.fa} 영입`); return faSign(x,{sal:d.ask,yrs:d.yrs})+`\n${d.need} 자리를 채웠습니다.`; }
       if(k==='farm'){ const p=farmOf(USER).find(p=>p.n===d.farm); if(!p) return `${d.farm}은(는) 이미 2군에 없습니다.`; const why=promoteBlock(p); if(why) return why;
-        doPromote(USER,p); memo('needs',d.farm,`보강 과제(${d.need}): 2군 ${d.farm} 등록`); return `${d.farm}이(가) 1군에 올라왔습니다. 캠프에서 ${d.need} 자리를 놓고 경쟁합니다.`; }
+        doPromote(USER,p); storyMark(d.farm,'needs'); memo('needs',d.farm,`보강 과제(${d.need}): 2군 ${d.farm} 등록`); return `${d.farm}이(가) 1군에 올라왔습니다. 캠프에서 ${d.need} 자리를 놓고 경쟁합니다.`; }
       (d.mine||[]).forEach(n=>{ const p=findPlayer(USER,n); if(p) addMor(p,3); });
       return `${d.need}은(는) 지금 선수들에게 맡깁니다. 코치진이 캠프에서 따로 챙기겠다고 합니다.`; }},
   // camp week 4: the press asks which jobs the exhibition games will settle; the answer sets the first block's plan

@@ -638,6 +638,7 @@ function afterGame(res){
     coachReport(ug);
     coachDesk(ug);
     offCallbacks();
+    storyTick();
     evtAfterGame(res);
     maybeMedia(ug);
     maybePress(ug);
@@ -2057,7 +2058,7 @@ function battleApply(auto){ const o=fm().off; if(!o||o.year!==state.year||!o.bat
     addMor(win,5); addMor(lose,-6);
     if(!auto&&b.pick!==better&&(sa||sb)){ addMor(lose,-5);
       feedPush({title:`${b.label} 경쟁, 시범경기 성적과 다른 선택`, body:josa(`${lose.n}은(는) 시범경기에서 더 좋은 성적을 냈지만 개막 ${b.label} 자리는 ${win.n}에게 돌아갔습니다.\n현장에서는 감독의 선택을 두고 말이 나옵니다.`), year:state.year, kind:'press', ug:0}); }
-    memo('battle',win.n,`개막 ${b.label}: ${win.n} 선택 (${lose.n} 탈락)`); }); }
+    memo('battle',win.n,`개막 ${b.label}: ${win.n} 선택 (${lose.n} 탈락)`); storyOpening(b,win,lose,auto); }); }
 function offConfirm(auto){ battleApply(!!auto); closeModal(); openSeason(); }
 
 // ----- results that come back during the season -----
@@ -2150,7 +2151,7 @@ const EV={
         if(Math.random()>0.8){ const t=offAiSign(x); return `${d.fa}은(는) 고민 끝에 ${t?K.ROSTERS[t].name:'다른 구단'}을(를) 택했습니다. ${d.need} 고민은 이어집니다.`; }
         memo('fa',d.fa,`보강 과제(${d.need}): FA ${d.fa} 영입`); return faSign(x,{sal:d.ask,yrs:d.yrs})+`\n${d.need} 자리를 채웠습니다.`; }
       if(k==='farm'){ const p=farmOf(USER).find(p=>p.n===d.farm); if(!p) return `${d.farm}은(는) 이미 2군에 없습니다.`; const why=promoteBlock(p); if(why) return why;
-        doPromote(USER,p); memo('needs',d.farm,`보강 과제(${d.need}): 2군 ${d.farm} 등록`); return `${d.farm}이(가) 1군에 올라왔습니다. 캠프에서 ${d.need} 자리를 놓고 경쟁합니다.`; }
+        doPromote(USER,p); storyMark(d.farm,'needs'); memo('needs',d.farm,`보강 과제(${d.need}): 2군 ${d.farm} 등록`); return `${d.farm}이(가) 1군에 올라왔습니다. 캠프에서 ${d.need} 자리를 놓고 경쟁합니다.`; }
       (d.mine||[]).forEach(n=>{ const p=findPlayer(USER,n); if(p) addMor(p,3); });
       return `${d.need}은(는) 지금 선수들에게 맡깁니다. 코치진이 캠프에서 따로 챙기겠다고 합니다.`; }},
   // camp week 4: the press asks which jobs the exhibition games will settle; the answer sets the first block's plan
@@ -3577,7 +3578,7 @@ function seasonRecap(){ const f=fm(), s=state.season[USER], rank=standings().fin
   const bats=K.ROSTERS[USER].batters.filter(p=>s.bat[p.n]&&s.bat[p.n].PA>=100).map(p=>({n:p.n,war:batWAR(USER,p,s.bat[p.n],env)})).sort((a,b)=>b.war-a.war);
   const grown=allPlayers(USER).map(p=>({n:p.n,g:(p.grow||[]).filter(g=>g[0]===state.year).length})).filter(x=>x.g>0).sort((a,b)=>b.g-a.g).slice(0,3);
   const calls=(f.memo||[]).filter(m=>m.y===state.year).slice(0,3).map(m=>m.txt);
-  return {rank,W:s.W,L:s.L,T:s.T,conf:f.board.conf,champ:state.champion===USER,best:bats[0]||null,grown,calls}; }
+  return Object.assign({rank,W:s.W,L:s.L,T:s.T,conf:f.board.conf,champ:state.champion===USER,best:bats[0]||null,grown,calls}, typeof storyRecap==='function'? storyRecap() : {}); }
 ACTIONS.openAwards=()=>{ setTimeout(showAwards,0); return '시상식장으로 이동했습니다.'; };
 function awardsAfterSeason(){ const f=fm(); try{ f.awards=f.awards||{}; f.awards[state.year]={a:seasonAwards(),r:seasonRecap()};
     const a=f.awards[state.year].a; send('KBO','🏆',`${state.year} 연말 시상식`,`MVP ${a.mvp?a.mvp.n+' ('+a.mvp.t+')':'-'} · 신인왕 ${a.roy?a.roy.n+' ('+a.roy.t+')':'-'}`,[{label:'시상식 보기',fn:'openAwards',arg:{}}]); }catch(e){ console.error('awards skipped',e); } }
@@ -3587,7 +3588,7 @@ function showAwards(y){ const f=fm(), yr=y||state.year, d=(f.awards||{})[yr]||(f
     <h4 class="st-group">타이틀</h4><div class="aw-list">${a.titles.map(x=>`<div><small>${x.l}</small><b>${esc(x.n)}</b><span>${esc(x.t)} · ${x.v}</span></div>`).join('')}</div>
     <h4 class="st-group">골든글러브</h4><div class="aw-list">${a.gg.map(x=>`<div><small>${x.pos}</small><b>${esc(x.n)}</b><span>${esc(x.t)}</span></div>`).join('')}</div>
     <h4 class="st-group">${esc(K.ROSTERS[USER].name)} 시즌 리캡</h4><p>${r.champ?'🏆 통합 우승 · ':''}정규시즌 ${r.rank}위 · ${r.W}승 ${r.L}패 ${r.T}무 · 이사회 신뢰 ${r.conf}</p>
-    ${r.best?`<p class="muted">팀 WAR 1위 ${esc(r.best.n)} (${r.best.war.toFixed(1)})</p>`:''}${r.calls&&r.calls.length?`<h4 class="st-group">올해의 결정</h4><ul class="ev-notes">${r.calls.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}${r.grown.length?`<p class="muted">올해 가장 많이 성장: ${r.grown.map(x=>esc(x.n)+' +'+x.g).join(', ')}</p>`:''}`); }
+    ${r.best?`<p class="muted">팀 WAR 1위 ${esc(r.best.n)} (${r.best.war.toFixed(1)})</p>`:''}${r.opening&&r.opening.length?`<h4 class="st-group">개막 결정 다시 보기</h4><ul class="ev-notes">${r.opening.map(x=>`<li><b>${esc(x.label)}</b>: ${esc(x.win)} 선택 (${esc(x.lose)} 대신) · 시범경기 ${esc(x.wl)}${x.now?` → 시즌 중 ${esc(x.now)}`:''}</li>`).join('')}</ul>`:''}${r.mine&&r.mine.length?`<h4 class="st-group">내가 키운 선수</h4><ul class="ev-notes">${r.mine.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}${r.calls&&r.calls.length?`<h4 class="st-group">올해의 결정</h4><ul class="ev-notes">${r.calls.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}${r.grown.length?`<p class="muted">올해 가장 많이 성장: ${r.grown.map(x=>esc(x.n)+' +'+x.g).join(', ')}</p>`:''}`); }
 function coachInterview(role,n){ const c=coachPool().find(x=>x.role===role&&x.n===n); if(!c) return; coachInit(c); closeModal();
   modal(`<span class="closeX" onclick="App.closeModal()" role="button" tabindex="0" aria-label="닫기">×</span><h2>${esc(n)} 면접</h2><p class="muted">우리 팀에서 가장 중요하게 볼 것을 물었습니다. 답에 따라 연봉 요구가 달라집니다.</p>
     <div class="grid" style="gap:8px;margin-top:8px">${COACH_STYLES.map(s=>`<button class="btn" onclick="FM.coachAnswer('${role}','${q(n)}','${s}')">${{'육성형':'어린 선수를 키워 주십시오','성적형':'올해 성적이 먼저입니다','데이터형':'데이터로 설득해 주십시오','올드스쿨':'기본기와 규율이 우선입니다'}[s]}</button>`).join('')}</div>`); }
@@ -3796,6 +3797,61 @@ function tradeHistoryCard(){
     <div class="tabsm">${ft('all','리그 전체')}${ft('mine','우리 구단')}</div>
     ${rows?`<ol class="th-list">${rows}</ol>`:'<p class="muted">아직 성사된 트레이드가 없어요. 마감이 다가오면 구단들이 움직이기 시작해요.</p>'}</div>`;
 }
+// ---------- 0.82: the manager's own story (docs/immersion-plan-1122.md C3, B4) ----------
+// "감독의 선수": players this manager drafted, called up, signed, traded for, or picked in an opening-day battle.
+// Their milestones become news and land in the season recap. The opening-day picks get a check-in
+// once the season has a sample (3 starts / 15 games), with a keep-or-reopen call.
+// State: fm().mine = {n: {why, y, base:{W,HR,SV}}}, fm().opening = {y, picks:[...]}, fm().mineLog = [{y, n, t}]
+function mineState(){ const f=fm(); f.mine=f.mine||{}; f.mineLog=f.mineLog||[]; return f.mine; }
+const MINE_WHY={draft:'직접 지명', callup:'직접 콜업', fa:'직접 영입', trade:'트레이드 영입', battle:'개막 주전으로 선택', needs:'보강 과제로 기회'};
+function seasonLineOf(n){ const s=state.season&&state.season[USER]; return {b:s&&s.bat[n]||null, p:s&&s.pit[n]||null}; }
+function storyMark(n,why){ const m=mineState(), p=findPlayer(USER,n); if(!p) return;
+  const L=seasonLineOf(n); m[n]={why, y:state.year, base:{y:state.year, W:(L.p&&L.p.W)||0, HR:(L.b&&L.b.HR)||0, SV:(L.p&&L.p.SV)||0, G:Math.max((L.b&&L.b.G)||0,(L.p&&L.p.G)||0)}, hit:{}}; }
+function storyNote(n){ const x=mineState()[n]; return x? `감독의 선수 · ${x.y} ${MINE_WHY[x.why]||x.why}` : ''; }
+// hooks on the manager's own moves (wrapping keeps the original functions untouched)
+const storyPromote=promote; promote=function(n){ const was=farmOf(USER).some(p=>p.n===n); const out=storyPromote(n); if(was&&!farmOf(USER).some(p=>p.n===n)) storyMark(n,'callup'); return out; };
+const storyDraftPick=draftPick; draftPick=function(n){ const d=draftState(), mine=d&&!draftDone(d)&&draftOnClock(d)===USER; const out=storyDraftPick(n); if(mine&&findPlayer(USER,n)) storyMark(n,'draft'); return out; };
+const storyFaSign=faSignWith; faSignWith=function(x,t,b){ const n=x&&x.p&&x.p.n, out=storyFaSign(x,t,b); if(t===USER&&n&&findPlayer(USER,n)) storyMark(n,'fa'); return out; };
+const storyTrade=executeClubTrade; executeClubTrade=function(a,b,aGive,bGive,kind){ const out=storyTrade(a,b,aGive,bGive,kind);
+  if(a===USER) bGive.forEach(p=>storyMark(p.n,'trade')); if(b===USER) aGive.forEach(p=>storyMark(p.n,'trade')); return out; };
+// opening-day job battle settled (fm/05b-preseason2.js battleApply)
+function storyOpening(b,win,lose,auto){ const f=fm(); if(!f.opening||f.opening.y!==state.year) f.opening={y:state.year,picks:[]};
+  f.opening.picks.push({k:b.k,label:b.label,win:win.n,lose:lose.n,wl:springLine(win.n).txt,ll:springLine(lose.n).txt,auto:!!auto,done:false});
+  if(!auto) storyMark(win.n,'battle'); }
+// after each of our games: opening check-ins and milestones
+function storyTick(){ if(state.phase!=='regular'&&state.phase!=='postseason') return; const f=fm(), ug=userGamesPlayed();
+  if(f.opening&&f.opening.y===state.year) f.opening.picks.forEach((x,i)=>{ if(x.done) return; const L=seasonLineOf(x.win);
+    const ready=x.k==='SP5'? L.p&&(L.p.GS||0)>=3 : L.b&&(L.b.G||0)>=15; if(!ready) return; x.done=true;
+    const now=x.k==='SP5'? `선발 ${L.p.GS}경기 ${ipStr(L.p.OUT)}이닝 ERA ${fmtEra(L.p.ER,L.p.OUT)}` : `${L.b.G}경기 ${L.b.AB}타수 ${L.b.H}안타 ${L.b.HR}홈런 · 타율 ${fmtAvg(L.b.H/Math.max(1,L.b.AB))}`;
+    const lose=findPlayer(USER,x.lose), lp=lose&&isFarm(USER,lose)? '2군에서 기회를 기다리고 있습니다.' : lose? '1군 벤치에서 기회를 기다리고 있습니다.' : '팀을 떠났습니다.';
+    x.now=now;
+    send('수석코치','🔁',`개막 때 고른 ${x.win}: 중간 점검`,josa(`개막 ${x.label} 경쟁에서 ${x.auto?'수석코치 추천으로 ':''}${x.win}을(를) 택했습니다. (시범경기 ${x.wl})\n지금까지 ${now}.\n\n경쟁했던 ${x.lose}은(는) ${lp}`),
+      [{label:`${x.win}에게 계속 맡긴다`, fn:'openingKeep', arg:{i}}].concat(lose&&!isFarm(USER,lose)?[{label:`${x.lose}에게 다시 기회를 준다`, fn:'openingSwap', arg:{i}}]:[])); });
+  const m=mineState();
+  for(const n in m){ const x=m[n], p=findPlayer(USER,n); if(!p||isFarm(USER,p)) continue; const L=seasonLineOf(n), base=x.base&&x.base.y===state.year? x.base : {W:0,HR:0,SV:0,G:0};
+    x.hit=x.hit||{}; const key=k=>state.year+':'+k, said=k=>x.hit[key(k)], say=(k,t)=>{ x.hit[key(k)]=1; storyNews(n,t); };
+    const W=(L.p&&L.p.W)||0, HR=(L.b&&L.b.HR)||0, SV=(L.p&&L.p.SV)||0, G=Math.max((L.b&&L.b.G)||0,(L.p&&L.p.G)||0);
+    if(['draft','callup','needs'].includes(x.why)&&G>base.G&&!said('app')) say('app',`${n}, 1군 무대에 서다`);
+    if(W>base.W&&!x.hit.W1){ x.hit.W1=1; say('W1',`${n}, 감독과 함께한 첫 승`); }
+    if(HR>base.HR&&!x.hit.HR1){ x.hit.HR1=1; say('HR1',`${n}, 감독과 함께한 첫 홈런`); }
+    if(SV>base.SV&&!x.hit.SV1){ x.hit.SV1=1; say('SV1',`${n}, 감독과 함께한 첫 세이브`); }
+    if(W>=10&&!said('W10')) say('W10',`${n}, 시즌 10승 달성`);
+    if(HR>=20&&!said('HR20')) say('HR20',`${n}, 시즌 20홈런 고지`);
+    if(SV>=20&&!said('SV20')) say('SV20',`${n}, 시즌 20세이브`); } }
+function storyNews(n,title){ const x=mineState()[n], f=fm(), why=x? MINE_WHY[x.why]||'' : '';
+  f.mineLog.push({y:state.year,n,t:title}); if(f.mineLog.length>80) f.mineLog.shift();
+  const body=josa(`${x?x.y+'년 감독이 '+why+'한 ':''}${n}이(가) 이정표를 세웠습니다.`);
+  feedPush({title, body, year:state.year, kind:'press', ug:userGamesPlayed()}); send('구단 홍보팀','🌱',title,body,[]); }
+ACTIONS.openingKeep=(m,a)=>{ const x=fm().opening&&fm().opening.picks[a.i]; const p=x&&findPlayer(USER,x.win); if(p) addMor(p,4); return x? josa(`${x.win}에게 계속 맡깁니다. 선수가 감독의 믿음을 느낍니다.`) : '처리했습니다.'; };
+ACTIONS.openingSwap=(m,a)=>{ const x=fm().opening&&fm().opening.picks[a.i], c=state.cfgs[USER]; if(!x) return '처리했습니다.';
+  const W=findPlayer(USER,x.win), Lo=findPlayer(USER,x.lose); if(!W||!Lo||isFarm(USER,Lo)) return josa(`${x.lose}은(는) 지금 1군에 없습니다.`);
+  if(x.k==='SP5'){ const i=c.rotation.indexOf(x.win); if(i<0) return '로테이션이 이미 바뀌었습니다.'; c.rotation[i]=x.lose; c.bullpen=(c.bullpen||[]).filter(n=>n!==x.lose); if(c.bullpen.indexOf(x.win)<0) c.bullpen.push(x.win); }
+  else { const i=c.lineup.indexOf(x.win); if(i<0||c.lineup.indexOf(x.lose)>=0) return '라인업이 이미 바뀌었습니다.'; c.lineup[i]=x.lose; }
+  addMor(Lo,8); addMor(W,-6); memo('reopen',x.lose,`${x.label} 경쟁 재개: ${x.lose}에게 기회`);
+  return josa(`${x.lose}이(가) 다시 기회를 받습니다. ${x.win}은(는) 아쉬워합니다.`); };
+// season recap pieces
+function storyRecap(){ const f=fm(); return {opening:(f.opening&&f.opening.y===state.year? f.opening.picks : []).map(x=>({label:x.label,win:x.win,lose:x.lose,wl:x.wl,now:x.now||null})),
+  mine:(f.mineLog||[]).filter(x=>x.y===state.year).map(x=>x.t).slice(-6)}; }
 // ---------- player records: game logs, season archive, career ----------
 function logGame(res){
   state.logs=state.logs||{};
@@ -3932,7 +3988,7 @@ function onSeasonEnd(){
     if(p.age<=33) acts.push({label:`3년 ${Math.round(ask*1.1*10)/10}억 재계약`, fn:'renew', arg:{n:p.n, years:3, sal:Math.round(ask*1.1*10)/10}});
     acts.push({label:'재계약하지 않는다', fn:'release', arg:{n:p.n}});
     send(`${p.n} 에이전트`,'📝',`${p.n} 계약 만료 — 재계약 협상`,
-      `${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})의 계약이 만료됩니다.\n현재 연봉 ${p.sal}억 원 · 요구 연봉 ${ask}억 원 · 사기 ${moraleLabel(K.mor(p))}\n\n` +
+      `${p.n}(${p.age}세, ${posFull(p.pos||p.role)}, OVR ${K.ovr(p)})의 계약이 만료됩니다.${storyNote(p.n)?' ('+storyNote(p.n)+')':''}\n현재 연봉 ${p.sal}억 원 · 요구 연봉 ${ask}억 원 · 사기 ${moraleLabel(K.mor(p))}\n\n` +
       `다음 시즌 시작 전까지 결정하지 않으면 요구 조건(1년 ${ask}억)으로 재계약합니다. 재계약하지 않으면 보류선수 명단에서 빠져 자유계약 선수가 됩니다.`, acts);
   }));
   faDeclare(faCands);
