@@ -1,7 +1,7 @@
 /* Options, notices and the information pages: what this project is, what it records, where the
    data comes from, and how saves work. Opened from the header's 설정 dropdown. */
 (function () {
-  const TRACK_OFF = 'kbo-track-off', SEEN = 'kbo-notice-seen', ASKED = 'kbo-ask-feedback', ASK_ID = '2026-11-12', PLAN = 'kbo-upcoming', PLAN_ID = '2026-11-22-0.82';
+  const TRACK_OFF = 'kbo-track-off', SEEN = 'kbo-notice-seen', ASKED = 'kbo-ask-feedback', ASK_ID = '2026-11-12', PLAN = 'kbo-upcoming', PLAN_ID = '2026-11-22-0.82', THANKS = 'kbo-thanks', THANKS_ID = '2026-11-26-420';
   const S083 = ["투수 보직 변경: 투수 프로필의 보직 숙련도 아래 [선발] [중계] [마무리] 버튼으로 바로 바꿀 수 있어요. 바꾸면 그 보직으로 기용되고, 새 보직 숙련도는 훈련으로 올라가요. 1군 선발은 5명 아래로 줄일 수 없어요.","로테이션 표에서 선발마다 올해 성적(선발 경기, 승패, ERA)을 볼 수 있어요."];
   const S082 = ["수석코치와 준비: 첫 시즌에는 시즌 방향·캠프 방향·시험할 선수 세 가지만 정하면 나머지는 수석코치가 맡고 바로 시범경기 1차전으로 가요. 직접 하나하나 정하는 길도 그대로 있어요.","결정과 결정 사이의 결과 화면을 없앴어요. 방금 내린 결정은 다음 카드 위에 한 줄로 보여요.","경기 중 앱을 닫아도 이어서 할 수 있어요. 공수 교대 때마다 저장되고, 다시 열면 \"7회초 4:1 · 이어하기\"가 나와요.","볼카운트마다 사인을 낼 수 있어요. 도루·히트앤런 같은 작전이 다음 타석이 아니라 그 타석에 바로 걸려요.","KBO 달력: 월요일은 쉬고, 화~목·금~일 3연전으로 돌아가요. 올스타 휴식기가 있고, 비로 취소된 경기는 뒤로 미뤄져요. 다음 선발을 다시 고를 수 있어요.","중계의 타구 방향이 실제 타구 각도와 같아졌어요. 좌중간 2루타면 기록에도 좌중간이에요.","감독과의 관계: 선수마다 감독을 얼마나 믿는지 기억해요. 약속을 지키고 어긴 일, 주전 선택, 면담, 말소가 쌓이고 재계약 금액과 FA 잔류, 불만 면담에 영향을 줘요. 선수 프로필에서 볼 수 있어요.","감독의 선수: 직접 지명·콜업·영입한 선수와 개막 주전으로 고른 선수의 첫 승, 첫 홈런, 10승 같은 이정표가 소식으로 와요. 개막 때 고른 선수는 시즌 초 중간 점검 보고가 오고, 계속 맡길지 다시 경쟁시킬지 정해요.","이사회 중간 평가: 40경기, 80경기에 단장 미팅에서 정한 방향(우승·균형·리빌딩)대로 운영하는지 평가해요.","스카우팅: 다른 팀 선수의 능력치는 범위로 보여요. 맞대결과 전력분석팀, 주 1회 스카우트 파견으로 범위가 좁아져요. 드래프트 후보도 파견하면 잠재력 추정이 정확해져요.","실제 홈구장: 10개 구단 홈구장 이름과 좌석 수가 반영돼 관중과 입장 수입이 구장마다 달라요.","상무: 상무 지원을 권한 선수는 다음 스토브리그에 합격 여부가 나오고, 합격하면 두 시즌 동안 팀을 떠났다가 돌아와요.","트레이드 다시 보기가 이적 후 성적만으로 평가해요.","실명 선수와 코치에게 따옴표 대사를 붙이지 않아요. 무엇을 했는지로 전해요."];
   const S08 = ["개막 전 흐름을 새로 짰어요. 스토브리그 3주: 1주차 단장 미팅과 코치진 정비, 2주차 리더 선임, 3주차 보강 과제(가장 약한 자리를 FA·2군·기존 선수 중 누구로 채울지). 2주차부터는 이벤트도 함께 와요.","주장·투수조장·야수조장: 수석코치 추천안을 한 장으로 보여 줘요. 그대로 승인하거나 이름을 눌러 바꿀 수 있고, 매 시즌 스토브리그 2주차에 다시 정해요. 뽑힌 선수 이름 옆에 C·투·야 표시가 붙어요.","스프링캠프 4주: 1주차는 훈련 방향, 2주차는 주장의 건의, 4주차는 기자 인터뷰예요. 인터뷰에서 시범경기에서 확인할 경쟁 자리와 기용 방침을 밝혀요. 시범경기는 9경기로 늘었어요.","수석코치 안내에 실제 중계 화면(작전 · 투수 교체 · 야수 교체)을 넣었어요. 첫 경기 전에 무엇을 지시할 수 있는지 미리 볼 수 있어요.","이벤트가 60종 넘게 생겼어요. 스토브리그·스프링캠프·시범경기·정규시즌마다 순위, 연봉, 선수 나이, 계약 기간, 시범경기 성적, 이전 선택에 따라 다른 장면이 열려요.","선수와의 약속: 베테랑에게 출전을, 유망주에게 콜업을, 간판에게 트레이드 불가를 약속할 수 있어요. 대시보드 \"약속\" 카드에 남은 경기와 진행이 보이고, 기한이 지나면 지켰는지에 따라 다음 장면이 이어져요.","이어지는 이벤트에는 \"지난 선택\"이 함께 보여요. 몇 주, 몇십 경기 뒤에 그때의 결정이 돌아와요.","팀 전술 → 투수 교체 타이밍에 \"직접 교체(중계)\"가 생겼어요. 중계를 보는 동안에는 투수코치가 교체를 권하고 멈출 뿐, 바꾸는 건 감독이 직접 해요. 130구를 넘기거나 다치면 코치가 바꿔요.","FA 규정: 두 번째 FA는 B등급, 세 번째부터는 C등급 보상이에요. 웨이버에서 아무도 데려가지 않은 선수는 그해 어느 구단과도 계약할 수 없어요."];
@@ -107,7 +107,7 @@
   // once per visitor per release: what this update brought, with the feedback button (returning players who already
   // got the feedback request still see this once)
   function askFeedback(tries) {
-    if (get(PLAN) === PLAN_ID) return;
+    if (get(PLAN) === PLAN_ID) { thanks(0); return; }
     if (document.querySelector('.modal-bg') || document.body.classList.contains('gate-on')) { if ((tries || 0) < 20) setTimeout(() => askFeedback((tries || 0) + 1), 1500); return; }
     set(PLAN, PLAN_ID); set(ASKED, ASK_ID); set(SEEN, NOTICES[0].id); dot();
     if (!RETURNING) return; // first visit: the coach's guide comes first, the notes stay in 공지사항
@@ -122,7 +122,24 @@
       <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="Info.askClose()">확인</button><button class="btn" onclick="Info.askOpen()">의견 보내기</button></div>`);
   }
   function askOpen() { if (window.Track) Track.action('askfb_open'); App.closeModal(); Feedback.open('plan-popup'); }
-  function askClose() { if (window.Track) Track.action('askfb_close'); App.closeModal(); }
-  window.Info = {notices, options, menu, closeMenu, page, setTrack, trackOn, dot, askFeedback, askOpen, askClose};
+  function askClose() { if (window.Track) Track.action('askfb_close'); App.closeModal(); setTimeout(() => thanks(0), 250); }
+  // once per visitor: a thank-you to the managers who keep playing, with the community milestone.
+  // it waits behind the gate and any open dialog (the update notes), so nothing is covered up
+  function thanks(tries) {
+    if (get(THANKS) === THANKS_ID) return;
+    if (document.querySelector('.modal-bg') || document.body.classList.contains('gate-on')) { if ((tries || 0) < 40) setTimeout(() => thanks((tries || 0) + 1), 1500); return; }
+    set(THANKS, THANKS_ID);
+    if (!RETURNING) return; // first visit: the coach's guide comes first
+    if (window.Track) Track.action('thanks_show');
+    show(`${X}<h2>감사합니다, 감독님 🎉</h2>
+      <div class="info-page"><p>계속해서 KBO 매니저를 이용해 주셔서 진심으로 감사합니다.</p>
+      <p>감독님들의 꾸준한 시즌 완주와 응원 덕분에 벌써 <b>420명이 넘는 감독님</b>이 함께하고 있습니다.</p>
+      <p>앞으로도 더 재미있는 구단 운영과 업데이트로 보답하겠습니다.</p>
+      <p class="hint">불편한 점이나 바라는 점은 언제든 들려주세요. 다음 업데이트에 반영할게요.</p></div>
+      <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="Info.thanksClose()">확인</button><button class="btn" onclick="Info.thanksOpen()">의견 보내기</button></div>`);
+  }
+  function thanksOpen() { if (window.Track) Track.action('thanks_fb'); App.closeModal(); Feedback.open('thanks-popup'); }
+  function thanksClose() { if (window.Track) Track.action('thanks_close'); App.closeModal(); }
+  window.Info = {notices, options, menu, closeMenu, page, setTrack, trackOn, dot, askFeedback, askOpen, askClose, thanks, thanksOpen, thanksClose};
   if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('DOMContentLoaded', dot);
 })();
