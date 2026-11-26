@@ -312,9 +312,10 @@ function radar(vals, labels, color){
 // pitcher profile: 보직 숙련도 bars, then the pitches he throws (and the one he's learning)
 function pitcherJobs(p){
   const bars=['SP','RP','CL'].map(j=>{ const v=K.roleSkill(p,j); return `<div class="job-row"><span>${JOB_L[j]}${j===p.role?' <small>주 보직</small>':''}${p.rt===j?' <small>훈련 중</small>':''}</span><div class="pt-bar"><i style="width:${v}%"></i></div><b>${v}%</b></div>`; }).join('');
+  const mine=!!findPlayer(USER,p.n), roleBtns=mine? `<div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0 2px"><span class="muted" style="align-self:center">보직 바꾸기</span>${['SP','RP','CL'].map(j=>`<button type="button" class="btn btn-sm${j===p.role?' primary':''}" ${j===p.role?'disabled':''} onclick="FM.setRole('${q(p.n)}','${j}')">${JOB_L[j]}</button>`).join('')}</div><p class="hint" style="margin:2px 0 8px">바꾸면 바로 그 보직으로 기용돼요. 익숙하지 않은 보직은 숙련도만큼 힘이 덜 나오고, 훈련으로 올라가요.</p>` : '';
   const rep=K.repertoire(p), pit=rep.map(t=>`<span class="pill pos">${t.k} <small>${Math.round(t.use*100)}%</small>${t.learned?' · 새로 익힘':''}</span>`).join(' ');
   const src=rep[0]&&rep[0].est? '실제 구종 자료가 없어 같은 손 투수의 흔한 조합으로 정했어요(추정).' : rep[0]&&rep[0].src==='m'? '구사율은 미국 무대 투구 추적 기록 기준이에요.' : '구사율은 중계·보도 기준 대략치예요.';
-  return `<div class="job-list">${bars}</div><div class="muted" style="font-weight:700;margin:14px 0 6px">보유 구종</div><div class="row" style="gap:4px;flex-wrap:wrap">${pit}${p.pq&&p.pq.k?` <span class="pill" style="background:var(--panel2);color:var(--dim)">연마 중: ${p.pq.k} ${p.pq.pct||0}%</span>`:''}</div><div class="hint" style="margin-top:6px">${src}</div>`; }
+  return `<div class="job-list">${bars}</div>${roleBtns}<div class="muted" style="font-weight:700;margin:14px 0 6px">보유 구종</div><div class="row" style="gap:4px;flex-wrap:wrap">${pit}${p.pq&&p.pq.k?` <span class="pill" style="background:var(--panel2);color:var(--dim)">연마 중: ${p.pq.k} ${p.pq.pct||0}%</span>`:''}</div><div class="hint" style="margin-top:6px">${src}</div>`; }
 function posStars(p){
   if(p.type!=='B') return pitcherJobs(p);
   return ['C','1B','2B','3B','SS','LF','CF','RF','DH'].map(x=>{

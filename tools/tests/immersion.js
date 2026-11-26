@@ -59,4 +59,16 @@ module.exports = ({assert,test}) => {
     h.FM.scoutSend('LG',p.n); assert.equal(h.state.fm.scout[p.n],1);
     h.FM.scoutSend('LG',p.n); assert.equal(h.state.fm.scout[p.n],1,'only one trip per week');
   });
+  test('보직 변경: label and depth chart change now, skill for the new job only through training; at least five starters stay', () => {
+    const h=new Runtime({observe:false}).start('KIA'), K=h.K, c=h.state.cfgs.KIA, r=K.ROSTERS.KIA;
+    const rp=r.pitchers.find(p=>p.role==='RP'&&p.n!==c.closer), before=K.roleSkill(rp,'SP');
+    h.FM.setRole(rp.n,'SP'); assert.equal(rp.role,'SP'); assert.equal(K.roleSkill(rp,'SP'),before,'no instant starter skill'); assert.equal(rp.rt,'SP','training toward the new job');
+    assert.ok(!c.bullpen.includes(rp.n));
+    const sp=r.pitchers.find(p=>p.role==='SP'&&c.rotation.includes(p.n)&&p!==rp); h.FM.setRole(sp.n,'RP');
+    assert.equal(sp.role,'RP'); assert.ok(!c.rotation.includes(sp.n),'left the rotation'); assert.equal(c.rotation.length,5);
+    const sps=()=>r.pitchers.filter(p=>p.role==='SP'); while(sps().length>5) sps()[0].role='RP';
+    const last=sps()[0]; h.FM.setRole(last.n,'RP'); assert.equal(last.role,'SP','blocked below five starters');
+    const oldCl=c.closer, nw=r.pitchers.find(p=>p.role==='RP'&&p.n!==oldCl); h.FM.setRole(nw.n,'CL');
+    assert.equal(c.closer,nw.n); assert.equal(r.pitchers.find(p=>p.n===oldCl).role,'RP');
+  });
 };

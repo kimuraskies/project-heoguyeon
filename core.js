@@ -755,7 +755,7 @@ function arsenal(pit){
 function repertoire(pit){ return arsenal(pit); }
 // 보직 숙련도 0..100: his own role is 100; training (p.rs) raises the others
 var ROLE_BASE={SP:{SP:100,RP:60,CL:50}, RP:{SP:45,RP:100,CL:70}, CL:{SP:40,RP:90,CL:100}};
-function roleSkill(p,job){ var own=ROLE_BASE[p.role]||ROLE_BASE.RP, v=p.rs&&p.rs[job]; return Math.max(own[job]||50, v||0); }
+function roleSkill(p,job){ var own=ROLE_BASE[p.skillRole||p.role]||ROLE_BASE.RP, v=p.rs&&p.rs[job]; return Math.max(own[job]||50, v||0); }
 function pickType(pit,random,balls,strikes,res,side,list){
   random=random||pitchRandom; var r=list||arsenal(pit), total=0;
   var weights=r.map(function(t){ var fast=t.code==='FF'||t.code==='SI'||t.code==='FC';

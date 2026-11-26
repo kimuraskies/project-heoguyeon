@@ -141,3 +141,23 @@ function rainoutCard(){ const r=state.rainout; if(!r||r.asked||state.phase!=='re
 ACTIONS.rainKeep=()=>{ const r=state.rainout, p=r&&findPlayer(USER,r.sp); if(p) p.cond=clampN(K.cond(p)+4,0,100); return josa(`${r?r.sp:'예정 선발'}이(가) 하루 더 쉬고 그대로 나갑니다.`); };
 ACTIONS.rainPull=()=>{ const n=window.App&&window.App.advanceRainoutRotation? window.App.advanceRainoutRotation() : false;
   return n? josa(`로테이션을 한 칸 당겼습니다. 다음 경기 선발은 ${n}이에요.`) : '지금은 로테이션을 바꿀 수 없습니다.'; };
+
+// ----- 보직 변경 (feedback 11/15): the manager moves a pitcher between 선발 · 중계 · 마무리 -----
+// The label and the depth chart change now; the skill for the new job grows through role training (p.rt), since
+// core.js roleSkill reads p.skillRole (the role he was built for) until training completes the new job.
+function setRole(n,j){ const p=findPlayer(USER,n), c=state.cfgs[USER], r=K.ROSTERS[USER]; if(!p||p.type==='B'||!JOB_L[j]||p.role===j) return;
+  if(p.role==='SP'&&j!=='SP'&&!isFarm(USER,p)&&r.pitchers.filter(x=>x.role==='SP').length<=5){ notify('1군 선발이 5명 아래로 줄어요. 다른 투수를 먼저 선발로 바꾸세요.'); return; }
+  const was=p.role; p.skillRole=p.skillRole||was; p.role=j;
+  if(K.roleSkill(p,j)<100){ p.rt=j; } else if(p.rt===j) p.rt=null;
+  const best=(ok)=>r.pitchers.filter(x=>x!==p&&!K.isInjured(x)&&ok(x)).sort((a,b)=>K.ovr(b)-K.ovr(a))[0];
+  if(c.rotation.includes(n)&&j!=='SP'){ const sub=best(x=>x.role==='SP'&&!c.rotation.includes(x.n)); if(sub) c.rotation[c.rotation.indexOf(n)]=sub.n; }
+  if(j==='CL'){ const old=findPlayer(USER,c.closer); if(old&&old!==p){ old.skillRole=old.skillRole||old.role; old.role='RP'; if((c.bullpen||[]).indexOf(old.n)<0) (c.bullpen=c.bullpen||[]).push(old.n); } c.closer=n; c.bullpen=(c.bullpen||[]).filter(x=>x!==n); }
+  else if(c.closer===n){ const nc=best(x=>x.role!=='SP'); if(nc){ c.closer=nc.n; c.bullpen=(c.bullpen||[]).filter(x=>x!==nc.n); } }
+  if(j==='RP'&&(c.bullpen||[]).indexOf(n)<0) (c.bullpen=c.bullpen||[]).push(n);
+  if(j==='SP') c.bullpen=(c.bullpen||[]).filter(x=>x!==n);
+  const down=was==='SP'||(was==='CL'&&j==='RP'), up=j==='SP'||j==='CL';
+  if(down&&!up){ addMor(p,-4); addTrust(p,-3,JOB_L[was]+'에서 '+JOB_L[j]+'(으)로 전환'); }
+  else if(up){ addMor(p,4); addTrust(p,3,JOB_L[j]+' 기회'); }
+  if(typeof repairCfg==='function') repairCfg(USER); saveNow();
+  notify(josa(`${n}을(를) ${JOB_L[j]}(으)로 바꿨어요.${K.roleSkill(p,j)<100?` 새 보직 숙련 ${Math.round(K.roleSkill(p,j))}% · 훈련으로 올라가요.`:''}${j==='SP'&&!c.rotation.includes(n)?' 로테이션에 넣으려면 라인업 탭에서 선발 칸을 바꾸세요.':''}`));
+  showProfile(USER,n); }

@@ -1621,8 +1621,9 @@ function renderLineup(){
   const rotPool=r.pitchers.filter(p=>p.n!==c.closer);
   const rotRows=c.rotation.map((n,i)=>{ const p=K.getP(USER,n);
     const warn = p && (p.role!=='SP' || p.sta<58) ? `<div style="color:var(--warn);font-size:12px">⚠️ ${p.role!=='SP'?'불펜 투수':'체력이 낮은 투수'} — 일찍 내려가 불펜 소모가 커집니다</div>` : '';
-    return `<tr><td>선발 ${i+1}</td>
-    <td class="name"><select onchange="App.setRotation(${i},this.value)">${pitOpts(n,rotPool)}</select></td>
+    const st=state.season[USER].pit[n], line=st&&st.G? `올해 ${st.GS||0}선발 ${st.W||0}승 ${st.L||0}패 · ERA ${fmtEra(st.ER,st.OUT)}` : '올해 기록 없음';
+    return `<tr><td style="white-space:nowrap">선발 ${i+1}</td>
+    <td class="name"><select onchange="App.setRotation(${i},this.value)">${pitOpts(n,rotPool)}</select><div class="rot-line">${line}</div></td>
     <td>${p?`구위${ratNum(p.stu)}/제구${ratNum(p.ctl)}/체력${ratNum(p.sta)} ${FM.statusInline(p)}`:''}${warn}</td></tr>`; }).join("");
 
   const allPit=r.pitchers;
@@ -1644,7 +1645,7 @@ function renderLineup(){
       <button class="btn" style="margin-top:10px" onclick="App.autoLineup()">${FM.icon('lineup')}코치 추천 라인업</button>
     </div>
     <div class="card lu-pit"><h3>선발 로테이션</h3>
-      <table><thead><tr><th>순번</th><th class="name">투수</th><th>능력</th></tr></thead><tbody>${rotRows}</tbody></table>
+      <table><thead><tr><th>순번</th><th class="name">투수 · 올해 성적</th><th>능력</th></tr></thead><tbody>${rotRows}</tbody></table>
       <h3 style="margin-top:18px">마무리 투수</h3>
       <div class="row">${closerSel}</div>
       ${bullpenList()}
