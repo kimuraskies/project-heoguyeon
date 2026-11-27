@@ -1780,7 +1780,7 @@ function canQuickStart(){
   if(state.phase!=='stove'&&!(state.phase==='spring'&&springNext())) return false;
   return f.firstYear!=null? f.firstYear===state.year : state.year===2026;
 }
-function quickBtn(){ return `<button class="btn gold" onclick="FM.quickStart()">${icon('play')}추천 준비로 개막전까지</button>`; }
+function quickBtn(cls){ return cls? `<button class="btn quick ${cls}" onclick="FM.quickStart()">추천 준비로 개막전까지</button>` : `<button class="btn gold quick" onclick="FM.quickStart()">${icon('play')}추천 준비로 개막전까지</button>`; }
 function quickStart(){
   const f=fm();
   if(window.Track) Track.action('quick_start');
@@ -4333,7 +4333,7 @@ const GUIDE=[
   {sel:'#tabs button[onclick*="mail"]', t:'구단 소식과 결정할 일은 <b>받은편지함</b>에 모입니다. 급하지 않아요. 기한이 지나면 제가 기본값으로 처리합니다.'},
   {sel:'#tabs button[onclick*="players"]', t:'타순과 로테이션은 제가 <b>이미 짜 뒀습니다</b>. 바꾸고 싶을 때만 선수단 → 라인업 탭을 보세요.'},
   {shots:true, t:'경기가 시작되면 <b>중계 화면 아래 버튼</b>으로 직접 지시합니다. 실제 화면을 미리 보여 드릴게요.'},
-  {sel:'.hero-more .gold', dash:true, skip:()=>!canQuickStart(), t:'준비 과정이 번거로우면 <b>추천 준비로 개막전까지</b>를 누르세요. 캠프와 시범경기를 제가 맡고 바로 개막전으로 모시겠습니다.'},
+  {sel:'.hero-more .quick', dash:true, skip:()=>!canQuickStart(), t:'준비는 감독님이 직접 하시는 게 기본입니다. 번거로우면 아래 버튼으로 넘어가도 돼요. <b>수석코치에게 맡기면</b> 세 가지만 정하고 시범 1차전으로, <b>추천 준비로 개막전까지</b>를 누르면 바로 개막전으로 모시겠습니다.'},
   {relay:true, t:'경기가 시작됐습니다. 위쪽 버튼으로 <b>재생·정지·끝까지</b>를, 대타·투수 교체·작전은 그 옆 메뉴에서 지시하세요. 바쁘면 끝까지를 눌러도 됩니다.'}
 ];
 function guideRender(){
@@ -4382,6 +4382,11 @@ function returnCard(){
 
 // ---------- UI: dashboard (design pass 1: hero → decisions → reference panels) ----------
 // Decisions the manager owes right now, most urgent first. Each: {ic, t, d, a, go}
+// the one thing the main button should open right now: an unanswered message first (press questions, contracts), then this week's decision
+function nowTask(){ const L=dashTasks(), m=L.find(x=>/openMsg/.test(x.go))||L[0];
+  if(!m) return {t:offHero().title, a:offHero().cta, go:'FM.offOpen()'};
+  const short=/기자회견/.test(m.t)?'기자회견 답하기':/openMsg/.test(m.go)?(m.a==='검토'?'답하기':m.a):m.a;
+  return {t:m.t, a:short, go:m.go}; }
 function dashTasks(){
   ensure();
   const f=fm(), out=[], c=state.cfgs[USER];
@@ -5170,7 +5175,7 @@ function farmView(){
     <div style="overflow-x:auto"><table class="stat-table"><caption>2군 투수</caption><thead><tr><th>선수</th><th>보직</th><th>나이</th><th>OVR</th><th>잠재력</th><th>컨디션</th><th>사기</th><th>G</th><th>IP</th><th>ERA</th><th>SO</th><th>BB</th><th></th></tr></thead><tbody>${ps.map(pRow).join('')}</tbody></table></div>`;
 }
 
-window.FM={ setRole, rainoutCard, springTestCard, scoutSend, militaryTick, parkOf, leaderTag, leaders, leadPick, guideShot, coachPrep, prepSet, prepGo, canCoachPrep, springTestNote, evtPromises, promiseCard, fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
+window.FM={ nowTask, setRole, rainoutCard, springTestCard, scoutSend, militaryTick, parkOf, leaderTag, leaders, leadPick, guideShot, coachPrep, prepSet, prepGo, canCoachPrep, springTestNote, evtPromises, promiseCard, fanCard, contractsCard, scoutRoom, faOffer, faSetYears, faBid, faWithdraw, compToggle, compSubmit, compTake, faLeft, capOf, capPay, setPlanFromReport, setJobTrain, setPitchTrain, fxCard, fxCount, fxLabel, gate, gateCta, setPosTrain, coachMove, offOpen, offChoose, offAuto, offHero, offRoster, offPick, offConfirm, offHasBattles, showAwards, coachInterview, coachAnswer, staffCard:staffBoard, briefingCard, setPlan, applyPlanRec, saberTeam, setSaberSort, restOne, canQuickStart, quickBtn, quickStart, resultHTML, setupMore, guideRender, guideNext, guideSkip, noteReturn, dismissReturn, returnCard, notify, ask, answer, esc, applyTheme, teamPitch, fans, fansLabel, delegPicker, setDeleg, inboxCounts, coachPicker, hireCoach, staffOf, showSetup, setupPick, setupBg, setupName, setupPhoto, setupStart, mgrAvatar, readPhoto, mgrBg, onCareerStart, ensure, prepareCfg, afterGame, previewNote, onSeasonEnd, maybeShowFired, offseasonMoves, onNewSeason, confirmNextSeason,
   tradeValue, packageValue, tradeVerdict, tradeLog, teamMode, aiTradeTick, clubTradeBudget, playerValue:p=>playerValue(p), tradeBudget, tradeCheck, doTrade, payroll, calDate, dateLabel, tradeWindow, tradeTag, draftState, draftDone, draftOnClock, openDraft, showDraft, draftPick, draftAuto, draftView, famOf, execOf, execTable, buyIn, knowOf, activePlans, tfState, snap, capPot, renderInbox, renderClub, dashCards, lineupCard, statusCells, statusInline, attrNum, tabBadge,
   sprayTake, tradeHistoryCard, setTradeHist, tradeReact, tradeGrade, showProfile, closeProfile, refreshProfile, renderTacticsTab, openMsg, markAllRead, setInboxFilter, act, teamMeeting, meeting, talk, toggleRest, toggleList, setAutoRest, releasePlayer,
   newCareer, lastChance, aiTactics, tacName, tacLabel, setTac, tacticsCard, preseasonCard, preseasonControls, campPicker, setCamp, startSpring,

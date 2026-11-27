@@ -275,7 +275,7 @@ function canQuickStart(){
   if(state.phase!=='stove'&&!(state.phase==='spring'&&springNext())) return false;
   return f.firstYear!=null? f.firstYear===state.year : state.year===2026;
 }
-function quickBtn(){ return `<button class="btn gold" onclick="FM.quickStart()">${icon('play')}추천 준비로 개막전까지</button>`; }
+function quickBtn(cls){ return cls? `<button class="btn quick ${cls}" onclick="FM.quickStart()">추천 준비로 개막전까지</button>` : `<button class="btn gold quick" onclick="FM.quickStart()">${icon('play')}추천 준비로 개막전까지</button>`; }
 function quickStart(){
   const f=fm();
   if(window.Track) Track.action('quick_start');

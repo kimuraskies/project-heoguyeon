@@ -71,4 +71,18 @@ module.exports = ({assert,test}) => {
     const oldCl=c.closer, nw=r.pitchers.find(p=>p.role==='RP'&&p.n!==oldCl); h.FM.setRole(nw.n,'CL');
     assert.equal(c.closer,nw.n); assert.equal(r.pitchers.find(p=>p.n===oldCl).role,'RP');
   });
+  test('시리즈 빠르게: plays only the current series; a rained-out game moves later and the run still stops at the series end', () => {
+    const h=new Runtime({observe:false}).start('KIA'); h.FM.quickStart();
+    const out=h.eval(`(()=>{ const ug=()=>state.schedule.filter(g=>g.home===USER||g.away===USER), res=[];
+      advanceSeries(); // past the 2-game opening series
+      const c=curSeries(), before=ug().filter(g=>g.played).length; let rained=null;
+      const real=checkRain; checkRain=function(i){ const g=state.schedule[i];
+        if(!rained&&(g.home===USER||g.away===USER)&&g.ser===2&&!g.played){ rained=g; state.schedule.splice(i,1); g.originalDay=g.day; g.day=state.schedule[state.schedule.length-1].day+1; state.schedule.push(g); return true; }
+        return real(i); };
+      advanceSeries(); checkRain=real;
+      const nx=ug().find(g=>!g.played&&g!==rained);
+      return {len:c.len, played:ug().filter(g=>g.played).length-before, rainedLater:!!rained&&!rained.played, nextSer:nx.ser, nextNew:!(nx.home===c.home&&nx.away===c.away&&nx.day<=c.end)}; })()`);
+    assert.equal(out.len,3); assert.ok(out.rainedLater,'the rained-out game waits for its makeup date');
+    assert.equal(out.played,2,'two games of the 3-game series, nothing from the next series'); assert.equal(out.nextSer,1); assert.ok(out.nextNew);
+  });
 };

@@ -521,6 +521,31 @@ function advanceUserGames(n){
   if(state.gameIdx>=state.schedule.length) endRegularSeason();
   render();
 }
+// the series the next user game belongs to: same home/away, original days start..end. A makeup game is a series of its own.
+function curSeries(){
+  const g=state.schedule.find(x=>!x.played&&(x.home===USER||x.away===USER)); if(!g) return null;
+  if(g.originalDay!=null) return {home:g.home,away:g.away,end:g.day,len:1};
+  const start=g.day-(g.ser-1), end=start+(g.serLen||1)-1;
+  return {home:g.home,away:g.away,end,len:g.serLen||1};
+}
+// button label: "3연전 빠르게" at the start of a series, "남은 2경기 빠르게" midway
+function seriesLabel(){ const c=curSeries(), n=seriesLeft(); return !c? '시리즈 빠르게' : n===c.len&&c.len>1? `${c.len}연전 빠르게` : `남은 ${n}경기 빠르게`; }
+function seriesLeft(){ const c=curSeries(); if(!c) return 0;
+  return state.schedule.filter(x=>!x.played&&x.home===c.home&&x.away===c.away&&x.day<=c.end).length; }
+// play out the current series only. A rained-out game moves to a later date and is not made up now: the run still stops at the end of this series.
+function advanceSeries(){
+  if(state.liveMatch)return Match.resume(true);
+  const c=curSeries(); if(!c||state.phase!=="regular") return render();
+  state.pendingGame=null; state.matchTac=null; closeModal();
+  while(state.gameIdx<state.schedule.length&&state.phase==="regular"){
+    const g=state.schedule[state.gameIdx], isUser=(g.home===USER||g.away===USER);
+    if(isUser&&!(g.home===c.home&&g.away===c.away&&g.day<=c.end)) break;
+    if(checkRain(state.gameIdx)) continue;
+    playGame(state.gameIdx,false); state.gameIdx++;
+  }
+  if(state.gameIdx>=state.schedule.length) endRegularSeason();
+  render();
+}
 function simRestOfSeason(){
   if(state.liveMatch)return Match.resume(true);
   state.pendingGame=null; closeModal();
@@ -1358,9 +1383,9 @@ function heroInfo(rank){
     return {eyebrow:`${state.year} SEASON / PREPARATION`, title:oh.title,
       sub:`스토브리그 ${oh.weeks}주 → 스프링캠프 4주 → 시범경기 ${FM.SPRING_GAMES}경기 → 개막`, m:null, tbd:"시범경기",
       starters:`<p>다음 경기 · 시범경기</p><strong>선발 미정 <span class="muted">vs</span> 선발 미정</strong><p>캠프를 마치면 시범경기 대진이 정해집니다.</p>`,
-      cta: FM.canCoachPrep()? `<button class="btn primary hero-cta" onclick="FM.coachPrep()">${I('play')}수석코치와 준비 → 시범 1차전</button>` : `<button class="btn primary hero-cta" onclick="FM.offOpen()">${I('play')}${oh.cta}</button>`,
-      hint: FM.canCoachPrep()? '세 가지만 정하면 나머지는 수석코치가 맡고 바로 시범 1차전으로 가요. 직접 하나하나 정하려면 아래 "직접 준비하기"를 누르세요.' : oh.hint,
-      more:(FM.canCoachPrep()?`<button class="btn" onclick="FM.offOpen()">직접 준비하기 · ${oh.title}</button>`:'')+(FM.canQuickStart()?FM.quickBtn():'')+(oh.auto&&!FM.canCoachPrep()?`<button class="btn" onclick="FM.offAuto()">단장에게 맡기기</button>`:'')};
+      cta: (nt=>`<button class="btn primary hero-cta" onclick="${nt.go}">${I('play')}${nt.a}</button>`)(FM.nowTask()),
+      hint: `지금 할 일: ${FM.esc(FM.nowTask().t)}`,
+      more:(FM.canCoachPrep()?`<button class="btn hero-alt" onclick="FM.coachPrep()">수석코치에게 맡기고 시범 1차전으로</button>${FM.quickBtn('hero-alt')}`:(FM.canQuickStart()?FM.quickBtn():''))+(oh.auto&&!FM.canCoachPrep()?`<button class="btn" onclick="FM.offAuto()">단장에게 맡기기</button>`:'')};
   }
   if(ph==="spring"){
     const n=FM.springNext(), sp=state.spring;
@@ -1383,8 +1408,7 @@ function heroInfo(rank){
       sub:`${FM.dateLabel(FM.calDate(next.day))} · ${played+1}번째 경기${next.serLen?` · ${next.serLen}연전 ${next.ser}차전`:""} · 남은 ${SEASON_GAMES-played}경기${played?` · 현재 ${rank}위`:''}`, m:{home:next.home,away:next.away,label:'정규시즌'},
       progress:Math.round(played/SEASON_GAMES*100),
       cta:`<button class="btn primary hero-cta" onclick="App.nextGame()">${I('play')}경기 준비</button>`,
-      more:`<button class="btn" onclick="App.userGames(5)">${I('fast-forward')}5경기 빠르게</button>
-        <button class="btn" onclick="App.userGames(20)">${I('fast-forward')}20경기</button>
+      more:`<button class="btn" onclick="App.series()">${I('fast-forward')}${seriesLabel()}</button>
         <button class="btn" onclick="App.simRest()">${I('skip')}시즌 끝까지</button>`};
   }
   if(ph==="postseason"){
@@ -1669,8 +1693,7 @@ function renderSched(){
   }).join("");
   const ctrl = state.phase==="regular"?`<div class="row" style="margin-bottom:12px">
     <button class="btn primary" onclick="App.nextGame()">▶ 다음 경기</button>
-    <button class="btn" onclick="App.userGames(5)">5경기</button>
-    <button class="btn" onclick="App.userGames(20)">20경기</button>
+    <button class="btn" onclick="App.series()">${seriesLabel()}</button>
     <button class="btn" onclick="App.simRest()">시즌 끝까지</button></div>`:'';
   return `<div class="card"><h3>${K.ROSTERS[USER].name} 일정 <span class="tag">144경기</span></h3>${ctrl}
     <div style="max-height:620px;overflow:auto">
@@ -2031,6 +2054,7 @@ const App={
   cancelPreview:()=>{ closeModal(); closePreview(); },
   takeJob:(t)=>FM.takeJob(t),
   player:(t,n)=>FM.showProfile(t,n),
+  series:()=>{ if(window.Track) Track.action('sim_series'); advanceSeries(); },
   userGames:(n)=>{ if(window.Track) Track.action('sim_'+n); advanceUserGames(n); },
   simRest:()=>FM.ask('남은 정규시즌을 모두 시뮬레이션합니다.', '시즌 끝까지 진행', simRestOfSeason),
   // moving a hitter within the order keeps his position; a bench player takes over the slot's position
